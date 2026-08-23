@@ -21,6 +21,8 @@ export default function App() {
   const [selectedCellIndex, setSelectedCellIndex] = useState<number | null>(null);
   const [monopolySortMode, setMonopolySortMode] = useState<'DEFAULT' | 'PERCENTAGE' | 'ROYALTIES' | 'ALPHABETICAL'>('DEFAULT');
   const [showActionModal, setShowActionModal] = useState(false);
+  const [boardZoom, setBoardZoom] = useState(1.0);
+
 
 
 
@@ -314,10 +316,53 @@ export default function App() {
 
           
           {/* Plateau 2D à Gauche (Prend 3 colonnes sur LG) */}
-          <div className="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center justify-center overflow-auto">
+          <div className="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center justify-center overflow-auto relative min-h-[600px]">
             
-            {/* Grille du plateau 11x11 */}
-            <div className="grid grid-cols-11 grid-rows-11 gap-0.5 w-[880px] h-[880px] relative text-slate-100 font-sans">
+            {/* Zoom Controls Overlay */}
+            <div className="absolute top-4 right-4 z-30 bg-slate-950/85 backdrop-blur-sm border border-slate-800 p-1.5 rounded-lg flex items-center gap-2 shadow-lg select-none">
+              <span className="text-[10px] text-slate-400 font-bold px-1.5 uppercase tracking-wider">Plateau :</span>
+              <button
+                onClick={() => setBoardZoom(prev => Math.max(0.6, parseFloat((prev - 0.1).toFixed(1))))}
+                className="w-7 h-7 bg-slate-800 hover:bg-slate-750 active:bg-slate-700 text-slate-100 rounded flex items-center justify-center font-black text-xs transition"
+                title="Zoomer arrière"
+              >
+                ➖
+              </button>
+              <span className="text-xs font-mono font-bold text-amber-400 min-w-[40px] text-center">
+                {Math.round(boardZoom * 100)}%
+              </span>
+              <button
+                onClick={() => setBoardZoom(prev => Math.min(2.0, parseFloat((prev + 0.1).toFixed(1))))}
+                className="w-7 h-7 bg-slate-800 hover:bg-slate-750 active:bg-slate-700 text-slate-100 rounded flex items-center justify-center font-black text-xs transition"
+                title="Zoomer avant"
+              >
+                ➕
+              </button>
+              <button
+                onClick={() => setBoardZoom(1.0)}
+                className="text-[9px] bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-white px-2 py-1 rounded font-bold border border-slate-800 transition"
+                title="Rétablir zoom à 100%"
+              >
+                Réinit
+              </button>
+            </div>
+
+            {/* Wrapper pour calculer les dimensions réelles après zoom et permettre le défilement (scroll) */}
+            <div 
+              style={{ width: `${880 * boardZoom}px`, height: `${880 * boardZoom}px` }} 
+              className="relative flex items-center justify-center overflow-hidden flex-none"
+            >
+              {/* Grille du plateau 11x11 */}
+              <div 
+                style={{
+                  transform: `scale(${boardZoom})`,
+                  transformOrigin: 'center center',
+                  width: '880px',
+                  height: '880px'
+                }}
+                className="grid grid-cols-11 grid-rows-11 gap-0.5 absolute text-slate-100 font-sans transition-transform duration-350 ease-out"
+              >
+
 
               
               {/* Rendu des 78 cases du plateau spiralé */}
@@ -704,6 +749,8 @@ export default function App() {
 
             </div>
           </div>
+        </div>
+
 
 
           {/* Fiches Joueurs à Droite (Prend 1 colonne sur LG) */}
