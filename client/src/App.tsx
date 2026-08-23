@@ -1062,7 +1062,7 @@ export default function App() {
       {/* Rendu d'une carte de fin de partie en plein écran si le jeu est terminé */}
       {gameState.status === 'FINISHED' && (
         <div className="fixed inset-0 bg-slate-950/90 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-slate-900 border-2 border-emerald-500/30 rounded-2xl p-8 w-full max-w-md shadow-2xl text-center space-y-6">
+          <div className="bg-slate-900 border-2 border-emerald-500/30 rounded-2xl p-8 w-full max-w-2xl shadow-2xl text-center space-y-6">
             <span className="text-5xl animate-bounce block">🏆</span>
             <div className="space-y-2">
               <h2 className="text-2xl font-black text-emerald-400 uppercase tracking-wider">
@@ -1073,12 +1073,187 @@ export default function App() {
               </p>
             </div>
 
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
-              <span className="text-xs text-slate-500 uppercase font-semibold block">Vainqueur</span>
-              <span className="text-lg font-bold text-white">
-                {gameState.players.find(p => !p.isBankrupt)?.username || 'Inconnu'}
-              </span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Carte du Vainqueur */}
+              <div className="md:col-span-1 bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col justify-center items-center space-y-1">
+                <span className="text-xs text-slate-500 uppercase font-semibold block">Vainqueur</span>
+                <span className="text-lg font-bold text-white uppercase tracking-wider">
+                  {gameState.players.find(p => !p.isBankrupt)?.username || 'Inconnu'}
+                </span>
+                <span className="text-[10px] text-emerald-400 font-mono font-bold mt-1">
+                  {(gameState.players.find(p => !p.isBankrupt)?.cash ?? 0).toLocaleString()} F
+                </span>
+              </div>
+
+              {/* Classement général final */}
+              <div className="md:col-span-2 bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-left">
+                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider block border-b border-slate-800 pb-1">
+                  Classement final
+                </span>
+                <div className="space-y-1.5 pt-1">
+                  {gameState.players
+                    .slice()
+                    .sort((a, b) => b.cash - a.cash)
+                    .map((p, idx) => (
+                      <div key={p.id} className="flex justify-between items-center text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-slate-500 font-bold">#{idx + 1}</span>
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
+                          <span className="font-bold text-slate-350">{p.username}</span>
+                        </div>
+                        <span className="font-mono font-bold text-slate-100">
+                          {p.isBankrupt ? 'FAILLITE' : `${p.cash.toLocaleString()} F`}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
             </div>
+
+            {/* Graphique d'historique de l'argent des joueurs */}
+            {(() => {
+              // Récupérer l'historique le plus long
+              const maxHistoryLength = Math.max(...gameState.players.map(p => p.cashHistory?.length || 0), 0);
+              if (maxHistoryLength < 2) {
+                return (
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs text-slate-500 italic">
+                    Pas assez de tours joués pour afficher le graphique d'évolution.
+                  </div>
+                );
+              }
+
+              // Trouver la valeur max de cash atteinte pour l'échelle Y
+              let maxCashEver = 20000000;
+              gameState.players.forEach(p => {
+                p.cashHistory?.forEach(val => {
+                  if (val > maxCashEver) maxCashEver = val;
+                });
+              });
+
+              // Dimensions de l'SVG
+              const svgW = 500;
+              const svgH = 200;
+              const padLeft = 60;
+              const padRight = 20;
+              const padTop = 15;
+              const padBottom = 25;
+
+              const getX = (index: number) => {
+                return padLeft + (index / (maxHistoryLength - 1)) * (svgW - padLeft - padRight);
+              };
+
+              const getY = (cash: number) => {
+                return padTop + (1 - cash / maxCashEver) * (svgH - padTop - padBottom);
+              };
+
+              // Paliers Y pour le quadrillage (5 lignes : 0, 25%, 50%, 75%, 100%)
+              const gridYValues = [0, 0.25, 0.5, 0.75, 1].map(k => k * maxCashEver);
+
+              return (
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 text-left">
+                  <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider block border-b border-slate-800 pb-1.5">
+                    Graphique d'évolution des fortunes (par tour)
+                  </span>
+                  
+                  <div className="relative">
+                    <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full h-auto text-slate-400">
+                      {/* Quadrillage Horizontal */}
+                      {gridYValues.map((val, idx) => {
+                        const y = getY(val);
+                        return (
+                          <g key={idx} className="opacity-30">
+                            <line
+                              x1={padLeft}
+                              y1={y}
+                              x2={svgW - padRight}
+                              y2={y}
+                              stroke="#475569"
+                              strokeWidth="0.5"
+                              strokeDasharray="4 4"
+                            />
+                            <text
+                              x={padLeft - 8}
+                              y={y + 3}
+                              textAnchor="end"
+                              className="fill-slate-400 text-[8px] font-mono"
+                            >
+                              {(val / 1000000).toFixed(1)}M F
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {/* Ligne verticale de fin */}
+                      <line
+                        x1={padLeft}
+                        y1={padTop}
+                        x2={padLeft}
+                        y2={svgH - padBottom}
+                        stroke="#475569"
+                        strokeWidth="1"
+                        className="opacity-50"
+                      />
+                      <line
+                        x1={padLeft}
+                        y1={svgH - padBottom}
+                        x2={svgW - padRight}
+                        y2={svgH - padBottom}
+                        stroke="#475569"
+                        strokeWidth="1"
+                        className="opacity-50"
+                      />
+
+                      {/* Label axe X */}
+                      <text
+                        x={padLeft + (svgW - padLeft - padRight) / 2}
+                        y={svgH - 4}
+                        textAnchor="middle"
+                        className="fill-slate-500 text-[8px] font-bold uppercase tracking-wider"
+                      >
+                        Progression des Tours (Passez sur les points pour les détails)
+                      </text>
+
+                      {/* Courbes des Joueurs */}
+                      {gameState.players.map((p) => {
+                        if (!p.cashHistory || p.cashHistory.length === 0) return null;
+                        const points = p.cashHistory.map((val, idx) => `${getX(idx)},${getY(val)}`).join(' ');
+
+                        return (
+                          <g key={p.id}>
+                            <polyline
+                              points={points}
+                              fill="none"
+                              stroke={p.color}
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="opacity-80 hover:opacity-100 transition-opacity"
+                            />
+                            {/* Points interactifs */}
+                            {p.cashHistory.map((val, idx) => (
+                              <circle
+                                key={idx}
+                                cx={getX(idx)}
+                                cy={getY(val)}
+                                r="3.5"
+                                fill={p.color}
+                                stroke="#020617"
+                                strokeWidth="1"
+                                className="cursor-pointer hover:scale-125 transition-transform origin-center"
+                              >
+                                <title>
+                                  {p.username} : {val.toLocaleString()} F (Tour {idx + 1})
+                                </title>
+                              </circle>
+                            ))}
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  </div>
+                </div>
+              );
+            })()}
 
             <button
               onClick={() => {
@@ -1091,6 +1266,7 @@ export default function App() {
           </div>
         </div>
       )}
+
         </>
       )}
     </div>

@@ -61,7 +61,8 @@ class GameEngine {
             isBankrupt: false,
             color,
             lapsCompleted: 0,
-            hasJokerCard: false
+            hasJokerCard: false,
+            cashHistory: []
         };
         this.state.players.push(newPlayer);
         this.state.log.push(`${username} a rejoint la partie.`);
@@ -77,6 +78,7 @@ class GameEngine {
         const startingCash = Math.floor(200000000 / nbPlayers);
         this.state.players.forEach(p => {
             p.cash = startingCash;
+            p.cashHistory = [startingCash];
         });
         // --- Placement Aléatoire des 48 plaquettes Royalties ---
         // Il y a 48 plaquettes : 2 de chaque sorte pour les 24 ressources
@@ -418,6 +420,11 @@ class GameEngine {
         return true;
     }
     nextTurn() {
+        this.state.players.forEach(p => {
+            if (!p.cashHistory)
+                p.cashHistory = [];
+            p.cashHistory.push(p.cash);
+        });
         this.state.lastDiceRoll = null;
         let nextIndex = this.state.currentPlayerIndex;
         let loopCount = 0;
@@ -472,6 +479,7 @@ class GameEngine {
             p.isBankrupt = false;
             p.lapsCompleted = 0;
             p.hasJokerCard = false;
+            p.cashHistory = [];
         });
         this.state.titles = JSON.parse(JSON.stringify(board_1.INITIAL_TITLES));
         return true;

@@ -71,7 +71,9 @@ export interface Player {
   color: string;
   lapsCompleted: number;
   hasJokerCard: boolean;
+  cashHistory: number[];
 }
+
 
 export interface GameCard {
   id: string;
