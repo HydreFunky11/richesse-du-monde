@@ -36,7 +36,8 @@ class GameEngine {
             turnNumber: 1,
             lastDiceRoll: null,
             log: ['Partie créée. En attente de joueurs.'],
-            auction: null
+            auction: null,
+            purchasesThisTurn: 0
         };
     }
     getStatus() {
@@ -208,6 +209,10 @@ class GameEngine {
             return false;
         if (this.state.status !== 'PLAYING')
             return false;
+        if (this.state.purchasesThisTurn >= 6) {
+            this.state.log.push(`⚠️ ${currentPlayer.username} ne peut plus acheter de titres : limite de 6 achats par tour atteinte.`);
+            return false;
+        }
         const cell = this.state.board[currentPlayer.position];
         const title = this.state.titles[titleId];
         if (!title || title.ownerId !== null || currentPlayer.cash < title.purchasePrice)
@@ -216,7 +221,8 @@ class GameEngine {
         if (cell.type === 'RICHESSE' && cell.titleIds?.includes(titleId)) {
             currentPlayer.cash -= title.purchasePrice;
             title.ownerId = currentPlayer.id;
-            this.state.log.push(`${currentPlayer.username} a acheté le titre de ${title.country} (${board_1.RESOURCE_DEFINITIONS[title.resourceType].name}) pour ${title.purchasePrice.toLocaleString()} F.`);
+            this.state.purchasesThisTurn++;
+            this.state.log.push(`${currentPlayer.username} a acheté le titre de ${title.country} (${board_1.RESOURCE_DEFINITIONS[title.resourceType].name}) pour ${title.purchasePrice.toLocaleString()} F (${this.state.purchasesThisTurn}/6).`);
             return true;
         }
         // Achat via CHOIX_CONTINENTAL ou CHOIX_MONDIAL
@@ -239,7 +245,8 @@ class GameEngine {
             }
             currentPlayer.cash -= title.purchasePrice;
             title.ownerId = currentPlayer.id;
-            this.state.log.push(`${currentPlayer.username} a acheté ${title.country} (${board_1.RESOURCE_DEFINITIONS[title.resourceType].name}) via la case ${cell.name} pour ${title.purchasePrice.toLocaleString()} F.`);
+            this.state.purchasesThisTurn++;
+            this.state.log.push(`${currentPlayer.username} a acheté ${title.country} (${board_1.RESOURCE_DEFINITIONS[title.resourceType].name}) via la case ${cell.name} pour ${title.purchasePrice.toLocaleString()} F (${this.state.purchasesThisTurn}/6).`);
             return true;
         }
         return false;
@@ -426,6 +433,7 @@ class GameEngine {
             p.cashHistory.push(p.cash);
         });
         this.state.lastDiceRoll = null;
+        this.state.purchasesThisTurn = 0;
         let nextIndex = this.state.currentPlayerIndex;
         let loopCount = 0;
         do {
@@ -473,6 +481,7 @@ class GameEngine {
         this.state.lastDiceRoll = null;
         this.state.auction = null;
         this.state.log = ['La partie a été réinitialisée. En attente du lancement.'];
+        this.state.purchasesThisTurn = 0;
         this.state.players.forEach(p => {
             p.cash = 0;
             p.position = 0;

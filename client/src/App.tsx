@@ -949,11 +949,23 @@ export default function App() {
                 <p className="text-slate-400 text-[11px] pb-1">
                   Vous avez atterri sur cette case. Choisissez votre action :
                 </p>
-                {/* Affichage de l'argent du joueur dans le pop-up */}
-                <div className="inline-block bg-slate-800 border border-slate-700/80 px-4 py-1 rounded-full text-xs font-bold shadow-inner">
-                  Votre Fortune : <span className="text-amber-400 font-mono font-extrabold">{(me?.cash ?? 0).toLocaleString()} F</span>
+                {/* Affichage de l'argent et compteur d'achats dans le pop-up */}
+                <div className="flex justify-center gap-2 items-center mt-1.5 flex-wrap">
+                  <div className="bg-slate-800 border border-slate-700/80 px-4 py-1 rounded-full text-xs font-bold shadow-inner">
+                    Votre Fortune : <span className="text-amber-400 font-mono font-extrabold">{(me?.cash ?? 0).toLocaleString()} F</span>
+                  </div>
+                  <div className="bg-slate-800 border border-slate-700/80 px-4 py-1 rounded-full text-xs font-bold shadow-inner text-slate-350">
+                    Achats ce tour : <span className={`font-mono font-extrabold ${gameState.purchasesThisTurn >= 6 ? 'text-red-400' : 'text-slate-200'}`}>{gameState.purchasesThisTurn}/6</span>
+                  </div>
                 </div>
+
+                {gameState.purchasesThisTurn >= 6 && (
+                  <div className="bg-red-950/45 border border-red-900/50 text-red-400 p-2.5 rounded-lg text-[10px] font-bold text-center mt-2 animate-pulse">
+                    ⚠️ Limite de 6 achats par tour atteinte ! Vous ne pouvez plus acheter de titres ce tour-ci.
+                  </div>
+                )}
               </div>
+
 
 
               {/* Section Achat Richesse */}
@@ -989,11 +1001,12 @@ export default function App() {
                           </div>
                           <button
                             onClick={() => handleBuyTitle(t.id)}
-                            disabled={(me?.cash ?? 0) < t.purchasePrice}
+                            disabled={(me?.cash ?? 0) < t.purchasePrice || gameState.purchasesThisTurn >= 6}
                             className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-800 text-white font-bold py-1.5 px-3 rounded text-[11px] transition shadow ml-2"
                           >
                             Acheter
                           </button>
+
                         </div>
                       );
                     })}
@@ -1034,11 +1047,12 @@ export default function App() {
                           </div>
                           <button
                             onClick={() => handleBuyTitle(t.id)}
-                            disabled={(me?.cash ?? 0) < t.purchasePrice}
+                            disabled={(me?.cash ?? 0) < t.purchasePrice || gameState.purchasesThisTurn >= 6}
                             className="bg-teal-600 hover:bg-teal-700 disabled:bg-slate-800 text-white font-bold py-1.5 px-3 rounded text-[11px] transition ml-2"
                           >
                             Acheter
                           </button>
+
                         </div>
                       );
                     })}

@@ -103,7 +103,9 @@ export interface GameState {
   lastDiceRoll: [number, number] | null;
   log: string[];
   auction: AuctionState | null; // État de l'enchère si status === 'AUCTION'
+  purchasesThisTurn: number;
 }
+
 export type GameCardEvent = {
   text: string;
   amount: number;
