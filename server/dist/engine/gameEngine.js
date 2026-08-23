@@ -422,6 +422,14 @@ class GameEngine {
             return false;
         if (this.state.status !== 'PLAYING')
             return false;
+        // Empêcher de passer son tour sans vendre si on est sur la case Enchères et qu'on possède des titres
+        const cell = this.state.board[currentPlayer.position];
+        if (cell.type === 'ENCHERES') {
+            const hasTitles = Object.values(this.state.titles).some(t => t.ownerId === currentPlayer.id);
+            if (hasTitles) {
+                return false;
+            }
+        }
         this.state.log.push(`${currentPlayer.username} termine son tour.`);
         this.nextTurn();
         return true;

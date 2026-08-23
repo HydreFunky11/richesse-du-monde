@@ -714,10 +714,12 @@ export default function App() {
                                     )}
                                     <button
                                       onClick={handlePassTurn}
-                                      className="w-full bg-slate-800 hover:bg-slate-750 text-white font-bold py-2 rounded-lg border border-slate-700 text-xs transition"
+                                      disabled={cell.type === 'ENCHERES' && Object.values(gameState.titles).some(t => t.ownerId === me?.id)}
+                                      className="w-full bg-slate-800 hover:bg-slate-750 disabled:bg-slate-900 disabled:text-slate-550 disabled:border-slate-850 text-white font-bold py-2 rounded-lg border border-slate-700 text-xs transition"
                                     >
                                       Terminer mon tour ➡️
                                     </button>
+
                                   </div>
                                 );
                               })()}
@@ -1134,13 +1136,20 @@ export default function App() {
 
               {/* Bouton de Fermeture / Passage de Tour */}
               <div className="border-t border-slate-800 pt-3">
-                <button
-                  onClick={handlePassTurn}
-                  className="w-full bg-slate-800 hover:bg-slate-750 text-slate-200 font-bold py-1.5 rounded text-xs transition border border-slate-700"
-                >
-                  Passer mon tour / Fermer ➡️
-                </button>
+                {!(cell.type === 'ENCHERES' && Object.values(gameState.titles).some((t) => t.ownerId === me?.id)) ? (
+                  <button
+                    onClick={handlePassTurn}
+                    className="w-full bg-slate-800 hover:bg-slate-750 text-slate-200 font-bold py-1.5 rounded text-xs transition border border-slate-700"
+                  >
+                    Passer mon tour / Fermer ➡️
+                  </button>
+                ) : (
+                  <div className="text-[10px] text-center text-red-400 font-semibold bg-red-950/20 border border-red-900/40 p-2 rounded-lg">
+                    ⚠️ Case Enchères : Vous devez obligatoirement vendre un ou plusieurs titres (ou utiliser un Joker) pour pouvoir passer votre tour.
+                  </div>
+                )}
               </div>
+
             </div>
           </div>
         );
