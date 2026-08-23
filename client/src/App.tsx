@@ -298,16 +298,40 @@ export default function App() {
                       {cell.name}
                     </div>
 
+                    {/* Ressources produites par ce pays */}
+                    {cell.type === 'RICHESSE' && cell.titleIds && (
+                      <div className="flex flex-col gap-0.5 my-1 text-[7px] text-slate-400 leading-none">
+                        {cell.titleIds.map((tId) => {
+                          const t = gameState.titles[tId];
+                          const ownerColor = t.ownerId ? gameState.players.find(p => p.id === t.ownerId)?.color : null;
+                          return (
+                            <div key={tId} className="flex justify-between items-center pr-0.5">
+                              <span className="truncate" style={{ color: RESOURCE_DEFINITIONS[t.resourceType].color }}>
+                                {RESOURCE_DEFINITIONS[t.resourceType].name.substring(0, 6)}.
+                              </span>
+                              <span
+                                style={{ color: ownerColor || '#94a3b8' }}
+                                className={`font-mono font-bold ${ownerColor ? 'underline decoration-dotted' : ''}`}
+                              >
+                                {t.percentage}%
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
                     {/* Plaquette Royaltie ou Détails */}
                     {royaltyRes ? (
-                      <div className="text-[7.5px] bg-slate-950/80 rounded px-0.5 py-0.5 border border-slate-800 font-semibold text-slate-100 flex items-center justify-center truncate">
-                        {royaltyRes.name}
+                      <div className="text-[7.5px] bg-slate-950/80 rounded px-0.5 py-0.5 border border-slate-800 font-semibold text-slate-100 flex items-center justify-center truncate mt-auto">
+                        Plaq: {royaltyRes.name}
                       </div>
                     ) : (
-                      <div className="text-[7.5px] text-slate-500 truncate">
+                      <div className="text-[7.5px] text-slate-500 truncate mt-auto">
                         {cell.type !== 'RICHESSE' ? cell.type.replace('_', ' ') : ''}
                       </div>
                     )}
+
 
                   </div>
                 );
@@ -678,24 +702,42 @@ export default function App() {
                 <div className="space-y-2">
                   <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Titres disponibles :</h3>
                   <div className="grid grid-cols-1 gap-2">
-                    {availableTitles.map((t) => (
-                      <div key={t.id} className="bg-slate-850 p-2.5 rounded-lg border border-slate-750 flex justify-between items-center text-xs">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-200 flex items-center gap-1.5">
-                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: RESOURCE_DEFINITIONS[t.resourceType].color }} />
-                            {RESOURCE_DEFINITIONS[t.resourceType].name} ({t.percentage}%)
-                          </span>
-                          <span className="text-[9px] text-slate-500">{t.purchasePrice.toLocaleString()} F</span>
+                    {availableTitles.map((t) => {
+                      const myCurrentTitles = Object.values(gameState.titles).filter(
+                        (title) => title.resourceType === t.resourceType && title.ownerId === me?.id
+                      );
+                      const currentCount = myCurrentTitles.length;
+                      const currentRoyalties = currentCount >= 2 ? RESOURCE_DEFINITIONS[t.resourceType].royalties[currentCount - 2] : 0;
+                      const nextCount = currentCount + 1;
+                      const nextRoyalties = nextCount >= 2 ? RESOURCE_DEFINITIONS[t.resourceType].royalties[nextCount - 2] : 0;
+
+                      return (
+                        <div key={t.id} className="bg-slate-850 p-2.5 rounded-lg border border-slate-750 flex justify-between items-center text-xs">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: RESOURCE_DEFINITIONS[t.resourceType].color }} />
+                              {RESOURCE_DEFINITIONS[t.resourceType].name} ({t.percentage}%)
+                            </span>
+                            <span className="text-[9px] text-slate-500">{t.purchasePrice.toLocaleString()} F</span>
+                            <div className="text-[8.5px] text-slate-400 mt-0.5 leading-none">
+                              Possédé : {currentCount}/6 ({myCurrentTitles.reduce((s, curr) => s + (curr.percentage ?? 0), 0)}%) — Redevance : {currentRoyalties.toLocaleString()} F
+                              {nextRoyalties > currentRoyalties && (
+                                <span className="text-emerald-400 font-bold ml-1">
+                                  ➔ {nextRoyalties.toLocaleString()} F après achat !
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleBuyTitle(t.id)}
+                            disabled={(me?.cash ?? 0) < t.purchasePrice}
+                            className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-800 text-white font-bold py-1.5 px-3 rounded text-[11px] transition shadow ml-2"
+                          >
+                            Acheter
+                          </button>
                         </div>
-                        <button
-                          onClick={() => handleBuyTitle(t.id)}
-                          disabled={(me?.cash ?? 0) < t.purchasePrice}
-                          className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-800 text-white font-bold py-1.5 px-3 rounded text-[11px] transition shadow"
-                        >
-                          Acheter
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -705,24 +747,43 @@ export default function App() {
                 <div className="space-y-2">
                   <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Choix : Acheter un titre mondial/continental :</h3>
                   <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
-                    {availableChoixTitles.map((t) => (
-                      <div key={t.id} className="bg-slate-850 p-2.5 rounded-lg border border-slate-750 flex justify-between items-center text-xs">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-200 flex items-center gap-1.5">
-                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: RESOURCE_DEFINITIONS[t.resourceType].color }} />
-                            {t.country} - {RESOURCE_DEFINITIONS[t.resourceType].name} ({t.percentage}%)
-                          </span>
-                          <span className="text-[9px] text-slate-500">{t.purchasePrice.toLocaleString()} F</span>
+                    {availableChoixTitles.map((t) => {
+                      const myCurrentTitles = Object.values(gameState.titles).filter(
+                        (title) => title.resourceType === t.resourceType && title.ownerId === me?.id
+                      );
+                      const currentCount = myCurrentTitles.length;
+                      const currentRoyalties = currentCount >= 2 ? RESOURCE_DEFINITIONS[t.resourceType].royalties[currentCount - 2] : 0;
+                      const nextCount = currentCount + 1;
+                      const nextRoyalties = nextCount >= 2 ? RESOURCE_DEFINITIONS[t.resourceType].royalties[nextCount - 2] : 0;
+
+                      return (
+                        <div key={t.id} className="bg-slate-850 p-2.5 rounded-lg border border-slate-750 flex justify-between items-center text-xs">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: RESOURCE_DEFINITIONS[t.resourceType].color }} />
+                              {t.country} - {RESOURCE_DEFINITIONS[t.resourceType].name} ({t.percentage}%)
+                            </span>
+                            <span className="text-[9px] text-slate-500">{t.purchasePrice.toLocaleString()} F</span>
+                            <div className="text-[8.5px] text-slate-400 mt-0.5 leading-none">
+                              Possédé : {currentCount}/6 ({myCurrentTitles.reduce((s, curr) => s + (curr.percentage ?? 0), 0)}%) — Redevance : {currentRoyalties.toLocaleString()} F
+                              {nextRoyalties > currentRoyalties && (
+                                <span className="text-teal-400 font-bold ml-1">
+                                  ➔ {nextRoyalties.toLocaleString()} F après achat !
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleBuyTitle(t.id)}
+                            disabled={(me?.cash ?? 0) < t.purchasePrice}
+                            className="bg-teal-600 hover:bg-teal-700 disabled:bg-slate-800 text-white font-bold py-1.5 px-3 rounded text-[11px] transition ml-2"
+                          >
+                            Acheter
+                          </button>
                         </div>
-                        <button
-                          onClick={() => handleBuyTitle(t.id)}
-                          disabled={(me?.cash ?? 0) < t.purchasePrice}
-                          className="bg-teal-600 hover:bg-teal-700 disabled:bg-slate-800 text-white font-bold py-1.5 px-3 rounded text-[11px] transition"
-                        >
-                          Acheter
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
+
                   </div>
                 </div>
               )}
