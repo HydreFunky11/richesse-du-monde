@@ -20,6 +20,9 @@ export default function App() {
   const [bidValue, setBidValue] = useState(0);
   const [selectedCellIndex, setSelectedCellIndex] = useState<number | null>(null);
   const [monopolySortMode, setMonopolySortMode] = useState<'DEFAULT' | 'PERCENTAGE' | 'ROYALTIES' | 'ALPHABETICAL'>('DEFAULT');
+  const [showActionModal, setShowActionModal] = useState(false);
+
+
 
 
 
@@ -64,6 +67,22 @@ export default function App() {
   useEffect(() => {
     setSelectedTitlesForAuction([]);
   }, [gameState?.currentPlayerIndex, gameState?.status]);
+
+  // Retarder l'ouverture du pop-up d'action pour laisser le pion glisser sur le plateau (0.8s d'anim + 0.4s de pause)
+  useEffect(() => {
+    if (!gameState || !socket) return;
+    const isMyTurn = gameState.players[gameState.currentPlayerIndex]?.id === socket.id;
+    
+    if (isMyTurn && gameState.lastDiceRoll !== null && gameState.status === 'PLAYING') {
+      const timer = setTimeout(() => {
+        setShowActionModal(true);
+      }, 1200);
+      return () => clearTimeout(timer);
+    } else {
+      setShowActionModal(false);
+    }
+  }, [gameState?.currentPlayerIndex, gameState?.lastDiceRoll, gameState?.status, socket?.id]);
+
 
 
   const handleJoin = (e: React.FormEvent) => {
@@ -806,8 +825,9 @@ export default function App() {
 
 
       {/* Rendu du pop-up modal d'action principal */}
-      {isMyTurn && gameState.lastDiceRoll !== null && gameState.status === 'PLAYING' && (() => {
+      {showActionModal && (() => {
         const cell = gameState.board[me?.position ?? 0];
+
         
         // Achat titres pays
         const availableTitles = cell.type === 'RICHESSE'
@@ -975,8 +995,9 @@ export default function App() {
               {hasEnchereAction && (
                 <div className="space-y-2">
                   <h3 className="text-[10px] font-bold text-red-400 uppercase tracking-wider">
-                    🔨 Enchères (Dé rouge = {gameState.lastDiceRoll[1]} titres)
+                    🔨 Enchères (Dé rouge = {gameState.lastDiceRoll?.[1]} titres)
                   </h3>
+
                   <p className="text-[9.5px] text-slate-400">
                     Sélectionnez les titres à mettre aux enchères. Les monopoles ne peuvent pas être dépareillés (ils seront vendus ensemble).
                   </p>
