@@ -486,7 +486,34 @@ export class GameEngine {
         t.ownerId = null;
       }
     });
+
+    const activePlayers = this.state.players.filter(p => !p.isBankrupt);
+    if (activePlayers.length === 1) {
+      this.state.status = 'FINISHED';
+      this.state.log.push(`🎉 La partie est terminée ! Le dernier survivant et grand vainqueur est ${activePlayers[0].username} !`);
+    }
   }
+
+  public resetGame(): boolean {
+    this.state.status = 'LOBBY';
+    this.state.currentPlayerIndex = 0;
+    this.state.turnNumber = 1;
+    this.state.lastDiceRoll = null;
+    this.state.auction = null;
+    this.state.log = ['La partie a été réinitialisée. En attente du lancement.'];
+    
+    this.state.players.forEach(p => {
+      p.cash = 0;
+      p.position = 0;
+      p.isBankrupt = false;
+      p.lapsCompleted = 0;
+      p.hasJokerCard = false;
+    });
+
+    this.state.titles = JSON.parse(JSON.stringify(INITIAL_TITLES));
+    return true;
+  }
+
 
   private getCurrentPlayer(): Player | null {
     if (this.state.players.length === 0) return null;

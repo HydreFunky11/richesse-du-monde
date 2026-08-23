@@ -38,7 +38,9 @@ export interface Title {
   country: string;
   purchasePrice: number;
   ownerId: string | null;
+  percentage: number;
 }
+
 
 export type CellType =
   | 'DEPART'

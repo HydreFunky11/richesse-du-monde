@@ -56,6 +56,12 @@ export default function App() {
     }
   }, [gameState?.auction?.currentBid, gameState?.auction?.currentHighestBidderId]);
 
+  // Réinitialiser la sélection de titres d'enchères quand le tour ou le statut change (évite l'accumulation)
+  useEffect(() => {
+    setSelectedTitlesForAuction([]);
+  }, [gameState?.currentPlayerIndex, gameState?.status]);
+
+
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || !roomCode.trim() || !socket) return;
@@ -111,7 +117,7 @@ export default function App() {
     );
   };
 
-  // Calcul du placement dans la double-boucle (grille 11x11)
+  // Calcul du placement dans la double-boucle (grille 11x11, 70 cases)
   const getCellGridCoords = (index: number) => {
     // Boucle 1 (extérieure) : index 0 à 39
     if (index >= 0 && index <= 39) {
@@ -121,19 +127,14 @@ export default function App() {
       return { gridRow: 11 - (index - 30), gridColumn: 1 };
     }
     
-    // Boucle 2 (intérieure) : index 40 à 71
-    if (index >= 40 && index <= 71) {
-      const inner = index - 40;
-      if (inner <= 8) return { gridRow: 2, gridColumn: inner + 2 };
-      if (inner <= 15) return { gridRow: (inner - 9) + 3, gridColumn: 10 };
-      if (inner <= 24) return { gridRow: 10, gridColumn: 10 - (inner - 16) };
-      return { gridRow: 9 - (inner - 25), gridColumn: 2 };
-    }
-    
-    // Boucle 3 (spirale la plus interne) : index 72 à 77
-    const innermost = index - 72;
-    return { gridRow: 3, gridColumn: innermost + 3 };
+    // Boucle 2 (intérieure) : index 40 à 69 (30 cases)
+    const inner = index - 40;
+    if (inner <= 8) return { gridRow: 2, gridColumn: inner + 2 }; // col 2 à 10
+    if (inner <= 14) return { gridRow: (inner - 9) + 3, gridColumn: 10 }; // row 3 à 8
+    if (inner <= 23) return { gridRow: 10, gridColumn: 10 - (inner - 15) }; // col 10 à 2
+    return { gridRow: 9 - (inner - 24), gridColumn: 2 }; // row 9 à 4
   };
+
 
   if (!joined || !gameState) {
     return (
@@ -194,10 +195,23 @@ export default function App() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col p-4">
       {/* Header */}
       <header className="flex justify-between items-center bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-md mb-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-wider text-amber-500">RICHESSES DU MONDE</h1>
-          <p className="text-xs text-slate-400">Code du salon : <span className="font-mono text-white font-bold">{gameState.gameId}</span></p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-xl font-bold tracking-wider text-amber-500 font-sans">RICHESSES DU MONDE</h1>
+            <p className="text-xs text-slate-400">Code du salon : <span className="font-mono text-white font-bold">{gameState.gameId}</span></p>
+          </div>
+          <button
+            onClick={() => {
+              if (socket && window.confirm("Voulez-vous vraiment réinitialiser la partie ? Tout sera remis à zéro.")) {
+                socket.emit('resetGame');
+              }
+            }}
+            className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-bold py-1.5 px-3 rounded-lg text-[10px] border border-slate-700 transition"
+          >
+            🔄 Réinitialiser la Partie
+          </button>
         </div>
+
         <div className="flex items-center gap-3">
           {me && (
             <div className="flex items-center gap-3 bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 shadow-sm">
@@ -245,8 +259,10 @@ export default function App() {
           )}
         </div>
       ) : (
-        /* Playing / Finished Game State */
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <>
+          {/* Playing / Finished Game State */}
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4">
+
           
           {/* Plateau 2D à Gauche (Prend 3 colonnes sur LG) */}
           <div className="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center justify-center overflow-auto">
@@ -432,7 +448,7 @@ export default function App() {
                   ) : (
                     /* --- INTERFACE DE JEU NORMALE --- */
                     <div className="flex flex-col items-center justify-center py-2 space-y-2">
-                      {/* Dés de lancer */}
+                      {/* Lancement de dés */}
                       {gameState.lastDiceRoll ? (
                         <div className="flex gap-2">
                           <div className="w-10 h-10 bg-white text-slate-900 rounded-lg flex items-center justify-center font-extrabold text-lg shadow border border-slate-350">
@@ -443,7 +459,7 @@ export default function App() {
                           </div>
                         </div>
                       ) : (
-                        <div className="text-slate-400 text-xs italic">Dés non lancés.</div>
+                        <div className="text-slate-400 text-xs italic">Les dés ne sont pas encore lancés.</div>
                       )}
 
                       {/* Actions disponibles pour le joueur actif */}
@@ -452,9 +468,9 @@ export default function App() {
                           {gameState.lastDiceRoll === null && (
                             <button
                               onClick={handleRollDice}
-                              className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-2 rounded-lg shadow transition transform hover:-translate-y-0.5 text-xs"
+                              className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-2.5 rounded-lg shadow transition transform hover:-translate-y-0.5 text-xs"
                             >
-                              Lancer les dés 🎲
+                              Lancer les dés (Blanc + Rouge) 🎲
                             </button>
                           )}
 
@@ -463,7 +479,6 @@ export default function App() {
                             const availableTitles = cell.type === 'RICHESSE'
                               ? cell.titleIds?.map(id => gameState.titles[id]).filter(t => t.ownerId === null) || []
                               : [];
-
                             const isChoix = cell.type === 'CHOIX_MONDIAL' || cell.type === 'CHOIX_CONTINENTAL';
                             const availableChoixTitles = isChoix && (me?.lapsCompleted ?? 0) >= 1
                               ? Object.values(gameState.titles).filter(
@@ -472,119 +487,42 @@ export default function App() {
                                 )
                               : [];
 
+                            const hasRichesseAction = cell.type === 'RICHESSE' && availableTitles.length > 0;
+                            const hasChoixAction = isChoix && (me?.lapsCompleted ?? 0) >= 1 && availableChoixTitles.length > 0;
+                            const hasJokerAction = cell.type === 'JOKER' && !me?.hasJokerCard && (me?.cash ?? 0) >= 3000000;
+                            const hasEnchereAction = cell.type === 'ENCHERES' && (me?.lapsCompleted ?? 0) >= 1;
+                            const hasAnyAction = hasRichesseAction || hasChoixAction || hasJokerAction || hasEnchereAction;
+
                             return (
-                              <div className="space-y-2">
-                                {/* Achat de titres */}
-                                {availableTitles.length > 0 && (
-                                  <div className="bg-slate-900 p-2 rounded border border-slate-800 space-y-1">
-                                    <div className="text-[10px] font-semibold text-slate-400">Acheter titres de {cell.name} :</div>
-                                    <div className="grid grid-cols-1 gap-1">
-                                      {availableTitles.map((t) => (
-                                        <button
-                                          key={t.id}
-                                          onClick={() => handleBuyTitle(t.id)}
-                                          disabled={(me?.cash ?? 0) < t.purchasePrice}
-                                          className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 text-white font-bold py-1 px-2 rounded text-[10px] flex justify-between"
-                                        >
-                                          <span>{RESOURCE_DEFINITIONS[t.resourceType].name}</span>
-                                          <span>{t.purchasePrice.toLocaleString()} F</span>
-                                        </button>
-                                      ))}
-                                    </div>
+                              <div className="space-y-2 text-center">
+                                {hasAnyAction ? (
+                                  <div className="text-[11px] text-amber-400 font-semibold py-1 animate-pulse">
+                                    Sélectionnez vos actions dans le pop-up à l'écran.
+                                  </div>
+                                ) : (
+                                  <div className="text-[11px] text-slate-400 py-1">
+                                    Aucune action disponible sur cette case.
                                   </div>
                                 )}
-
-                                {/* Achat Choix */}
-                                {isChoix && (me?.lapsCompleted ?? 0) >= 1 && (
-                                  <div className="bg-slate-900 p-2 rounded border border-slate-800 space-y-1">
-                                    <div className="text-[10px] font-semibold text-teal-400">Choix : Acheter titre existant</div>
-                                    {availableChoixTitles.length > 0 ? (
-                                      <div className="max-h-20 overflow-y-auto space-y-0.5">
-                                        {availableChoixTitles.map((t) => (
-                                          <button
-                                            key={t.id}
-                                            onClick={() => handleBuyTitle(t.id)}
-                                            disabled={(me?.cash ?? 0) < t.purchasePrice}
-                                            className="w-full bg-teal-800 hover:bg-teal-700 disabled:bg-slate-700 text-white py-0.5 px-2 rounded text-[9px] flex justify-between"
-                                          >
-                                            <span>{t.country} ({RESOURCE_DEFINITIONS[t.resourceType].name})</span>
-                                            <span>{t.purchasePrice.toLocaleString()} F</span>
-                                          </button>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <div className="text-[9px] text-slate-500 italic">Aucun titre éligible.</div>
-                                    )}
-                                  </div>
-                                )}
-
-                                {/* Joker */}
-                                {cell.type === 'JOKER' && !me?.hasJokerCard && (
-                                  <button
-                                    onClick={handleBuyJokerCard}
-                                    disabled={(me?.cash ?? 0) < 3000000}
-                                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 rounded-lg text-xs"
-                                  >
-                                    Acheter Joker (3 000 000 F) 🃏
-                                  </button>
-                                )}
-
-                                {/* Utiliser Joker */}
-                                {cell.type === 'ENCHERES' && me?.hasJokerCard && (
-                                  <button
-                                    onClick={handleUseJokerCard}
-                                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 rounded-lg text-xs"
-                                  >
-                                    Utiliser Joker (Annuler) 🃏
-                                  </button>
-                                )}
-
-                                {/* Enchères */}
-                                {cell.type === 'ENCHERES' && (me?.lapsCompleted ?? 0) >= 1 && (
-                                  <div className="bg-slate-900 p-2 rounded border border-slate-800 space-y-1">
-                                    <div className="text-[10px] font-semibold text-red-400">
-                                      Démarrez l'enchère (Dé rouge = {gameState.lastDiceRoll[1]}) :
-                                    </div>
-                                    <div className="max-h-20 overflow-y-auto space-y-0.5 bg-slate-950 p-1 rounded border border-slate-800">
-                                      {Object.values(gameState.titles)
-                                        .filter((t) => t.ownerId === me?.id)
-                                        .map((t) => (
-                                          <label key={t.id} className="flex items-center gap-2 text-[10px] text-slate-200 cursor-pointer">
-                                            <input
-                                              type="checkbox"
-                                              checked={selectedTitlesForAuction.includes(t.id)}
-                                              onChange={() => toggleSelectTitleForAuction(t.id)}
-                                              className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 w-3 h-3"
-                                            />
-                                            <span>{t.country} ({RESOURCE_DEFINITIONS[t.resourceType].name})</span>
-                                          </label>
-                                        ))}
-                                    </div>
-                                    <button
-                                      onClick={handleStartAuction}
-                                      disabled={
-                                        selectedTitlesForAuction.length === 0 &&
-                                        Object.values(gameState.titles).filter((t) => t.ownerId === me?.id).length > 0
-                                      }
-                                      className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-1 rounded text-xs transition"
-                                    >
-                                      Lancer l'Enchère 🔨
-                                    </button>
-                                  </div>
-                                )}
-
                                 <button
                                   onClick={handlePassTurn}
-                                  className="w-full bg-slate-800 hover:bg-slate-750 text-white font-bold py-1.5 rounded-lg border border-slate-700 text-xs transition"
+                                  className="w-full bg-slate-800 hover:bg-slate-750 text-white font-bold py-2 rounded-lg border border-slate-700 text-xs transition"
                                 >
-                                  Passer son tour ➡️
+                                  Terminer mon tour ➡️
                                 </button>
                               </div>
                             );
                           })()}
                         </div>
                       )}
+
+                      {!isMyTurn && (
+                        <div className="text-xs text-slate-500 italic py-2">
+                          En attente du lancer de {currentTurnPlayer?.username}...
+                        </div>
+                      )}
                     </div>
+
                   )}
                 </div>
 
@@ -638,7 +576,7 @@ export default function App() {
             </div>
 
             {/* Section Titres Possédés */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow max-h-96 overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow max-h-[580px] overflow-y-auto">
               <h3 className="font-bold text-sm text-slate-400 mb-3 uppercase tracking-wider">Vos Monopoles</h3>
               <div className="space-y-2">
                 {Object.values(RESOURCE_DEFINITIONS).map((res) => {
@@ -648,20 +586,31 @@ export default function App() {
                   
                   if (myTitles.length === 0) return null;
 
+                  const totalPercentage = myTitles.reduce((sum, t) => sum + (t.percentage ?? 0), 0);
+                  const royaltiesAmount = myTitles.length >= 2 ? res.royalties[myTitles.length - 2] : 0;
+
                   return (
-                    <div key={res.type} className="bg-slate-800/60 p-2 rounded-lg border border-slate-700/60">
-                      <div className="flex items-center justify-between text-[11px] mb-1">
+                    <div key={res.type} className="bg-slate-800/60 p-2.5 rounded-lg border border-slate-700/60 space-y-1">
+                      <div className="flex items-center justify-between text-[11px]">
                         <span className="font-bold" style={{ color: res.color }}>
                           {res.name}
                         </span>
-                        <span className="text-slate-400 font-semibold text-[9px]">
-                          {myTitles.length} / 6
+                        <span className="text-slate-200 font-bold text-[10px]">
+                          {totalPercentage}%
                         </span>
                       </div>
-                      <div className="text-[9px] text-slate-500 flex flex-wrap gap-1">
+                      
+                      <div className="flex justify-between items-center text-[9px]">
+                        <span className="text-slate-400">Parts : {myTitles.length}/6</span>
+                        <span className="text-amber-400 font-bold">
+                          {royaltiesAmount > 0 ? `${royaltiesAmount.toLocaleString()} F / passage` : '0 F (sans monopole)'}
+                        </span>
+                      </div>
+
+                      <div className="text-[9px] text-slate-500 flex flex-wrap gap-1 pt-1 border-t border-slate-700/20">
                         {myTitles.map(t => (
-                          <span key={t.id} className="bg-slate-700/50 px-1 py-0.5 rounded border border-slate-650">
-                            {t.country}
+                          <span key={t.id} className="bg-slate-700/40 px-1 py-0.5 rounded border border-slate-650/50">
+                            {t.country} ({t.percentage}%)
                           </span>
                         ))}
                       </div>
@@ -678,9 +627,226 @@ export default function App() {
             </div>
 
           </div>
-
         </div>
+
+
+      {/* Rendu du pop-up modal d'action principal */}
+      {isMyTurn && gameState.lastDiceRoll !== null && gameState.status === 'PLAYING' && (() => {
+        const cell = gameState.board[me?.position ?? 0];
+        
+        // Achat titres pays
+        const availableTitles = cell.type === 'RICHESSE'
+          ? cell.titleIds?.map(id => gameState.titles[id]).filter(t => t.ownerId === null) || []
+          : [];
+
+        // Achat titres Choix
+        const isChoix = cell.type === 'CHOIX_MONDIAL' || cell.type === 'CHOIX_CONTINENTAL';
+        const availableChoixTitles = isChoix && (me?.lapsCompleted ?? 0) >= 1
+          ? Object.values(gameState.titles).filter(
+              t => t.ownerId === null && 
+              Object.values(gameState.titles).some(myT => myT.resourceType === t.resourceType && myT.ownerId === me?.id)
+            )
+          : [];
+
+        // Vérifier si des actions sont disponibles sur cette case
+        const hasRichesseAction = cell.type === 'RICHESSE' && availableTitles.length > 0;
+        const hasChoixAction = isChoix && (me?.lapsCompleted ?? 0) >= 1 && availableChoixTitles.length > 0;
+        const hasJokerAction = cell.type === 'JOKER' && !me?.hasJokerCard && (me?.cash ?? 0) >= 3000000;
+        const hasEnchereAction = cell.type === 'ENCHERES' && (me?.lapsCompleted ?? 0) >= 1;
+
+        if (!hasRichesseAction && !hasChoixAction && !hasJokerAction && !hasEnchereAction) {
+          return null;
+        }
+
+        return (
+          <div className="fixed inset-0 bg-slate-950/85 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <div className="bg-slate-900 border border-slate-850 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+              <div className="text-center space-y-1">
+                <span className="text-[10px] bg-amber-500/20 text-amber-400 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  Action Disponible
+                </span>
+                <h2 className="text-xl font-black text-slate-100 uppercase tracking-wide">
+                  {cell.name}
+                </h2>
+                <p className="text-slate-400 text-[11px]">
+                  Vous avez atterri sur cette case. Choisissez votre action :
+                </p>
+              </div>
+
+              {/* Section Achat Richesse */}
+              {hasRichesseAction && (
+                <div className="space-y-2">
+                  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Titres disponibles :</h3>
+                  <div className="grid grid-cols-1 gap-2">
+                    {availableTitles.map((t) => (
+                      <div key={t.id} className="bg-slate-850 p-2.5 rounded-lg border border-slate-750 flex justify-between items-center text-xs">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: RESOURCE_DEFINITIONS[t.resourceType].color }} />
+                            {RESOURCE_DEFINITIONS[t.resourceType].name} ({t.percentage}%)
+                          </span>
+                          <span className="text-[9px] text-slate-500">{t.purchasePrice.toLocaleString()} F</span>
+                        </div>
+                        <button
+                          onClick={() => handleBuyTitle(t.id)}
+                          disabled={(me?.cash ?? 0) < t.purchasePrice}
+                          className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-800 text-white font-bold py-1.5 px-3 rounded text-[11px] transition shadow"
+                        >
+                          Acheter
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Section Achat Choix */}
+              {hasChoixAction && (
+                <div className="space-y-2">
+                  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Choix : Acheter un titre mondial/continental :</h3>
+                  <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                    {availableChoixTitles.map((t) => (
+                      <div key={t.id} className="bg-slate-850 p-2.5 rounded-lg border border-slate-750 flex justify-between items-center text-xs">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: RESOURCE_DEFINITIONS[t.resourceType].color }} />
+                            {t.country} - {RESOURCE_DEFINITIONS[t.resourceType].name} ({t.percentage}%)
+                          </span>
+                          <span className="text-[9px] text-slate-500">{t.purchasePrice.toLocaleString()} F</span>
+                        </div>
+                        <button
+                          onClick={() => handleBuyTitle(t.id)}
+                          disabled={(me?.cash ?? 0) < t.purchasePrice}
+                          className="bg-teal-600 hover:bg-teal-700 disabled:bg-slate-800 text-white font-bold py-1.5 px-3 rounded text-[11px] transition"
+                        >
+                          Acheter
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Section Achat Joker */}
+              {hasJokerAction && (
+                <div className="bg-slate-850 p-4 rounded-lg border border-slate-750 flex flex-col items-center text-center space-y-2">
+                  <span className="text-2xl">🃏</span>
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-slate-200 text-xs">Carte Joker disponible</span>
+                    <p className="text-[9.5px] text-slate-400">Permet d'annuler les enchères obligatoires si vous y tombez dessus.</p>
+                  </div>
+                  <button
+                    onClick={handleBuyJokerCard}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 px-4 rounded text-xs transition"
+                  >
+                    Acheter le Joker (3 000 000 F)
+                  </button>
+                </div>
+              )}
+
+              {/* Section Enchères */}
+              {hasEnchereAction && (
+                <div className="space-y-2">
+                  <h3 className="text-[10px] font-bold text-red-400 uppercase tracking-wider">
+                    🔨 Enchères (Dé rouge = {gameState.lastDiceRoll[1]} titres)
+                  </h3>
+                  <p className="text-[9.5px] text-slate-400">
+                    Sélectionnez les titres à mettre aux enchères. Les monopoles ne peuvent pas être dépareillés (ils seront vendus ensemble).
+                  </p>
+
+                  <div className="max-h-28 overflow-y-auto space-y-1 bg-slate-950 p-1.5 rounded border border-slate-800">
+                    {Object.values(gameState.titles)
+                      .filter((t) => t.ownerId === me?.id)
+                      .map((t) => (
+                        <label key={t.id} className="flex items-center gap-2 text-xs text-slate-350 cursor-pointer p-1 hover:bg-slate-900 rounded">
+                          <input
+                            type="checkbox"
+                            checked={selectedTitlesForAuction.includes(t.id)}
+                            onChange={() => toggleSelectTitleForAuction(t.id)}
+                            className="rounded border-slate-800 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                          />
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: RESOURCE_DEFINITIONS[t.resourceType].color }} />
+                          <span>{t.country} ({RESOURCE_DEFINITIONS[t.resourceType].name} - {t.percentage}%)</span>
+                        </label>
+                      ))}
+                    {Object.values(gameState.titles).filter((t) => t.ownerId === me?.id).length === 0 && (
+                      <div className="text-[10px] text-slate-500 italic text-center py-2">Vous n'avez aucun titre à vendre.</div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-1.5">
+                    {me?.hasJokerCard && (
+                      <button
+                        onClick={handleUseJokerCard}
+                        className="flex-1 bg-indigo-650 hover:bg-indigo-700 text-white font-bold py-2 rounded text-xs transition"
+                      >
+                        Utiliser mon Joker 🃏
+                      </button>
+                    )}
+                    <button
+                      onClick={handleStartAuction}
+                      disabled={
+                        selectedTitlesForAuction.length === 0 &&
+                        Object.values(gameState.titles).filter((t) => t.ownerId === me?.id).length > 0
+                      }
+                      className="flex-1 bg-red-650 hover:bg-red-700 disabled:bg-slate-800 text-white font-bold py-2 rounded text-xs transition"
+                    >
+                      Lancer l'Enchère
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Bouton de Fermeture / Passage de Tour */}
+              <div className="border-t border-slate-800 pt-3">
+                <button
+                  onClick={handlePassTurn}
+                  className="w-full bg-slate-800 hover:bg-slate-750 text-slate-200 font-bold py-1.5 rounded text-xs transition border border-slate-700"
+                >
+                  Passer mon tour / Fermer ➡️
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Rendu d'une carte de fin de partie en plein écran si le jeu est terminé */}
+      {gameState.status === 'FINISHED' && (
+        <div className="fixed inset-0 bg-slate-950/90 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-slate-900 border-2 border-emerald-500/30 rounded-2xl p-8 w-full max-w-md shadow-2xl text-center space-y-6">
+            <span className="text-5xl animate-bounce block">🏆</span>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-black text-emerald-400 uppercase tracking-wider">
+                Partie Terminée
+              </h2>
+              <p className="text-xs text-slate-400">
+                Un grand magnat économique a vaincu tous ses adversaires !
+              </p>
+            </div>
+
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
+              <span className="text-xs text-slate-500 uppercase font-semibold block">Vainqueur</span>
+              <span className="text-lg font-bold text-white">
+                {gameState.players.find(p => !p.isBankrupt)?.username || 'Inconnu'}
+              </span>
+            </div>
+
+            <button
+              onClick={() => {
+                if (socket) socket.emit('resetGame');
+              }}
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold py-3 rounded-lg shadow-lg hover:shadow-xl transition"
+            >
+              Relancer une nouvelle partie 🔄
+            </button>
+          </div>
+        </div>
+      )}
+        </>
       )}
     </div>
   );
 }
+
+

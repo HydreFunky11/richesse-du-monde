@@ -171,7 +171,22 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('resetGame', () => {
+    const roomCode = (socket as any).roomCode;
+
+    if (!roomCode || !games[roomCode]) return;
+
+    const game = games[roomCode];
+    const success = game.resetGame();
+
+    if (success) {
+      io.to(roomCode).emit('gameStateUpdate', game.getState());
+      console.log(`[GAME] Partie réinitialisée dans le salon ${roomCode}`);
+    }
+  });
+
   socket.on('passTurn', () => {
+
     const roomCode = (socket as any).roomCode;
     if (!roomCode || !games[roomCode]) return;
 
