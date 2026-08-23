@@ -270,7 +270,8 @@ export default function App() {
           <div className="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center justify-center overflow-auto">
             
             {/* Grille du plateau 11x11 */}
-            <div className="grid grid-cols-11 grid-rows-11 gap-0.5 w-[760px] h-[760px] relative text-slate-100 font-sans">
+            <div className="grid grid-cols-11 grid-rows-11 gap-0.5 w-[880px] h-[880px] relative text-slate-100 font-sans">
+
               
               {/* Rendu des 78 cases du plateau spiralé */}
               {gameState.board.map((cell) => {
