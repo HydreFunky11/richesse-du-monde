@@ -30,6 +30,8 @@ export default function App() {
 
   const prevOwnedTitlesCountRef = useRef<number | null>(null);
   const prevHasJokerRef = useRef<boolean | null>(null);
+  const prevDiceRollRef = useRef<[number, number] | null>(null);
+
 
 
 
@@ -150,6 +152,23 @@ export default function App() {
     prevHasJokerRef.current = currentMe.hasJokerCard;
   }, [gameState, socket?.id]);
 
+  // 🎵 Jouer le son "faaah" quand quelqu'un fait un double
+  useEffect(() => {
+    if (!gameState || !gameState.lastDiceRoll) return;
+
+    const [d1, d2] = gameState.lastDiceRoll;
+    const prev = prevDiceRollRef.current;
+
+    // Détecte un NOUVEAU double (valeur différente du dernier lancé enregistré)
+    const isNewRoll = !prev || prev[0] !== d1 || prev[1] !== d2;
+    if (isNewRoll && d1 === d2) {
+      const audio = new Audio('/fahhhhhhhhhhhhhh.mp3');
+      audio.volume = 0.8;
+      audio.play().catch(() => {}); // ignore autoplay block silently
+    }
+
+    prevDiceRollRef.current = [d1, d2];
+  }, [gameState?.lastDiceRoll]);
 
 
 
