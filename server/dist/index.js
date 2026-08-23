@@ -182,6 +182,14 @@ io.on('connection', (socket) => {
             socket.emit('error', 'Impossible de passer votre tour (vous devez d\'abord lancer les dés).');
         }
     });
+    socket.on('closeLobby', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !games[roomCode])
+            return;
+        console.log(`[LOBBY] Le salon ${roomCode} a été fermé par ${socket.username}`);
+        io.to(roomCode).emit('lobbyClosed');
+        delete games[roomCode];
+    });
     socket.on('disconnect', () => {
         const roomCode = socket.roomCode;
         const username = socket.username;

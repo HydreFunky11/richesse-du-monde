@@ -42,10 +42,17 @@ export default function App() {
       setErrorMsg(msg);
     });
 
+    newSocket.on('lobbyClosed', () => {
+      alert("Le salon a été fermé par l'hôte. Retour à l'accueil.");
+      setJoined(false);
+      setGameState(null);
+    });
+
     return () => {
       newSocket.disconnect();
     };
   }, []);
+
 
   useEffect(() => {
     if (logsEndRef.current) {
@@ -94,6 +101,13 @@ export default function App() {
   const handleStartGame = () => {
     if (socket) socket.emit('startGame');
   };
+
+  const handleCloseLobby = () => {
+    if (socket && window.confirm("Voulez-vous vraiment fermer et supprimer ce salon de jeu ? Tous les joueurs seront redirigés vers l'accueil.")) {
+      socket.emit('closeLobby');
+    }
+  };
+
 
   const handleRollDice = () => {
     if (socket) socket.emit('rollDice');
@@ -213,6 +227,8 @@ export default function App() {
   const me = gameState.players.find((p) => p.id === socket?.id);
   const isMyTurn = gameState.players[gameState.currentPlayerIndex]?.id === socket?.id;
   const currentTurnPlayer = gameState.players[gameState.currentPlayerIndex];
+  const isHost = gameState.players[0]?.id === socket?.id;
+
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col p-4">
@@ -233,6 +249,16 @@ export default function App() {
           >
             🔄 Réinitialiser la Partie
           </button>
+
+          {isHost && (
+            <button
+              onClick={handleCloseLobby}
+              className="bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-red-200 font-bold py-1.5 px-3 rounded-lg text-[10px] border border-red-900/50 transition"
+            >
+              🚪 Fermer le Salon
+            </button>
+          )}
+
         </div>
 
         <div className="flex items-center gap-3">

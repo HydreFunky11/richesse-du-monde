@@ -201,7 +201,17 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('closeLobby', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !games[roomCode]) return;
+
+    console.log(`[LOBBY] Le salon ${roomCode} a été fermé par ${(socket as any).username}`);
+    io.to(roomCode).emit('lobbyClosed');
+    delete games[roomCode];
+  });
+
   socket.on('disconnect', () => {
+
     const roomCode = (socket as any).roomCode;
     const username = (socket as any).username;
 
