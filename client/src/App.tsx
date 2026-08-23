@@ -1135,8 +1135,9 @@ export default function App() {
 
         return (
           <div className="fixed inset-0 bg-slate-950/85 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-slate-900 border border-slate-850 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+            <div className="bg-slate-900 border border-slate-850 rounded-2xl p-6 md:p-8 w-full md:w-[50vw] max-w-4xl min-w-[340px] md:min-w-[700px] shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
               <div className="text-center space-y-1">
+
                 <span className="text-[10px] bg-amber-500/20 text-amber-400 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                   Action Disponible
                 </span>
@@ -1253,8 +1254,9 @@ export default function App() {
                     )}
                   </div>
 
-                  <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                  <div className="max-h-[380px] overflow-y-auto space-y-1.5 pr-1">
                     {(() => {
+
                       const filteredChoix = availableChoixTitles.filter((t) => {
                         // 1. Filtrer par continent (seulement si Choix Mondial)
                         if (cell.type === 'CHOIX_MONDIAL' && auctionContinentFilter !== 'ALL') {
@@ -1378,10 +1380,11 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Liste des titres de l'hôte avec filtres et recherche */}
-                  <div className="max-h-28 overflow-y-auto space-y-1 bg-slate-950 p-1.5 rounded border border-slate-800">
+                   {/* Liste des titres de l'hôte avec filtres et recherche */}
+                  <div className="max-h-[300px] overflow-y-auto space-y-1 bg-slate-950 p-1.5 rounded border border-slate-800">
                     {(() => {
                       const allMyTitles = Object.values(gameState.titles).filter((t) => t.ownerId === me?.id);
+
                       
                       const filteredTitles = allMyTitles.filter((t) => {
                         // 1. Filtrer par continent
