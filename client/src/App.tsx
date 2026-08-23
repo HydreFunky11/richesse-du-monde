@@ -18,6 +18,8 @@ export default function App() {
   // Pour la sélection des titres à mettre aux enchères
   const [selectedTitlesForAuction, setSelectedTitlesForAuction] = useState<string[]>([]);
   const [bidValue, setBidValue] = useState(0);
+  const [selectedCellIndex, setSelectedCellIndex] = useState<number | null>(null);
+
 
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -279,6 +281,7 @@ export default function App() {
                 return (
                   <div
                     key={cell.index}
+                    onClick={() => setSelectedCellIndex(cell.index)}
                     style={{
                       gridRow: coords.gridRow,
                       gridColumn: coords.gridColumn,
@@ -290,9 +293,12 @@ export default function App() {
                       cell.type === 'ACTUALITE' || cell.type === 'JOKER' ? 'bg-indigo-950/30 border-t-indigo-500' : ''
                     } ${
                       cell.type === 'CHOIX_CONTINENTAL' || cell.type === 'CHOIX_MONDIAL' || cell.type === 'ENCHERES' ? 'bg-teal-950/30 border-t-teal-500 font-semibold' : ''
+                    } ${
+                      selectedCellIndex === cell.index ? 'ring-2 ring-amber-400 bg-slate-750' : ''
                     }`}
                     title={`${cell.name} - Case #${cell.index}`}
                   >
+
                     {/* Nom de la case */}
                     <div className="font-bold text-slate-300 leading-tight truncate">
                       {cell.name}
@@ -370,199 +376,287 @@ export default function App() {
                     </span>
                   );
                 })}
-
-
               {/* Console Centrale (Dice, Actions, Log) placée au centre de la grille (lignes 4 à 9, colonnes 3 à 9) */}
+
               <div 
                 style={{ gridRow: "4 / 10", gridColumn: "3 / 10" }}
                 className="bg-slate-950 rounded-xl border border-slate-800 p-4 flex flex-col justify-between shadow-inner overflow-hidden z-10"
               >
-                <div>
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-3 h-3 rounded-full border border-slate-950"
-                        style={{ backgroundColor: currentTurnPlayer?.color }}
-                      />
-                      <h3 className="font-bold text-sm text-slate-100 truncate max-w-xs">
-                        Tour de {currentTurnPlayer?.username} {isMyTurn && "(Vous)"}
-                      </h3>
+                {selectedCellIndex !== null ? (
+                  <div className="flex flex-col justify-between h-full space-y-3">
+                    <div className="space-y-2 flex-1 flex flex-col min-h-0">
+                      <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                        <div className="flex flex-col">
+                          <span className="text-[9px] text-amber-500 font-bold uppercase tracking-wider">
+                            Détails Case #{selectedCellIndex}
+                          </span>
+                          <span className="text-sm font-black text-slate-100 uppercase tracking-wide truncate max-w-[150px]">
+                            {gameState.board[selectedCellIndex].name}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => setSelectedCellIndex(null)}
+                          className="text-[9.5px] bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold py-1.5 px-2.5 rounded border border-slate-700 transition"
+                        >
+                          ✖ Fermer
+                        </button>
+                      </div>
+
+                      <div className="text-[10px] text-slate-400 leading-normal flex-none">
+                        {(() => {
+                          const cell = gameState.board[selectedCellIndex];
+                          if (cell.type === 'DEPART') return "Case Départ : Tous les joueurs démarrent ici.";
+                          if (cell.type === 'BANQUE') return "Case Banque : Vous recevez 500 000 F multiplié par le résultat de vos dés.";
+                          if (cell.type === 'ACTUALITE') return "Case Actualité : Vous piochez une carte Actualité (effet financier direct).";
+                          if (cell.type === 'JOKER') return "Case Joker : Vous pouvez acquérir une carte Joker pour 3 000 000 F (protection contre les enchères).";
+                          if (cell.type === 'ENCHERES') return "Case Enchères : Vous devez mettre aux enchères un ou plusieurs de vos titres.";
+                          if (cell.type === 'CHOIX_MONDIAL') return "Case Choix Mondial : Permet d'acheter un titre existant de votre choix.";
+                          if (cell.type === 'CHOIX_CONTINENTAL') return `Case Choix Continental (${cell.continent}) : Permet d'acheter un titre libre sur le continent ${cell.continent}.`;
+                          return `Pays d'exploitation. Si vous tombez sur une case de redevance correspondante, vous payez des royalties au propriétaire du monopole.`;
+                        })()}
+                      </div>
+
+                      {/* Liste des titres d'exploitation pour cette case Richesse */}
+                      {(() => {
+                        const cell = gameState.board[selectedCellIndex];
+                        if (cell.type !== 'RICHESSE' || !cell.titleIds) return null;
+                        const countryTitles = cell.titleIds.map(id => gameState.titles[id]);
+                        return (
+                          <div className="space-y-1.5 pt-1.5 flex-1 flex flex-col min-h-0">
+                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider flex-none">
+                              Titres de production :
+                            </span>
+                            <div className="overflow-y-auto space-y-1 pr-1 flex-1 min-h-0 max-h-[160px]">
+                              {countryTitles.map((t) => {
+                                const owner = t.ownerId ? gameState.players.find(p => p.id === t.ownerId) : null;
+                                return (
+                                  <div key={t.id} className="bg-slate-900 p-2 rounded border border-slate-800 flex justify-between items-center text-[10px] gap-2">
+                                    <div className="flex items-center gap-1.5 font-semibold truncate min-w-0">
+                                      <span className="w-2 h-2 rounded-full flex-none" style={{ backgroundColor: RESOURCE_DEFINITIONS[t.resourceType].color }} />
+                                      <span className="truncate" style={{ color: RESOURCE_DEFINITIONS[t.resourceType].color }}>
+                                        {RESOURCE_DEFINITIONS[t.resourceType].name}
+                                      </span>
+                                      <span className="text-slate-400 font-mono text-[9px]">({t.percentage}%)</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 flex-none">
+                                      <span className="text-slate-500 font-mono text-[9px]">{t.purchasePrice.toLocaleString()} F</span>
+                                      {owner ? (
+                                        <span
+                                          className="px-1.5 py-0.5 rounded font-bold text-[8px] truncate max-w-[80px]"
+                                          style={{ backgroundColor: `${owner.color}15`, color: owner.color, border: `1px solid ${owner.color}30` }}
+                                        >
+                                          {owner.username}
+                                        </span>
+                                      ) : (
+                                        <span className="bg-emerald-950/20 border border-emerald-900/50 text-emerald-400 px-1 py-0.5 rounded font-bold text-[8px]">
+                                          LIBRE
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
-                    <div className="text-xs font-semibold text-slate-400">
-                      Tour #{gameState.turnNumber}
+
+                    <div className="text-[8.5px] text-slate-500 italic text-center border-t border-slate-850/50 pt-1.5 flex-none">
+                      Cliquez sur une autre case ou sur Fermer.
                     </div>
                   </div>
-
-                  {/* Zone d'action centrale */}
-                  {gameState.status === 'AUCTION' && gameState.auction ? (
-                    /* --- INTERFACE D'ENCHÈRE --- */
-                    <div className="bg-slate-900 border border-indigo-500/50 p-3 rounded-lg space-y-2 shadow-inner">
-                      <div className="text-center font-bold text-indigo-400 text-[10px] tracking-wider uppercase">
-                        ⚠️ ENCHÈRE EN COURS
+                ) : (
+                  <>
+                    <div>
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-3 h-3 rounded-full border border-slate-950"
+                            style={{ backgroundColor: currentTurnPlayer?.color }}
+                          />
+                          <h3 className="font-bold text-sm text-slate-100 truncate max-w-xs">
+                            Tour de {currentTurnPlayer?.username} {isMyTurn && "(Vous)"}
+                          </h3>
+                        </div>
+                        <div className="text-xs font-semibold text-slate-400">
+                          Tour #{gameState.turnNumber}
+                        </div>
                       </div>
-                      <div className="text-center text-[10px] text-slate-300">
-                        Vente de <span className="text-white font-bold font-mono">{gameState.auction.titleIds.length}</span> titre(s) par <span className="font-bold">{gameState.players.find((p) => p.id === gameState.auction?.sellerId)?.username}</span>
-                      </div>
 
-                      <div className="max-h-16 overflow-y-auto space-y-1 bg-slate-950 p-1.5 rounded border border-slate-800 text-[10px]">
-                        {gameState.auction.titleIds.map((id) => {
-                          const title = gameState.titles[id];
-                          return (
-                            <div key={id} className="flex justify-between">
-                              <span>{title.country}</span>
-                              <span className="font-bold" style={{ color: RESOURCE_DEFINITIONS[title.resourceType].color }}>
-                                {RESOURCE_DEFINITIONS[title.resourceType].name}
-                              </span>
+                      {/* Zone d'action centrale */}
+                      {gameState.status === 'AUCTION' && gameState.auction ? (
+                        /* --- INTERFACE D'ENCHÈRE --- */
+                        <div className="bg-slate-900 border border-indigo-500/50 p-3 rounded-lg space-y-2 shadow-inner">
+                          <div className="text-center font-bold text-indigo-400 text-[10px] tracking-wider uppercase">
+                            ⚠️ ENCHÈRE EN COURS
+                          </div>
+                          <div className="text-center text-[10px] text-slate-300">
+                            Vente de <span className="text-white font-bold font-mono">{gameState.auction.titleIds.length}</span> titre(s) par <span className="font-bold">{gameState.players.find((p) => p.id === gameState.auction?.sellerId)?.username}</span>
+                          </div>
+
+                          <div className="max-h-16 overflow-y-auto space-y-1 bg-slate-950 p-1.5 rounded border border-slate-800 text-[10px]">
+                            {gameState.auction.titleIds.map((id) => {
+                              const title = gameState.titles[id];
+                              return (
+                                <div key={id} className="flex justify-between">
+                                  <span>{title.country}</span>
+                                  <span className="font-bold" style={{ color: RESOURCE_DEFINITIONS[title.resourceType].color }}>
+                                    {RESOURCE_DEFINITIONS[title.resourceType].name}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <div className="flex justify-between items-center bg-slate-950 p-2 rounded border border-slate-800">
+                            <div>
+                              <div className="text-[8px] text-slate-400 uppercase font-bold">Meilleure offre</div>
+                              <div className="text-sm font-black text-amber-400">
+                                {gameState.auction.currentBid.toLocaleString()} F
+                              </div>
                             </div>
-                          );
-                        })}
-                      </div>
-
-                      <div className="flex justify-between items-center bg-slate-950 p-2 rounded border border-slate-800">
-                        <div>
-                          <div className="text-[8px] text-slate-400 uppercase font-bold">Meilleure offre</div>
-                          <div className="text-sm font-black text-amber-400">
-                            {gameState.auction.currentBid.toLocaleString()} F
+                            <div className="text-right">
+                              <div className="text-[8px] text-slate-400 uppercase font-bold">Offrant</div>
+                              <div className="text-xs font-bold text-white">
+                                {gameState.auction.currentHighestBidderId
+                                  ? gameState.players.find((p) => p.id === gameState.auction?.currentHighestBidderId)?.username
+                                  : 'Banque'}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-[8px] text-slate-400 uppercase font-bold">Offrant</div>
-                          <div className="text-xs font-bold text-white">
-                            {gameState.auction.currentHighestBidderId
-                              ? gameState.players.find((p) => p.id === gameState.auction?.currentHighestBidderId)?.username
-                              : 'Banque'}
-                          </div>
-                        </div>
-                      </div>
 
-                      {/* Formulaire d'enchère pour les autres joueurs */}
-                      {socket?.id !== gameState.auction.sellerId && !me?.isBankrupt && (
-                        <div className="space-y-1.5">
-                          <div className="flex gap-2">
-                            <input
-                              type="number"
-                              value={bidValue}
-                              onChange={(e) => setBidValue(Math.max(0, parseInt(e.target.value) || 0))}
-                              step="100000"
-                              className="w-24 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white text-xs font-bold"
-                            />
-                            <button
-                              onClick={handlePlaceBid}
-                              disabled={bidValue < (gameState.auction.currentHighestBidderId === null ? gameState.auction.currentBid : gameState.auction.currentBid + 100000) || (me?.cash ?? 0) < bidValue}
-                              className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-700 text-white font-bold py-1 rounded text-xs transition"
-                            >
-                              Enchérir 💰
-                            </button>
-                          </div>
-                          <button
-                            onClick={handlePassBid}
-                            className="w-full bg-slate-850 hover:bg-slate-800 text-white font-semibold py-1 rounded text-[10px] border border-slate-700 transition"
-                          >
-                            Passer l'offre ➡️
-                          </button>
-                        </div>
-                      )}
-
-                      {socket?.id === gameState.auction.sellerId && (
-                        <div className="text-[10px] text-amber-400/80 text-center italic">
-                          En attente des offres des autres joueurs...
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    /* --- INTERFACE DE JEU NORMALE --- */
-                    <div className="flex flex-col items-center justify-center py-2 space-y-2">
-                      {/* Lancement de dés */}
-                      {gameState.lastDiceRoll ? (
-                        <div className="flex gap-2">
-                          <div className="w-10 h-10 bg-white text-slate-900 rounded-lg flex items-center justify-center font-extrabold text-lg shadow border border-slate-350">
-                            {gameState.lastDiceRoll[0]}
-                          </div>
-                          <div className="w-10 h-10 bg-red-600 text-white rounded-lg flex items-center justify-center font-extrabold text-lg shadow border border-red-500">
-                            {gameState.lastDiceRoll[1]}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-slate-400 text-xs italic">Les dés ne sont pas encore lancés.</div>
-                      )}
-
-                      {/* Actions disponibles pour le joueur actif */}
-                      {isMyTurn && (
-                        <div className="w-full space-y-2">
-                          {gameState.lastDiceRoll === null && (
-                            <button
-                              onClick={handleRollDice}
-                              className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-2.5 rounded-lg shadow transition transform hover:-translate-y-0.5 text-xs"
-                            >
-                              Lancer les dés (Blanc + Rouge) 🎲
-                            </button>
-                          )}
-
-                          {gameState.lastDiceRoll !== null && (() => {
-                            const cell = gameState.board[me?.position ?? 0];
-                            const availableTitles = cell.type === 'RICHESSE'
-                              ? cell.titleIds?.map(id => gameState.titles[id]).filter(t => t.ownerId === null) || []
-                              : [];
-                            const isChoix = cell.type === 'CHOIX_MONDIAL' || cell.type === 'CHOIX_CONTINENTAL';
-                            const availableChoixTitles = isChoix && (me?.lapsCompleted ?? 0) >= 1
-                              ? Object.values(gameState.titles).filter(
-                                  t => t.ownerId === null && 
-                                  Object.values(gameState.titles).some(myT => myT.resourceType === t.resourceType && myT.ownerId === me?.id)
-                                )
-                              : [];
-
-                            const hasRichesseAction = cell.type === 'RICHESSE' && availableTitles.length > 0;
-                            const hasChoixAction = isChoix && (me?.lapsCompleted ?? 0) >= 1 && availableChoixTitles.length > 0;
-                            const hasJokerAction = cell.type === 'JOKER' && !me?.hasJokerCard && (me?.cash ?? 0) >= 3000000;
-                            const hasEnchereAction = cell.type === 'ENCHERES' && (me?.lapsCompleted ?? 0) >= 1;
-                            const hasAnyAction = hasRichesseAction || hasChoixAction || hasJokerAction || hasEnchereAction;
-
-                            return (
-                              <div className="space-y-2 text-center">
-                                {hasAnyAction ? (
-                                  <div className="text-[11px] text-amber-400 font-semibold py-1 animate-pulse">
-                                    Sélectionnez vos actions dans le pop-up à l'écran.
-                                  </div>
-                                ) : (
-                                  <div className="text-[11px] text-slate-400 py-1">
-                                    Aucune action disponible sur cette case.
-                                  </div>
-                                )}
+                          {/* Formulaire d'enchère pour les autres joueurs */}
+                          {socket?.id !== gameState.auction.sellerId && !me?.isBankrupt && (
+                            <div className="space-y-1.5">
+                              <div className="flex gap-2">
+                                <input
+                                  type="number"
+                                  value={bidValue}
+                                  onChange={(e) => setBidValue(Math.max(0, parseInt(e.target.value) || 0))}
+                                  step="100000"
+                                  className="w-24 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white text-xs font-bold"
+                                />
                                 <button
-                                  onClick={handlePassTurn}
-                                  className="w-full bg-slate-800 hover:bg-slate-750 text-white font-bold py-2 rounded-lg border border-slate-700 text-xs transition"
+                                  onClick={handlePlaceBid}
+                                  disabled={bidValue < (gameState.auction.currentHighestBidderId === null ? gameState.auction.currentBid : gameState.auction.currentBid + 100000) || (me?.cash ?? 0) < bidValue}
+                                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-700 text-white font-bold py-1 rounded text-xs transition"
                                 >
-                                  Terminer mon tour ➡️
+                                  Enchérir 💰
                                 </button>
                               </div>
-                            );
-                          })()}
-                        </div>
-                      )}
+                              <button
+                                onClick={handlePassBid}
+                                className="w-full bg-slate-850 hover:bg-slate-800 text-white font-semibold py-1 rounded text-[10px] border border-slate-700 transition"
+                              >
+                                Passer l'offre ➡️
+                              </button>
+                            </div>
+                          )}
 
-                      {!isMyTurn && (
-                        <div className="text-xs text-slate-500 italic py-2">
-                          En attente du lancer de {currentTurnPlayer?.username}...
+                          {socket?.id === gameState.auction.sellerId && (
+                            <div className="text-[10px] text-amber-400/80 text-center italic">
+                              En attente des offres des autres joueurs...
+                            </div>
+                          )}
                         </div>
+                      ) : (
+                        /* --- INTERFACE DE JEU NORMALE --- */
+                        <div className="flex flex-col items-center justify-center py-2 space-y-2">
+                          {/* Lancement de dés */}
+                          {gameState.lastDiceRoll ? (
+                            <div className="flex gap-2">
+                              <div className="w-10 h-10 bg-white text-slate-900 rounded-lg flex items-center justify-center font-extrabold text-lg shadow border border-slate-350">
+                                {gameState.lastDiceRoll[0]}
+                              </div>
+                              <div className="w-10 h-10 bg-red-600 text-white rounded-lg flex items-center justify-center font-extrabold text-lg shadow border border-red-500">
+                                {gameState.lastDiceRoll[1]}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-slate-400 text-xs italic">Les dés ne sont pas encore lancés.</div>
+                          )}
+
+                          {/* Actions disponibles pour le joueur actif */}
+                          {isMyTurn && (
+                            <div className="w-full space-y-2">
+                              {gameState.lastDiceRoll === null && (
+                                <button
+                                  onClick={handleRollDice}
+                                  className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-2.5 rounded-lg shadow transition transform hover:-translate-y-0.5 text-xs"
+                                >
+                                  Lancer les dés (Blanc + Rouge) 🎲
+                                </button>
+                              )}
+
+                              {gameState.lastDiceRoll !== null && (() => {
+                                const cell = gameState.board[me?.position ?? 0];
+                                const availableTitles = cell.type === 'RICHESSE'
+                                  ? cell.titleIds?.map(id => gameState.titles[id]).filter(t => t.ownerId === null) || []
+                                  : [];
+                                const isChoix = cell.type === 'CHOIX_MONDIAL' || cell.type === 'CHOIX_CONTINENTAL';
+                                const availableChoixTitles = isChoix && (me?.lapsCompleted ?? 0) >= 1
+                                  ? Object.values(gameState.titles).filter(
+                                      t => t.ownerId === null && 
+                                      Object.values(gameState.titles).some(myT => myT.resourceType === t.resourceType && myT.ownerId === me?.id)
+                                    )
+                                  : [];
+
+                                const hasRichesseAction = cell.type === 'RICHESSE' && availableTitles.length > 0;
+                                const hasChoixAction = isChoix && (me?.lapsCompleted ?? 0) >= 1 && availableChoixTitles.length > 0;
+                                const hasJokerAction = cell.type === 'JOKER' && !me?.hasJokerCard && (me?.cash ?? 0) >= 3000000;
+                                const hasEnchereAction = cell.type === 'ENCHERES' && (me?.lapsCompleted ?? 0) >= 1;
+                                const hasAnyAction = hasRichesseAction || hasChoixAction || hasJokerAction || hasEnchereAction;
+
+                                return (
+                                  <div className="space-y-2 text-center">
+                                    {hasAnyAction ? (
+                                      <div className="text-[11px] text-amber-400 font-semibold py-1 animate-pulse">
+                                        Sélectionnez vos actions dans le pop-up à l'écran.
+                                      </div>
+                                    ) : (
+                                      <div className="text-[11px] text-slate-400 py-1">
+                                        Aucune action disponible sur cette case.
+                                      </div>
+                                    )}
+                                    <button
+                                      onClick={handlePassTurn}
+                                      className="w-full bg-slate-800 hover:bg-slate-750 text-white font-bold py-2 rounded-lg border border-slate-700 text-xs transition"
+                                    >
+                                      Terminer mon tour ➡️
+                                    </button>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          )}
+
+                          {!isMyTurn && (
+                            <div className="text-xs text-slate-500 italic py-2">
+                              En attente du lancer de {currentTurnPlayer?.username}...
+                            </div>
+                          )}
+                        </div>
+
                       )}
                     </div>
 
-                  )}
-                </div>
-
-                {/* Historique du jeu (log) */}
-                <div className="h-28 bg-slate-900 border border-slate-800 rounded p-2 overflow-y-auto font-mono text-[9.5px] text-slate-300 shadow-inner">
-                  {gameState.log.map((logLine, index) => (
-                    <div key={index} className="border-b border-slate-950/30 pb-0.5 mb-0.5 last:border-0 last:pb-0">
-                      {logLine}
+                    {/* Historique du jeu (log) */}
+                    <div className="h-28 bg-slate-900 border border-slate-800 rounded p-2 overflow-y-auto font-mono text-[9.5px] text-slate-300 shadow-inner">
+                      {gameState.log.map((logLine, index) => (
+                        <div key={index} className="border-b border-slate-950/30 pb-0.5 mb-0.5 last:border-0 last:pb-0">
+                          {logLine}
+                        </div>
+                      ))}
+                      <div ref={logsEndRef} />
                     </div>
-                  ))}
-                  <div ref={logsEndRef} />
-                </div>
+                  </>
+                )}
               </div>
 
             </div>
           </div>
+
 
           {/* Fiches Joueurs à Droite (Prend 1 colonne sur LG) */}
           <div className="lg:col-span-1 space-y-4 max-h-[780px] overflow-y-auto pr-1">
