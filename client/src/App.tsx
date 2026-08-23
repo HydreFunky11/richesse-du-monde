@@ -22,6 +22,9 @@ export default function App() {
   const [monopolySortMode, setMonopolySortMode] = useState<'DEFAULT' | 'PERCENTAGE' | 'ROYALTIES' | 'ALPHABETICAL'>('DEFAULT');
   const [showActionModal, setShowActionModal] = useState(false);
   const [boardZoom, setBoardZoom] = useState(1.0);
+  const [auctionSearchQuery, setAuctionSearchQuery] = useState('');
+  const [auctionContinentFilter, setAuctionContinentFilter] = useState<'ALL' | 'Europe' | 'Asie' | 'Afrique' | 'Amérique'>('ALL');
+
 
 
 
@@ -72,10 +75,13 @@ export default function App() {
     }
   }, [gameState?.auction?.currentBid, gameState?.auction?.currentHighestBidderId]);
 
-  // Réinitialiser la sélection de titres d'enchères quand le tour ou le statut change (évite l'accumulation)
+  // Réinitialiser la sélection de titres d'enchères et les filtres quand le tour ou le statut change (évite l'accumulation)
   useEffect(() => {
     setSelectedTitlesForAuction([]);
+    setAuctionSearchQuery('');
+    setAuctionContinentFilter('ALL');
   }, [gameState?.currentPlayerIndex, gameState?.status]);
+
 
   // Retarder l'ouverture du pop-up d'action pour laisser le pion glisser sur le plateau (0.8s d'anim + 0.4s de pause)
   useEffect(() => {
@@ -1091,25 +1097,84 @@ export default function App() {
                     Sélectionnez les titres à mettre aux enchères. Les monopoles ne peuvent pas être dépareillés (ils seront vendus ensemble).
                   </p>
 
-                  <div className="max-h-28 overflow-y-auto space-y-1 bg-slate-950 p-1.5 rounded border border-slate-800">
-                    {Object.values(gameState.titles)
-                      .filter((t) => t.ownerId === me?.id)
-                      .map((t) => (
-                        <label key={t.id} className="flex items-center gap-2 text-xs text-slate-350 cursor-pointer p-1 hover:bg-slate-900 rounded">
-                          <input
-                            type="checkbox"
-                            checked={selectedTitlesForAuction.includes(t.id)}
-                            onChange={() => toggleSelectTitleForAuction(t.id)}
-                            className="rounded border-slate-800 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
-                          />
-                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: RESOURCE_DEFINITIONS[t.resourceType].color }} />
-                          <span>{t.country} ({RESOURCE_DEFINITIONS[t.resourceType].name} - {t.percentage}%)</span>
-                        </label>
+                  {/* Barre de recherche et filtres de continent */}
+                  <div className="space-y-1.5 bg-slate-950 p-2 rounded-lg border border-slate-800">
+                    <input
+                      type="text"
+                      placeholder="Rechercher par pays ou matière première..."
+                      value={auctionSearchQuery}
+                      onChange={(e) => setAuctionSearchQuery(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-250 text-[10px] placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    />
+                    
+                    <div className="flex flex-wrap gap-1 text-[8.5px] items-center">
+                      <span className="text-slate-500 font-bold mr-0.5 uppercase tracking-wider text-[8px]">Continent :</span>
+                      {(['ALL', 'Europe', 'Asie', 'Afrique', 'Amérique'] as const).map((cont) => (
+                        <button
+                          key={cont}
+                          type="button"
+                          onClick={() => setAuctionContinentFilter(cont)}
+                          className={`px-2 py-0.5 rounded font-bold transition ${
+                            auctionContinentFilter === cont
+                              ? 'bg-indigo-650 text-white'
+                              : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                          }`}
+                        >
+                          {cont === 'ALL' ? 'Tous' : cont}
+                        </button>
                       ))}
-                    {Object.values(gameState.titles).filter((t) => t.ownerId === me?.id).length === 0 && (
-                      <div className="text-[10px] text-slate-500 italic text-center py-2">Vous n'avez aucun titre à vendre.</div>
-                    )}
+                    </div>
                   </div>
+
+                  {/* Liste des titres de l'hôte avec filtres et recherche */}
+                  <div className="max-h-28 overflow-y-auto space-y-1 bg-slate-950 p-1.5 rounded border border-slate-800">
+                    {(() => {
+                      const allMyTitles = Object.values(gameState.titles).filter((t) => t.ownerId === me?.id);
+                      
+                      const filteredTitles = allMyTitles.filter((t) => {
+                        // 1. Filtrer par continent
+                        if (auctionContinentFilter !== 'ALL') {
+                          const titleContinent = COUNTRY_CONTINENT_MAP[t.country];
+                          if (titleContinent !== auctionContinentFilter) return false;
+                        }
+                        // 2. Filtrer par requête de recherche (pays ou ressource)
+                        if (auctionSearchQuery.trim() !== '') {
+                          const q = auctionSearchQuery.toLowerCase();
+                          const matchesCountry = t.country.toLowerCase().includes(q);
+                          const matchesResource = RESOURCE_DEFINITIONS[t.resourceType].name.toLowerCase().includes(q);
+                          if (!matchesCountry && !matchesResource) return false;
+                        }
+                        return true;
+                      });
+
+                      if (filteredTitles.length === 0) {
+                        return (
+                          <div className="text-[10px] text-slate-500 italic text-center py-2">
+                            {allMyTitles.length === 0 ? "Vous n'avez aucun titre à vendre." : "Aucun titre ne correspond à vos filtres."}
+                          </div>
+                        );
+                      }
+
+                      return filteredTitles.map((t) => (
+                        <label key={t.id} className="flex items-center justify-between text-xs text-slate-350 cursor-pointer p-1 hover:bg-slate-900 rounded select-none">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedTitlesForAuction.includes(t.id)}
+                              onChange={() => toggleSelectTitleForAuction(t.id)}
+                              className="rounded border-slate-800 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                            />
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: RESOURCE_DEFINITIONS[t.resourceType].color }} />
+                            <span>{t.country} ({RESOURCE_DEFINITIONS[t.resourceType].name} - {t.percentage}%)</span>
+                          </div>
+                          <span className="text-[9px] text-slate-500 font-mono pr-1">
+                            {COUNTRY_CONTINENT_MAP[t.country]}
+                          </span>
+                        </label>
+                      ));
+                    })()}
+                  </div>
+
 
                   <div className="flex gap-2 pt-1.5">
                     {me?.hasJokerCard && (
