@@ -1215,48 +1215,111 @@ export default function App() {
               {hasChoixAction && (
                 <div className="space-y-2">
                   <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Choix : Acheter un titre mondial/continental :</h3>
-                  <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
-                    {availableChoixTitles.map((t) => {
-                      const myCurrentTitles = Object.values(gameState.titles).filter(
-                        (title) => title.resourceType === t.resourceType && title.ownerId === me?.id
-                      );
-                      const currentCount = myCurrentTitles.length;
-                      const currentRoyalties = currentCount >= 2 ? RESOURCE_DEFINITIONS[t.resourceType].royalties[currentCount - 2] : 0;
-                      const nextCount = currentCount + 1;
-                      const nextRoyalties = nextCount >= 2 ? RESOURCE_DEFINITIONS[t.resourceType].royalties[nextCount - 2] : 0;
-
-                      return (
-                        <div key={t.id} className="bg-slate-850 p-2.5 rounded-lg border border-slate-750 flex justify-between items-center text-xs">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-slate-200 flex items-center gap-1.5">
-                              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: RESOURCE_DEFINITIONS[t.resourceType].color }} />
-                              {t.country} - {RESOURCE_DEFINITIONS[t.resourceType].name} ({t.percentage}%)
-                            </span>
-                            <span className="text-[9px] text-slate-500">{t.purchasePrice.toLocaleString()} F</span>
-                            <div className="text-[8.5px] text-slate-400 mt-0.5 leading-none">
-                              Possédé : {currentCount}/6 ({myCurrentTitles.reduce((s, curr) => s + (curr.percentage ?? 0), 0)}%) — Redevance : {currentRoyalties.toLocaleString()} F
-                              {nextRoyalties > currentRoyalties && (
-                                <span className="text-teal-400 font-bold ml-1">
-                                  ➔ {nextRoyalties.toLocaleString()} F après achat !
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                  
+                  {/* Barre de recherche et filtres de continent */}
+                  <div className="space-y-1.5 bg-slate-950 p-2 rounded-lg border border-slate-800">
+                    <input
+                      type="text"
+                      placeholder="Rechercher par pays ou matière première..."
+                      value={auctionSearchQuery}
+                      onChange={(e) => setAuctionSearchQuery(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-250 text-[10px] placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    />
+                    
+                    {/* Filtre de continent uniquement si choix mondial */}
+                    {cell.type === 'CHOIX_MONDIAL' ? (
+                      <div className="flex flex-wrap gap-1 text-[8.5px] items-center">
+                        <span className="text-slate-500 font-bold mr-0.5 uppercase tracking-wider text-[8px]">Continent :</span>
+                        {(['ALL', 'Europe', 'Asie', 'Afrique', 'Amérique'] as const).map((cont) => (
                           <button
-                            onClick={() => handleBuyTitle(t.id)}
-                            disabled={(me?.cash ?? 0) < t.purchasePrice || gameState.purchasesThisTurn >= 6}
-                            className="bg-teal-600 hover:bg-teal-700 disabled:bg-slate-800 text-white font-bold py-1.5 px-3 rounded text-[11px] transition ml-2"
+                            key={cont}
+                            type="button"
+                            onClick={() => setAuctionContinentFilter(cont)}
+                            className={`px-2 py-0.5 rounded font-bold transition ${
+                              auctionContinentFilter === cont
+                                ? 'bg-indigo-655 text-white'
+                                : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                            }`}
                           >
-                            Acheter
+                            {cont === 'ALL' ? 'Tous' : cont}
                           </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-[9px] text-amber-500 font-bold flex items-center gap-1">
+                        <span>🌍 Continent limité par la case :</span>
+                        <span className="bg-amber-500/10 px-2 py-0.5 rounded text-amber-400 border border-amber-500/20">{cell.continent}</span>
+                      </div>
+                    )}
+                  </div>
 
-                        </div>
-                      );
-                    })}
+                  <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                    {(() => {
+                      const filteredChoix = availableChoixTitles.filter((t) => {
+                        // 1. Filtrer par continent (seulement si Choix Mondial)
+                        if (cell.type === 'CHOIX_MONDIAL' && auctionContinentFilter !== 'ALL') {
+                          const titleContinent = COUNTRY_CONTINENT_MAP[t.country];
+                          if (titleContinent !== auctionContinentFilter) return false;
+                        }
+                        // 2. Filtrer par texte (pays ou ressource)
+                        if (auctionSearchQuery.trim() !== '') {
+                          const q = auctionSearchQuery.toLowerCase();
+                          const matchesCountry = t.country.toLowerCase().includes(q);
+                          const matchesResource = RESOURCE_DEFINITIONS[t.resourceType].name.toLowerCase().includes(q);
+                          if (!matchesCountry && !matchesResource) return false;
+                        }
+                        return true;
+                      });
 
+                      if (filteredChoix.length === 0) {
+                        return (
+                          <div className="text-[10px] text-slate-500 italic text-center py-4 bg-slate-950/40 rounded border border-slate-850">
+                            Aucun titre disponible ne correspond à vos filtres.
+                          </div>
+                        );
+                      }
+
+                      return filteredChoix.map((t) => {
+                        const myCurrentTitles = Object.values(gameState.titles).filter(
+                          (title) => title.resourceType === t.resourceType && title.ownerId === me?.id
+                        );
+                        const currentCount = myCurrentTitles.length;
+                        const currentRoyalties = currentCount >= 2 ? RESOURCE_DEFINITIONS[t.resourceType].royalties[currentCount - 2] : 0;
+                        const nextCount = currentCount + 1;
+                        const nextRoyalties = nextCount >= 2 ? RESOURCE_DEFINITIONS[t.resourceType].royalties[nextCount - 2] : 0;
+
+                        return (
+                          <div key={t.id} className="bg-slate-850 p-2.5 rounded-lg border border-slate-750 flex justify-between items-center text-xs">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: RESOURCE_DEFINITIONS[t.resourceType].color }} />
+                                {t.country} - {RESOURCE_DEFINITIONS[t.resourceType].name} ({t.percentage}%)
+                              </span>
+                              <span className="text-[9px] text-slate-500">{t.purchasePrice.toLocaleString()} F — {COUNTRY_CONTINENT_MAP[t.country]}</span>
+                              <div className="text-[8.5px] text-slate-400 mt-0.5 leading-none">
+                                Possédé : {currentCount}/6 ({myCurrentTitles.reduce((s, curr) => s + (curr.percentage ?? 0), 0)}%) — Redevance : {currentRoyalties.toLocaleString()} F
+                                {nextRoyalties > currentRoyalties && (
+                                  <span className="text-teal-400 font-bold ml-1">
+                                    ➔ {nextRoyalties.toLocaleString()} F après achat !
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleBuyTitle(t.id)}
+                              disabled={(me?.cash ?? 0) < t.purchasePrice || gameState.purchasesThisTurn >= 6}
+                              className="bg-teal-600 hover:bg-teal-700 disabled:bg-slate-800 text-white font-bold py-1.5 px-3 rounded text-[11px] transition ml-2"
+                            >
+                              Acheter
+                            </button>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
               )}
+
 
               {/* Section Achat Joker */}
               {hasJokerAction && (
