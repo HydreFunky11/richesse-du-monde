@@ -1,0 +1,407 @@
+®
+un jeu de Christian PACHIS.
+"Richesses du monde" est un jeu de société dont le but consiste à acquérir le plus possible de productions mondiales.
+Au cours de la partie, ce jeu permettra de connaître et de localiser les productions et les industries des principaux pays
+du monde.
+
+I - PRINCIPE DU JEU
+Richesses du monde se joue de 2 à 6 joueurs.
+Le but du jeu est :
+1.
+2.
+3.
+4.
+
+d'acheter des "titres d'exploitation": productions des différents pays ou ensembles économiques,
+de réunir ces titres en monopoles,
+de gérer ces biens au mieux de façon à les faire fructifier tout au long de la partie,
+et, bien sûr, de gagner !... Pour cela, posséder des monopoles de bon rapport pour faire le plus de bénéfices.
+
+•
+
+Au départ, les joueurs reçoivent une certaine somme qui va leur permettre d'acheter, en cours de partie, les
+titres d'exploitation qui les intéressent.
+Puis ensuite, tout au long du jeu, les joueurs vont recevoir des redevances équivalentes aux productions qu'ils
+possèdent ou, au contraire, vont payer des redevances pour les productions acquises par les autres joueurs.
+Certaines productions ont plus de valeur que d'autres, mais les joueurs ont toujours intérêt à posséder 90 %
+d'une même production, plutôt que 30 % dans trois productions différentes.
+Les enchères, phase du jeu fort intéressante : les titres d'exploitation mis aux enchères de façon judicieuse et
+en fonction du jeu des autres joueurs, peuvent rapporter un bénéfice certain, même s'ils ne sont que de faible
+rapport.
+Enfin, l'association entre plusieurs joueurs oppose une "force" vis-à-vis du joueur qui est sur le point de
+gagner et peut ainsi modifier le sens de la partie.
+
+•
+•
+•
+•
+
+Tel est le principe général de ce jeu dont les règles équilibrées font que la victoire n'est jamais due qu'à la seule
+chance.
+Ces règles sont également étudiées pour que les parties ne s'éternisent pas et présentent toujours un intérêt nouveau.
+
+II - CONTENU DE LA BOÎTE
+1) Un plan de jeu sur le pourtour duquel se trouvent des cases :
+- Cases typographiques
+Elles sont réunies en continents, divisés eux-mêmes en pays producteurs ou grands ensembles
+économiques. Chaque continent a une couleur symbolique :
+Vert olive représente l'Afrique
+Rouge
+
+l'Amérique (sauf les Etats-Unis)
+
+Orange
+
+les Etats-Unis d'Amérique
+
+Vert clair
+
+l'Europe
+
+Vert foncé
+
+l'U.R.S.S.
+
+Jaune
+
+l'Asie
+
+Violet
+
+l'Océanie
+
+- Cases spéciales
+
+•
+•
+•
+•
+•
+•
+
+Choix continental (Europe, Amérique).
+Choix mondial.
+Enchères.
+Joker.
+Actualité.
+500.000 F.
+Toutes ces cases forment deux tours autour du plan de jeu. Ces deux tours constituent un tour du
+monde complet.
+
+- 2 emplacements réservés aux cartes "Actualité" et "Joker".
+
+2) 144 titres d'exploitation
+Ces titres d'exploitation représentent 24 productions mondiales (6 titres par production), soit :
+Pétrole
+
+Houille
+
+Acier
+
+Coton brut
+
+Fer
+
+Laine brute
+
+Cuivre
+
+Café
+
+Cobalt
+
+Or
+
+Tungstène
+
+Sucre
+
+Argent
+
+Riz
+
+Construction automobile
+
+Blé
+
+Construction navale
+
+Thé
+
+Aluminium
+
+Cacao
+
+Plomb
+
+Caoutchouc naturel
+
+Uranium
+
+Nickel
+
+Ces titres sont prédécoupés et colorés. Chaque couleur correspond à la couleur symbole du plan de jeu.
+Chaque titre mentionne :
+
+•
+•
+•
+•
+•
+•
+
+la production (ex.: aluminium),
+le pays ou ensemble économique producteur (ex.: Antilles - Jamaïque),
+le pourcentage de la production (ex.: 20 %),
+le tableau de rapports (sur fond bleu) indiquant, selon le pourcentage que l'on possède, les droits à encaisser
+(ex.: entre 30 et 50 % 900 000 F. entre 50 et 70% .4500000 F. etc.)
+un prix d'achat écrit en rouge (ex.: 2 000 000),
+un système de découpes qui permet, en posant deux ou plusieurs titres de même production l'un sur l'autre,
+de voir et calculer aisément, en pourcentage, la valeur totale du trust mondial que l'on possède.
+
+3) 2 "sabots-fichiers"
+sur lesquels sont indiqués les continents, pays ou ensembles économiques. En face de chacun d'eux est prévue une
+encoche pour placer les titres.
+
+4) 48 petites plaquettes rectangulaires
+"Royalties", soit 2 par production.
+
+5) Des cartes "joker".
+6) Des cartes "actualité".
+7) Des billets de banque.
+8) 1 dé blanc.
+9) 1 dé rouge.
+10) 6 pions personnages.
+
+III - PRÉPARATION DE LA PARTIE
+•
+
+Titres d'exploitation :
+les détacher et les placer dans les sabots fichiers dans les encoches correspondantes, d'abord par continent
+puis par pays ou ensemble économique.
+
+•
+
+Billets de banque :
+200 millions sont à partager entre les joueurs, en réservant un petit fonds de roulement à la banque.
+
+•
+
+Plan de jeu :
+le placer entre les joueurs.
+
+•
+
+Cartes "Actualité" :
+les poser en paquet et à l'envers, à la place indiquée sur le plan de jeu.
+
+•
+
+Cartes "joker" :
+les poser également en paquet à leur place sur le plan de jeu.
+
+•
+
+Plaquettes "Royalties" :
+les placer au hasard dans les 48 encoches prévues dans les cases du plan de jeu.
+
+RÈGLE DU JEU
+Avant de commencer à jouer, il est recommandé de lire attentivement toute la règle.
+
+•
+•
+•
+
+•
+•
+•
+
+•
+•
+
+•
+
+A tour de rôle, les joueurs lancent les dés. Celui qui obtient le chiffre le plus élevé commence. Il choisit un
+pion personnage et le place sur la flèche "départ".
+Il lance à nouveau les 2 dés et avance son pion d'autant de cases qu'il a tiré de points.
+Lorsqu'il arrive sur une case d'un pays quelconque (exemple : la France), il choisit dans le sabot fichier autant
+de titres d'exploitation qu'il le désire jusqu'à concurrence de 6. Ces titres sont obligatoirement à prendre dans
+le pays désigné par la case sur laquelle son pion s'est posé.
+Avant ce choix, il est conseillé de consulter le tableau des productions (fond de couvercle).
+Puis le joueur calcule le prix d'achat total des titres qu'il vient de choisir et le paye à la banque.
+Les autres joueurs jouent de la même façon. La partie est engagée.
+Chaque fois qu'un joueur tire :
+- 1 double as, il paie i million à la banque,
+- 1 double deux, 2 millions,
+- 1 double trois, 3 millions,
+- 1 double quatre, 4 millions,
+- 1 double cinq, 5 millions,
+- 1 double six, 6 millions.
+Au fur et à mesure du déroulement de la partie, les joueurs vont acquérir de plus en plus de titres
+d'exploitation qu'ils grouperont par production.
+Chaque fois qu'un joueur arrive sur une case d'un pays quelconque, il doit donc accomplir deux manœuvres
+successives :
+1. Payer des redevances aux propriétaires des titres ou monopoles correspondant à la production de la
+plaquette royaltie posée précédemment sur cette case.
+Attention : ces royalties doivent être payées par le joueur, même s'il possède lui-même un
+pourcentage de cette production.
+Les propriétaires de ces titres doivent réclamer leurs redevances (voir tableau des rapports sur
+titres) dans les 7 secondes qui suivent le moment où le joueur a posé son pion sur la case. Passé ce
+délai, ils perdent le bénéfice de leur pourcentage.
+Remarque : on ne peut commencer à recevoir des royalties que si l'on possède un minimum de 30
+% de la production désignée.
+Un monopole est constitué dès que 2 titres ou plus d'une même production sont assemblés.
+2. Choisir, dans le sabot fichier, d'autres titres d'exploitation du pays sur lequel son pion s'est posé,
+jusqu'à concurrence de 6, et les payer à la banque, comme indiqué précédemment.
+Enfin, le joueur range ses titres par monopole en posant les uns sur les autres les titres de même production
+: argent avec argent, riz avec riz, etc.
+
+Les cases spéciales
+Quand un joueur arrive sur l'une des cases suivantes :
+
+1) Choix continental (Amérique : 2 cases - Europe : 2 cases - Asie : 1 case - Afrique:
+1 case)
+•
+
+Le joueur doit d'abord payer les droits correspondant à la production de la plaquette royaltie placée sur cette
+case. Il peut ensuite acheter autant de titres d'exploitation qu'il le désire, jusqu'à concurrence de 6, dans le
+continent concerné.
+Cependant :
+o les U.S.A. ne sont pas compris dans le "choix continental Amérique" ainsi que l'U.R.S.S. dans le
+"choix continental Europe",
+o on ne peut acheter de nouveaux titres que si l'on possède déjà des titres de même production (au
+moins un).
+Exemple : si un joueur possède déjà 15 % d'argent produit par l'Australie puis arrive sur la case
+"choix continental Amérique", il peut acheter un titre de 20 % d'argent produit par le Mexique et un
+titre de 15 % d'argent produit par le Canada. Il aura ainsi 50 % de cette production.
+
+2) Choix mondial (2 cases)
+•
+
+Quand un joueur arrive sur l'une de ces cases, il peut acheter autant de titres qu'il le désire, jusqu'à
+concurrence de 6, et cela dans le monde entier, à condition qu'il possède déjà des titres de même production.
+Les U.S.A. et l'U.R.S.S. sont compris dans ce choix.
+Remarque : il n'y a pas de plaquette royaltie sur les cases "choix continental" et "choix mondial", donc pas
+de droits à payer.
+Attention : ces cases ne sont valables que lorsque le joueur a déjà accompli un tour du monde.
+
+3). Enchères (4 cases)
+•
+•
+
+•
+•
+•
+•
+•
+•
+
+•
+
+Ces cases ne sont valables que si le joueur qui y arrive a déjà accompli un tour du monde. Il doit mettre aux
+enchères autant de titres que de points indiqués par le dé rouge.
+Un trust monopole ne peut jamais être dépareillé. Ceci est valable pour toutes les transactions : achats,
+ventes, enchères, échanges (voir paragraphe sur les transactions).
+Exemple : si le dé rouge indique 3 points, le joueur doit mettre 3 titres aux enchères. Cependant, s'il ne
+possède que des trusts de 4, 5 ou 6 titres il est obligé de mettre ces 4,5 ou 6 titres aux enchères.
+Bien entendu, s'il possède des titres dépareillés (par exemple : 1 riz, 1 blé, 1 or) qui ne lui rapportent encore
+rien ou peu, il a intérêt à les proposer.
+Les titres sont mis aux enchères à la moitié de leur prix d'achat.
+Les titres d'un même trust sont mis ensemble aux enchères à la moitié de leur prix total d'achat.
+Les surenchères sont au minimum de 100 000 F. Le vendeur fait office de commissaire priseur et dirige les
+enchères.
+Les surenchérisseurs ont le droit de tenir secret leur avoir liquide. Par contre, ils doivent laisser connaître les
+titres qu'ils possèdent.
+Les titres sont adjugés par le fatidique "une fois, deux fois, trois fois, adjugé !" prononcé par le commissaire
+priseur.
+Il ne peut s'écouler plus de 7 secondes au cours d'une enchère, auquel cas la dernière surenchère est retenue
+comme valable.
+S'il n'y a pas de surenchère du tout, les titres sont acquis par la banque à la moitié de leur prix total d'achat.
+Ils sont remis dans les sabots fichiers et quiconque peut alors les acheter de nouveau séparément, comme
+précédemment.
+
+4) Joker (3 cases)
+•
+•
+•
+
+Pour 3 000 000 F. ,un joueur peut acheter une carte "joker". Elle lui permet, s'il le désire et lorsqu'il arrive sur
+une case "enchères", et dans ce cas seulement, d'être dispensé de mettre ses titres aux enchères.
+Elle ne peut servir qu'une fois et doit être ensuite remise à la banque.
+Un joker ne peut être vendu ni échangé.
+
+5) Actualité (6 cases)
+•
+
+Le joueur prend la carte qui se trouve sur le dessus du paquet, la lit et, selon le cas, donne ou reçoit la
+somme indiquée. La carte est ensuite remise, toujours à l'envers, sous le paquet.
+
+6) 500.000 F (8 cases)
+
+•
+
+Le joueur qui arrive sur l'une de ces cases doit d'abord recevoir de la banque autant de fois 500.000 F qu'il a
+tiré de points avec les deux dés, puis payer aux autres joueurs les droits correspondant à la plaquette royaltie
+placée sur cette case.
+
+LES TRANSACTIONS
+•
+
+•
+
+En cours de partie, si un joueur constate que son avoir liquide baisse et qu'il risque la faillite, il est libre de
+vendre des trusts monopoles à qui il le désire. Cependant, même en cours de transactions libres, les
+surenchères sont autorisées. Le vendeur a alors 7 secondes pour décider s'il vend ou pas le titre ou trust en
+cause. Passé ce délai, il ne pourra y avoir enchères que si le joueur offrant tombe sur la case "enchères".
+Les joueurs peuvent également s'échanger, à leur convenance, des trusts monopoles. Toutefois, ceux-ci ne
+doivent jamais être dépareillés.
+
+L'ASSOCIATION
+•
+•
+•
+•
+
+A n'importe quel moment de la partie, deux joueurs ou plus peuvent combiner l'ensemble de leurs titres ou
+trusts monopoles.
+Pour être autorisés à accomplir cette fusion, ils devront conjointement payer à la banque une taxe évaluée à
+la moitié du prix d'achat total de tous leurs titres et trusts.
+Ils joueront ensuite avec le pion personnage de l'associé qui aura apporté les titres ou trusts ayant le plus de
+valeur. Les pions des autres associés seront ôtés du plan de jeu.
+Toutes les décisions suivantes concernant le jeu seront donc prises en commun.
+
+LA FAILLITE
+•
+
+•
+
+Un joueur est déclaré en faillite lorsqu'il n'a plus assez d'argent liquide pour payer une dette, qu'il soit
+créditeur de la banque ou d'un autre joueur. Sa dette est alors assumée par la banque et les titres qu'il
+possède encore sont remis, à leur place, dans les sabots fichiers. Quiconque peut alors les acheter
+séparément comme précédemment.
+Puisque tous les joueurs peuvent vendre à tout moment, chacun d'eux doit prendre ses précautions en
+sachant que si son avoir liquide baisse, il risque la faillite.
+
+DEUX JOUEURS FACE A FACE
+•
+
+Quand il n'y a plus que deux joueurs face à face, les enchères n'ont plus lieu d'être. Les cases "enchères" et
+"joker" deviennent alors cases de repos. Les cartes "joker" achetées et non utilisées ne peuvent être rendues
+ou vendues à la banque, elles deviennent sans valeur.
+
+LE GAGNANT
+•
+
+Le gagnant est le joueur (ou les associés) qui a éliminé tous ses adversaires.
+Selon le nombre de joueurs, les autres se classeront second, troisième, etc.
+
+POUR MÉMOIRE
+ROYALTIE : redevance due au propriétaire d'un sol sur lequel sont exploités des mines, des puits, etc.
+Dans le jeu: redevance à payer ou à recevoir selon les pourcentages indiqués sur les titres d'exploitation.
+TRUST : chaîne économique ou financière qui réunit, sous un même contrôle, un ensemble d'entreprises.
+Dans le jeu : le trust monopole se compose de 6 titres d'exploitation.
+TITRE : acte authentique établissant un droit. Certificat représentatif d'une valeur.
+Dans le jeu : titre d'exploitation : droit acquis permettant de faire prospérer les différentes
+productions indiquées sur les titres.
+
+
