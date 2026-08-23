@@ -499,10 +499,13 @@ export default function App() {
                   transform: `scale(${boardZoom})`,
                   transformOrigin: 'center center',
                   width: '880px',
-                  height: '880px'
+                  height: '880px',
+                  gridTemplateRows: 'repeat(11, minmax(0, 1fr))',
+                  gridTemplateColumns: 'repeat(11, minmax(0, 1fr))'
                 }}
-                className="grid grid-cols-11 grid-rows-11 gap-0.5 absolute text-slate-100 font-sans transition-transform duration-350 ease-out"
+                className="grid gap-0.5 absolute text-slate-100 font-sans transition-transform duration-350 ease-out"
               >
+
 
 
               
