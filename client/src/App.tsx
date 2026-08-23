@@ -1044,13 +1044,45 @@ export default function App() {
                       )}
 
 
-                      <div className="text-[9px] text-slate-500 flex flex-wrap gap-1 pt-1 border-t border-slate-700/20">
-                        {myTitles.map(t => (
-                          <span key={t.id} className="bg-slate-700/40 px-1 py-0.5 rounded border border-slate-650/50">
-                            {t.country} ({t.percentage}%)
-                          </span>
-                        ))}
+                      <div className="text-[9.5px] flex flex-wrap gap-1 pt-1.5 border-t border-slate-700/25">
+                        {Object.values(gameState.titles)
+                          .filter((t) => t.resourceType === res.type)
+                          .map((t) => {
+                            const isMine = t.ownerId === me?.id;
+                            const isFree = t.ownerId === null;
+                            const owner = !isMine && !isFree 
+                              ? gameState.players.find((p) => p.id === t.ownerId) 
+                              : null;
+                            
+                            const cellIdx = gameState.board.findIndex(c => c.titleIds?.includes(t.id));
+
+                            return (
+                              <button
+                                key={t.id}
+                                type="button"
+                                onClick={() => cellIdx !== -1 && setSelectedCellIndex(cellIdx)}
+                                className={`px-1.5 py-0.5 rounded text-[8px] font-bold border transition ${
+                                  isMine
+                                    ? 'bg-emerald-950/45 text-emerald-450 border-emerald-800/80 hover:bg-emerald-900/30'
+                                    : isFree
+                                    ? 'bg-slate-900/35 text-slate-400 border-slate-700/40 border-dashed hover:bg-slate-800/50 hover:text-slate-200'
+                                    : 'bg-red-950/20 text-red-400 border-red-900/40 hover:bg-red-900/20'
+                                }`}
+                                title={
+                                  isMine 
+                                    ? 'Vous possédez ce titre. Cliquez pour voir sur le plateau.' 
+                                    : isFree 
+                                    ? 'Libre à la banque. Cliquez pour voir sur le plateau.' 
+                                    : `Possédé par ${owner?.username || 'un autre joueur'}. Cliquez pour voir sur le plateau.`
+                                }
+                              >
+                                {t.country} ({t.percentage}%)
+                                {owner && <span className="ml-1 text-[7.5px] font-black opacity-80">({owner.username[0].toUpperCase()})</span>}
+                              </button>
+                            );
+                          })}
                       </div>
+
                     </div>
                   ));
                 })()}
