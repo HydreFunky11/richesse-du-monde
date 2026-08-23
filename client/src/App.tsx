@@ -24,6 +24,11 @@ export default function App() {
   const [boardZoom, setBoardZoom] = useState(1.0);
   const [auctionSearchQuery, setAuctionSearchQuery] = useState('');
   const [auctionContinentFilter, setAuctionContinentFilter] = useState<'ALL' | 'Europe' | 'Asie' | 'Afrique' | 'Amérique'>('ALL');
+  const [cashNotifications, setCashNotifications] = useState<{ id: number; amount: number; type: 'gain' | 'loss' }[]>([]);
+  const prevCashRef = useRef<number | null>(null);
+  const prevOwnedTitlesCountRef = useRef<number | null>(null);
+  const prevHasJokerRef = useRef<boolean | null>(null);
+
 
 
 
@@ -97,6 +102,50 @@ export default function App() {
       setShowActionModal(false);
     }
   }, [gameState?.currentPlayerIndex, gameState?.lastDiceRoll, gameState?.status, socket?.id]);
+
+  // Suivi de l'argent du joueur pour les notifications de gain / perte
+  useEffect(() => {
+    if (!gameState || !socket) return;
+    const currentMe = gameState.players.find((p) => p.id === socket.id);
+    if (!currentMe) return;
+
+    const ownedTitlesCount = Object.values(gameState.titles).filter((t) => t.ownerId === currentMe.id).length;
+
+    // Ne s'active que si la partie est en cours
+    if (gameState.status !== 'PLAYING' && gameState.status !== 'AUCTION') {
+      prevCashRef.current = currentMe.cash;
+      prevOwnedTitlesCountRef.current = ownedTitlesCount;
+      prevHasJokerRef.current = currentMe.hasJokerCard;
+      return;
+    }
+
+    if (prevCashRef.current !== null) {
+      const cashDiff = currentMe.cash - prevCashRef.current;
+      if (cashDiff !== 0) {
+        // Est-ce un achat de propriété ou de Joker ?
+        const titleCountDiff = ownedTitlesCount - (prevOwnedTitlesCountRef.current ?? 0);
+        const boughtJoker = currentMe.hasJokerCard && !(prevHasJokerRef.current ?? false);
+        const isPurchase = cashDiff < 0 && (titleCountDiff > 0 || boughtJoker);
+
+        if (!isPurchase) {
+          const newNotif = {
+            id: Date.now() + Math.random(),
+            amount: Math.abs(cashDiff),
+            type: cashDiff > 0 ? ('gain' as const) : ('loss' as const)
+          };
+          setCashNotifications((prev) => [...prev, newNotif]);
+          setTimeout(() => {
+            setCashNotifications((prev) => prev.filter((n) => n.id !== newNotif.id));
+          }, 2500);
+        }
+      }
+    }
+
+    prevCashRef.current = currentMe.cash;
+    prevOwnedTitlesCountRef.current = ownedTitlesCount;
+    prevHasJokerRef.current = currentMe.hasJokerCard;
+  }, [gameState, socket?.id]);
+
 
 
 
@@ -239,7 +288,73 @@ export default function App() {
 
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col p-4">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col p-4 relative">
+      {/* Styles injectés pour les animations de gains / pertes */}
+      <style>{`
+        @keyframes floatUp {
+          0% {
+            transform: translateY(20px);
+            opacity: 0;
+            scale: 0.8;
+          }
+          15% {
+            transform: translateY(0);
+            opacity: 1;
+            scale: 1.1;
+          }
+          30% {
+            transform: translateY(-5px);
+            scale: 1;
+          }
+          100% {
+            transform: translateY(-60px);
+            opacity: 0;
+          }
+        }
+        @keyframes floatDown {
+          0% {
+            transform: translateY(-20px);
+            opacity: 0;
+            scale: 0.8;
+          }
+          15% {
+            transform: translateY(0);
+            opacity: 1;
+            scale: 1.1;
+          }
+          30% {
+            transform: translateY(5px);
+            scale: 1;
+          }
+          100% {
+            transform: translateY(60px);
+            opacity: 0;
+          }
+        }
+        .animate-float-up {
+          animation: floatUp 2.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+        .animate-float-down {
+          animation: floatDown 2.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+      `}</style>
+
+      {/* Notifications de Gain / Perte Financière */}
+      <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-3">
+        {cashNotifications.map((n) => (
+          <div
+            key={n.id}
+            className={`font-black text-2xl tracking-widest font-mono drop-shadow-[0_4px_8px_rgba(0,0,0,0.85)] ${
+              n.type === 'gain' 
+                ? 'text-emerald-400 animate-float-up' 
+                : 'text-rose-500 animate-float-down'
+            }`}
+          >
+            {n.type === 'gain' ? `+ ${n.amount.toLocaleString()} F` : `- ${n.amount.toLocaleString()} F`}
+          </div>
+        ))}
+      </div>
+
       {/* Header */}
       <header className="flex justify-between items-center bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-md mb-4">
         <div className="flex items-center gap-4">
