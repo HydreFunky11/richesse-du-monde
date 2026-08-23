@@ -514,6 +514,22 @@ export class GameEngine {
     return true;
   }
 
+  public handleDisconnectBankruptcy(playerId: string) {
+    const player = this.state.players.find(p => p.id === playerId);
+    if (!player || player.isBankrupt) return;
+
+    this.handleBankruptcy(player);
+
+    // Si c'était son tour et que la partie continue, on passe au joueur suivant
+    if (this.state.status === 'PLAYING') {
+      const currentPlayer = this.getCurrentPlayer();
+      if (currentPlayer && currentPlayer.id === playerId) {
+        this.nextTurn();
+      }
+    }
+  }
+
+
 
   private getCurrentPlayer(): Player | null {
     if (this.state.players.length === 0) return null;

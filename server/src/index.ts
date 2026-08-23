@@ -207,11 +207,25 @@ io.on('connection', (socket) => {
 
     if (roomCode && games[roomCode]) {
       const game = games[roomCode];
-      game.getState().log.push(`⚠️ ${username} s'est déconnecté.`);
+      
+      if (game.getState().status === 'PLAYING' || game.getState().status === 'AUCTION') {
+        // En cours de partie, la déconnexion équivaut à une faillite pour ne pas bloquer les autres
+        game.getState().log.push(`⚠️ ${username} s'est déconnecté et a été déclaré en faillite.`);
+        game.handleDisconnectBankruptcy(socket.id);
+      } else if (game.getState().status === 'LOBBY') {
+        // Dans le lobby, on retire simplement le joueur de la liste
+        game.getState().players = game.getState().players.filter(p => p.id !== socket.id);
+        game.getState().log.push(`⚠️ ${username} a quitté le salon.`);
+      } else {
+        // Partie déjà terminée ou autre
+        game.getState().log.push(`⚠️ ${username} s'est déconnecté.`);
+      }
+
       io.to(roomCode).emit('gameStateUpdate', game.getState());
       console.log(`[GAME] Déconnexion de ${username} du salon ${roomCode}`);
     }
   });
+
 });
 
 httpServer.listen(PORT, () => {

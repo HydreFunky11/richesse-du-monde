@@ -468,6 +468,19 @@ class GameEngine {
         this.state.titles = JSON.parse(JSON.stringify(board_1.INITIAL_TITLES));
         return true;
     }
+    handleDisconnectBankruptcy(playerId) {
+        const player = this.state.players.find(p => p.id === playerId);
+        if (!player || player.isBankrupt)
+            return;
+        this.handleBankruptcy(player);
+        // Si c'était son tour et que la partie continue, on passe au joueur suivant
+        if (this.state.status === 'PLAYING') {
+            const currentPlayer = this.getCurrentPlayer();
+            if (currentPlayer && currentPlayer.id === playerId) {
+                this.nextTurn();
+            }
+        }
+    }
     getCurrentPlayer() {
         if (this.state.players.length === 0)
             return null;
