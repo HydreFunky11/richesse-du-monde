@@ -19,6 +19,8 @@ export default function App() {
   const [selectedTitlesForAuction, setSelectedTitlesForAuction] = useState<string[]>([]);
   const [bidValue, setBidValue] = useState(0);
   const [selectedCellIndex, setSelectedCellIndex] = useState<number | null>(null);
+  const [monopolySortMode, setMonopolySortMode] = useState<'DEFAULT' | 'PERCENTAGE' | 'ROYALTIES' | 'ALPHABETICAL'>('DEFAULT');
+
 
 
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -695,20 +697,79 @@ export default function App() {
             </div>
 
             {/* Section Titres Possédés */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow max-h-[580px] overflow-y-auto">
-              <h3 className="font-bold text-sm text-slate-400 mb-3 uppercase tracking-wider">Vos Monopoles</h3>
-              <div className="space-y-2">
-                {Object.values(RESOURCE_DEFINITIONS).map((res) => {
-                  const myTitles = Object.values(gameState.titles).filter(
-                    (t) => t.resourceType === res.type && t.ownerId === me?.id
-                  );
-                  
-                  if (myTitles.length === 0) return null;
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow max-h-[680px] overflow-y-auto flex flex-col min-h-0">
+              <div className="flex flex-col gap-1.5 border-b border-slate-800 pb-2.5 mb-2.5 flex-none">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-bold text-xs text-slate-400 uppercase tracking-wider">Vos Monopoles</h3>
+                  <span className="text-[9px] bg-slate-850 text-slate-400 px-1.5 py-0.5 rounded font-mono">
+                    Tri : {monopolySortMode === 'DEFAULT' ? 'Sabot' : monopolySortMode === 'PERCENTAGE' ? 'Parts %' : monopolySortMode === 'ROYALTIES' ? 'Gains' : 'A-Z'}
+                  </span>
+                </div>
+                
+                {/* Contrôles de tri */}
+                <div className="grid grid-cols-4 gap-1 text-[9px]">
+                  <button
+                    onClick={() => setMonopolySortMode('DEFAULT')}
+                    className={`py-1 rounded font-bold transition text-center ${monopolySortMode === 'DEFAULT' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'bg-slate-800 hover:bg-slate-750 text-slate-300'}`}
+                    title="Ordre officiel du sabot de jeu"
+                  >
+                    Sabot
+                  </button>
+                  <button
+                    onClick={() => setMonopolySortMode('PERCENTAGE')}
+                    className={`py-1 rounded font-bold transition text-center ${monopolySortMode === 'PERCENTAGE' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'bg-slate-800 hover:bg-slate-750 text-slate-300'}`}
+                    title="Trier par pourcentage de production détenu"
+                  >
+                    Parts %
+                  </button>
+                  <button
+                    onClick={() => setMonopolySortMode('ROYALTIES')}
+                    className={`py-1 rounded font-bold transition text-center ${monopolySortMode === 'ROYALTIES' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'bg-slate-800 hover:bg-slate-750 text-slate-300'}`}
+                    title="Trier par montant de royalties"
+                  >
+                    Gains
+                  </button>
+                  <button
+                    onClick={() => setMonopolySortMode('ALPHABETICAL')}
+                    className={`py-1 rounded font-bold transition text-center ${monopolySortMode === 'ALPHABETICAL' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'bg-slate-800 hover:bg-slate-750 text-slate-300'}`}
+                    title="Trier par ordre alphabétique"
+                  >
+                    A-Z
+                  </button>
+                </div>
+              </div>
 
-                  const totalPercentage = myTitles.reduce((sum, t) => sum + (t.percentage ?? 0), 0);
-                  const royaltiesAmount = myTitles.length >= 2 ? res.royalties[myTitles.length - 2] : 0;
+              <div className="space-y-2 overflow-y-auto pr-0.5 flex-1 min-h-0">
+                {(() => {
+                  const ownedResources = Object.values(RESOURCE_DEFINITIONS)
+                    .map((res) => {
+                      const myTitles = Object.values(gameState.titles).filter(
+                        (t) => t.resourceType === res.type && t.ownerId === me?.id
+                      );
+                      const totalPercentage = myTitles.reduce((sum, t) => sum + (t.percentage ?? 0), 0);
+                      const royaltiesAmount = myTitles.length >= 2 ? res.royalties[myTitles.length - 2] : 0;
+                      return { res, myTitles, totalPercentage, royaltiesAmount };
+                    })
+                    .filter((item) => item.myTitles.length > 0);
 
-                  return (
+                  // Tri en fonction du mode choisi
+                  if (monopolySortMode === 'ALPHABETICAL') {
+                    ownedResources.sort((a, b) => a.res.name.localeCompare(b.res.name));
+                  } else if (monopolySortMode === 'PERCENTAGE') {
+                    ownedResources.sort((a, b) => b.totalPercentage - a.totalPercentage);
+                  } else if (monopolySortMode === 'ROYALTIES') {
+                    ownedResources.sort((a, b) => b.royaltiesAmount - a.royaltiesAmount);
+                  }
+
+                  if (ownedResources.length === 0) {
+                    return (
+                      <div className="text-slate-500 text-xs italic text-center py-4">
+                        Aucun titre d'exploitation détenu.
+                      </div>
+                    );
+                  }
+
+                  return ownedResources.map(({ res, myTitles, totalPercentage, royaltiesAmount }) => (
                     <div key={res.type} className="bg-slate-800/60 p-2.5 rounded-lg border border-slate-700/60 space-y-1">
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="font-bold" style={{ color: res.color }}>
@@ -734,19 +795,14 @@ export default function App() {
                         ))}
                       </div>
                     </div>
-                  );
-                })}
-
-                {Object.values(gameState.titles).filter((t) => t.ownerId === me?.id).length === 0 && (
-                  <div className="text-slate-500 text-xs italic text-center py-4">
-                    Aucun titre d'exploitation détenu.
-                  </div>
-                )}
+                  ));
+                })()}
               </div>
             </div>
 
           </div>
         </div>
+
 
 
       {/* Rendu du pop-up modal d'action principal */}
