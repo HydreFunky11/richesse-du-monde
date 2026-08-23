@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { GameState } from './types/game';
+import type { GameState, ResourceType } from './types/game';
 import { RESOURCE_DEFINITIONS, COUNTRY_CONTINENT_MAP } from './data/board';
 import './App.css';
 
@@ -24,8 +24,10 @@ export default function App() {
   const [boardZoom, setBoardZoom] = useState(1.0);
   const [auctionSearchQuery, setAuctionSearchQuery] = useState('');
   const [auctionContinentFilter, setAuctionContinentFilter] = useState<'ALL' | 'Europe' | 'Asie' | 'Afrique' | 'Amérique'>('ALL');
+  const [highlightedResourceType, setHighlightedResourceType] = useState<ResourceType | null>(null);
   const [cashNotifications, setCashNotifications] = useState<{ id: number; amount: number; type: 'gain' | 'loss' }[]>([]);
   const prevCashRef = useRef<number | null>(null);
+
   const prevOwnedTitlesCountRef = useRef<number | null>(null);
   const prevHasJokerRef = useRef<boolean | null>(null);
 
@@ -85,7 +87,9 @@ export default function App() {
     setSelectedTitlesForAuction([]);
     setAuctionSearchQuery('');
     setAuctionContinentFilter('ALL');
+    setHighlightedResourceType(null);
   }, [gameState?.currentPlayerIndex, gameState?.status]);
+
 
 
   // Retarder l'ouverture du pop-up d'action pour laisser le pion glisser sur le plateau (0.8s d'anim + 0.4s de pause)
@@ -337,7 +341,23 @@ export default function App() {
         .animate-float-down {
           animation: floatDown 2.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
         }
+        @keyframes targetGlow {
+          0%, 100% {
+            box-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
+            border-color: rgba(245, 158, 11, 0.4);
+          }
+          50% {
+            box-shadow: 0 0 20px rgba(245, 158, 11, 1);
+            border-color: rgba(245, 158, 11, 1);
+            background-color: rgba(245, 158, 11, 0.25);
+          }
+        }
+        .animate-target-glow {
+          animation: targetGlow 1.2s infinite ease-in-out;
+          z-index: 30 !important;
+        }
       `}</style>
+
 
       {/* Notifications de Gain / Perte Financière */}
       <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-3">
@@ -491,7 +511,11 @@ export default function App() {
                 const coords = getCellGridCoords(cell.index);
                 const royaltyRes = cell.royaltyResourceType ? RESOURCE_DEFINITIONS[cell.royaltyResourceType] : null;
 
-                
+                const isTargetCase = highlightedResourceType && cell.type === 'RICHESSE' && cell.titleIds?.some(id => {
+                  const t = gameState.titles[id];
+                  return t.resourceType === highlightedResourceType && t.ownerId === null;
+                });
+
                 return (
                   <div
                     key={cell.index}
@@ -509,9 +533,12 @@ export default function App() {
                       cell.type === 'CHOIX_CONTINENTAL' || cell.type === 'CHOIX_MONDIAL' || cell.type === 'ENCHERES' ? 'bg-teal-950/30 border-t-teal-500 font-semibold' : ''
                     } ${
                       selectedCellIndex === cell.index ? 'ring-2 ring-amber-400 bg-slate-750' : ''
+                    } ${
+                      isTargetCase ? 'animate-target-glow' : ''
                     }`}
                     title={`${cell.name} - Case #${cell.index}`}
                   >
+
 
                     {/* Nom de la case */}
                     <div className="font-bold text-slate-300 leading-tight truncate">
@@ -1001,6 +1028,21 @@ export default function App() {
                           {royaltiesAmount > 0 ? `${royaltiesAmount.toLocaleString()} F / passage` : '0 F (sans monopole)'}
                         </span>
                       </div>
+
+                      {myTitles.length < 6 && (
+                        <button
+                          type="button"
+                          onClick={() => setHighlightedResourceType(prev => prev === res.type ? null : res.type)}
+                          className={`w-full text-[8.5px] font-bold py-1 px-1.5 rounded transition flex items-center justify-center gap-1 ${
+                            highlightedResourceType === res.type
+                              ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow animate-pulse'
+                              : 'bg-slate-700/80 hover:bg-slate-650 text-slate-300 border border-slate-650/45'
+                          }`}
+                        >
+                          {highlightedResourceType === res.type ? '🎯 Cibles activées (clignotent)' : '🎯 Surligner les cibles libres'}
+                        </button>
+                      )}
+
 
                       <div className="text-[9px] text-slate-500 flex flex-wrap gap-1 pt-1 border-t border-slate-700/20">
                         {myTitles.map(t => (
