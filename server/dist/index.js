@@ -8,6 +8,7 @@ const http_1 = require("http");
 const socket_io_1 = require("socket.io");
 const cors_1 = __importDefault(require("cors"));
 const gameEngine_1 = require("./engine/gameEngine");
+const unoEngine_1 = require("./engine/unoEngine");
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
@@ -20,29 +21,52 @@ const io = new socket_io_1.Server(httpServer, {
 });
 const PORT = process.env.PORT || 3001;
 const games = {};
+const unoGames = {};
 const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
 app.get('/health', (req, res) => {
     res.send({ status: 'ok', activeGames: Object.keys(games).length });
 });
 io.on('connection', (socket) => {
     console.log(`Un joueur s'est connecté : ${socket.id}`);
-    socket.on('joinGame', ({ username, roomCode }) => {
+    socket.on('joinGame', ({ username, roomCode, gameType }) => {
         const formattedRoomCode = roomCode.toUpperCase().trim();
-        if (!games[formattedRoomCode]) {
-            games[formattedRoomCode] = new gameEngine_1.GameEngine(formattedRoomCode);
-        }
-        const game = games[formattedRoomCode];
-        const color = PLAYER_COLORS[game.getPlayers().length] || '#6B7280';
-        const success = game.addPlayer(socket.id, username, color);
-        if (success) {
-            socket.join(formattedRoomCode);
-            socket.roomCode = formattedRoomCode;
-            socket.username = username;
-            io.to(formattedRoomCode).emit('gameStateUpdate', game.getState());
-            console.log(`[LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+        const type = gameType === 'uno' ? 'uno' : 'richesse';
+        socket.gameType = type;
+        if (type === 'uno') {
+            if (!unoGames[formattedRoomCode]) {
+                unoGames[formattedRoomCode] = new unoEngine_1.UnoEngine(formattedRoomCode);
+            }
+            const game = unoGames[formattedRoomCode];
+            const color = PLAYER_COLORS[game.getPlayers().length] || '#6B7280';
+            const success = game.addPlayer(socket.id, username, color);
+            if (success) {
+                socket.join(formattedRoomCode);
+                socket.roomCode = formattedRoomCode;
+                socket.username = username;
+                io.to(formattedRoomCode).emit('unoStateUpdate', game.getState());
+                console.log(`[UNO LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+            }
+            else {
+                socket.emit('error', 'Impossible de rejoindre le salon UNO (partie commencée ou salon plein).');
+            }
         }
         else {
-            socket.emit('error', 'Impossible de rejoindre le salon (partie commencée ou salon plein).');
+            if (!games[formattedRoomCode]) {
+                games[formattedRoomCode] = new gameEngine_1.GameEngine(formattedRoomCode);
+            }
+            const game = games[formattedRoomCode];
+            const color = PLAYER_COLORS[game.getPlayers().length] || '#6B7280';
+            const success = game.addPlayer(socket.id, username, color);
+            if (success) {
+                socket.join(formattedRoomCode);
+                socket.roomCode = formattedRoomCode;
+                socket.username = username;
+                io.to(formattedRoomCode).emit('gameStateUpdate', game.getState());
+                console.log(`[LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+            }
+            else {
+                socket.emit('error', 'Impossible de rejoindre le salon (partie commencée ou salon plein).');
+            }
         }
     });
     socket.on('startGame', () => {
@@ -190,10 +214,93 @@ io.on('connection', (socket) => {
         io.to(roomCode).emit('lobbyClosed');
         delete games[roomCode];
     });
+    // ─── UNO event handlers ────────────────────────────────────────────────────
+    socket.on('uno:startGame', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !unoGames[roomCode])
+            return;
+        const game = unoGames[roomCode];
+        const success = game.startGame();
+        if (success) {
+            io.to(roomCode).emit('unoStateUpdate', game.getState());
+            console.log(`[UNO] Partie démarrée dans le salon ${roomCode}`);
+        }
+        else {
+            socket.emit('error', 'Impossible de démarrer la partie UNO (minimum 2 joueurs requis).');
+        }
+    });
+    socket.on('uno:playCard', ({ cardId, chosenColor }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !unoGames[roomCode])
+            return;
+        const game = unoGames[roomCode];
+        const result = game.playCard(socket.id, cardId, chosenColor);
+        if (result.success) {
+            io.to(roomCode).emit('unoStateUpdate', game.getState());
+        }
+        else {
+            socket.emit('error', result.error ?? 'Impossible de jouer cette carte.');
+        }
+    });
+    socket.on('uno:drawCard', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !unoGames[roomCode])
+            return;
+        const game = unoGames[roomCode];
+        const result = game.drawCard(socket.id);
+        if (result.success) {
+            io.to(roomCode).emit('unoStateUpdate', game.getState());
+        }
+        else {
+            socket.emit('error', result.error ?? 'Impossible de piocher.');
+        }
+    });
+    socket.on('uno:sayUno', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !unoGames[roomCode])
+            return;
+        const game = unoGames[roomCode];
+        game.sayUno(socket.id);
+        io.to(roomCode).emit('unoStateUpdate', game.getState());
+    });
+    socket.on('uno:challengeUno', ({ targetId }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !unoGames[roomCode])
+            return;
+        const game = unoGames[roomCode];
+        const result = game.challengeUno(socket.id, targetId);
+        if (result.success) {
+            io.to(roomCode).emit('unoStateUpdate', game.getState());
+        }
+        else {
+            socket.emit('error', result.error ?? 'Défi invalide.');
+        }
+    });
+    socket.on('uno:resetGame', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !unoGames[roomCode])
+            return;
+        const game = unoGames[roomCode];
+        game.resetGame();
+        io.to(roomCode).emit('unoStateUpdate', game.getState());
+        console.log(`[UNO] Partie réinitialisée dans le salon ${roomCode}`);
+    });
+    // ─── Disconnect ────────────────────────────────────────────────────────────
     socket.on('disconnect', () => {
         const roomCode = socket.roomCode;
         const username = socket.username;
-        if (roomCode && games[roomCode]) {
+        const gameType = socket.gameType;
+        if (gameType === 'uno' && roomCode && unoGames[roomCode]) {
+            const game = unoGames[roomCode];
+            game.removePlayer(socket.id);
+            io.to(roomCode).emit('unoStateUpdate', game.getState());
+            console.log(`[UNO] Déconnexion de ${username} du salon ${roomCode}`);
+            // Clean up empty rooms
+            if (game.getPlayers().length === 0) {
+                delete unoGames[roomCode];
+            }
+        }
+        else if (roomCode && games[roomCode]) {
             const game = games[roomCode];
             if (game.getState().status === 'PLAYING' || game.getState().status === 'AUCTION') {
                 // En cours de partie, la déconnexion équivaut à une faillite pour ne pas bloquer les autres

@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import type { GameState, ResourceType } from './types/game';
 import { RESOURCE_DEFINITIONS, COUNTRY_CONTINENT_MAP } from './data/board';
@@ -8,6 +9,7 @@ const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || 'http://localhost:3001'
 
 
 export default function App() {
+  const navigate = useNavigate();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [username, setUsername] = useState('');
@@ -256,6 +258,13 @@ export default function App() {
   if (!joined || !gameState) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
+        {/* Back button */}
+        <button
+          onClick={() => navigate('/')}
+          className="absolute top-4 left-4 flex items-center gap-1.5 text-slate-400 hover:text-slate-100 text-sm font-medium transition-colors"
+        >
+          ← Accueil
+        </button>
         <div className="bg-slate-900 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-800">
           <h1 className="text-3xl font-extrabold text-center mb-2 tracking-tight bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
             Richesses du Monde
@@ -397,6 +406,12 @@ export default function App() {
       {/* Header */}
       <header className="flex justify-between items-center bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-md mb-4">
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-1 text-slate-400 hover:text-slate-100 text-xs font-medium transition-colors"
+          >
+            ← Accueil
+          </button>
           <div>
             <h1 className="text-xl font-bold tracking-wider text-amber-500 font-sans">RICHESSES DU MONDE</h1>
             <p className="text-xs text-slate-400">Code du salon : <span className="font-mono text-white font-bold">{gameState.gameId}</span></p>
