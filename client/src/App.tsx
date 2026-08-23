@@ -797,10 +797,15 @@ export default function App() {
                 <h2 className="text-xl font-black text-slate-100 uppercase tracking-wide">
                   {cell.name}
                 </h2>
-                <p className="text-slate-400 text-[11px]">
+                <p className="text-slate-400 text-[11px] pb-1">
                   Vous avez atterri sur cette case. Choisissez votre action :
                 </p>
+                {/* Affichage de l'argent du joueur dans le pop-up */}
+                <div className="inline-block bg-slate-800 border border-slate-700/80 px-4 py-1 rounded-full text-xs font-bold shadow-inner">
+                  Votre Fortune : <span className="text-amber-400 font-mono font-extrabold">{(me?.cash ?? 0).toLocaleString()} F</span>
+                </div>
               </div>
+
 
               {/* Section Achat Richesse */}
               {hasRichesseAction && (
