@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.INITIAL_BOARD = exports.INITIAL_TITLES = exports.RESOURCE_DEFINITIONS = void 0;
+exports.COUNTRY_CONTINENT_MAP = exports.INITIAL_BOARD = exports.INITIAL_TITLES = exports.RESOURCE_DEFINITIONS = void 0;
 exports.RESOURCE_DEFINITIONS = {
     PETROLE: {
         type: 'PETROLE',
@@ -389,3 +389,45 @@ exports.INITIAL_BOARD = [
     { index: 68, name: "Europe", type: "CHOIX_CONTINENTAL", continent: "Europe" },
     { index: 69, name: "500 000 F", type: "BANQUE" },
 ];
+exports.COUNTRY_CONTINENT_MAP = {
+    "France": "Europe",
+    "Allemagne": "Europe",
+    "Royaume-Uni": "Europe",
+    "Italie": "Europe",
+    "Espagne": "Europe",
+    "Suède": "Europe",
+    "Norvège": "Europe",
+    "Pays-Bas": "Europe",
+    "Belgique": "Europe",
+    "Suisse": "Europe",
+    "U.R.S.S.": "Europe",
+    "Chine": "Asie",
+    "Japon": "Asie",
+    "Inde": "Asie",
+    "Indonésie": "Asie",
+    "Malaisie": "Asie",
+    "Thaïlande": "Asie",
+    "Arabie Saoudite": "Asie",
+    "Iran": "Asie",
+    "Irak": "Asie",
+    "Australie": "Asie",
+    "Nouvelle-Zélande": "Asie",
+    "Nouvelle-Calédonie": "Asie",
+    "Afrique du Sud": "Afrique",
+    "Algérie": "Afrique",
+    "Libye": "Afrique",
+    "Niger": "Afrique",
+    "Nigeria": "Afrique",
+    "Égypte": "Afrique",
+    "Zaïre (RDC)": "Afrique",
+    "Zambie": "Afrique",
+    "Canada": "Amérique",
+    "Mexique": "Amérique",
+    "Brésil": "Amérique",
+    "Colombie": "Amérique",
+    "Venezuela": "Amérique",
+    "Chili": "Amérique",
+    "Pérou": "Amérique",
+    "Argentine": "Amérique",
+    "États-Unis d'Amérique": "Amérique"
+};

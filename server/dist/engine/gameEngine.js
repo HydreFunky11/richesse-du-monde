@@ -221,6 +221,14 @@ class GameEngine {
         if (cell.type === 'CHOIX_CONTINENTAL' || cell.type === 'CHOIX_MONDIAL') {
             if (currentPlayer.lapsCompleted < 1)
                 return false;
+            // Filtre continental : si c'est un choix continental, le pays du titre doit correspondre au continent de la case
+            if (cell.type === 'CHOIX_CONTINENTAL') {
+                const titleContinent = board_1.COUNTRY_CONTINENT_MAP[title.country];
+                if (titleContinent !== cell.continent) {
+                    this.state.log.push(`${currentPlayer.username} ne peut pas acheter ${title.country} sur la case ${cell.name} car ce pays appartient au continent ${titleContinent}.`);
+                    return false;
+                }
+            }
             // Condition : Détenir déjà au moins un titre de cette ressource
             const ownsAtLeastOne = Object.values(this.state.titles).some(t => t.resourceType === title.resourceType && t.ownerId === currentPlayer.id);
             if (!ownsAtLeastOne) {

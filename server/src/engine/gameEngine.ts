@@ -1,5 +1,5 @@
 import { GameState, Player, Title, BoardCell, ResourceType, AuctionState, GameCardEvent } from '../types/game';
-import { INITIAL_BOARD, INITIAL_TITLES, RESOURCE_DEFINITIONS } from '../data/board';
+import { INITIAL_BOARD, INITIAL_TITLES, RESOURCE_DEFINITIONS, COUNTRY_CONTINENT_MAP } from '../data/board';
 
 // Deck de 18 cartes Actualités réalistes inspirées du jeu
 const ACTUALITE_DECK: GameCardEvent[] = [
@@ -236,6 +236,15 @@ export class GameEngine {
     if (cell.type === 'CHOIX_CONTINENTAL' || cell.type === 'CHOIX_MONDIAL') {
       if (currentPlayer.lapsCompleted < 1) return false;
 
+      // Filtre continental : si c'est un choix continental, le pays du titre doit correspondre au continent de la case
+      if (cell.type === 'CHOIX_CONTINENTAL') {
+        const titleContinent = COUNTRY_CONTINENT_MAP[title.country];
+        if (titleContinent !== cell.continent) {
+          this.state.log.push(`${currentPlayer.username} ne peut pas acheter ${title.country} sur la case ${cell.name} car ce pays appartient au continent ${titleContinent}.`);
+          return false;
+        }
+      }
+
       // Condition : Détenir déjà au moins un titre de cette ressource
       const ownsAtLeastOne = Object.values(this.state.titles).some(
         t => t.resourceType === title.resourceType && t.ownerId === currentPlayer.id
@@ -250,6 +259,7 @@ export class GameEngine {
       this.state.log.push(`${currentPlayer.username} a acheté ${title.country} (${RESOURCE_DEFINITIONS[title.resourceType].name}) via la case ${cell.name} pour ${title.purchasePrice.toLocaleString()} F.`);
       return true;
     }
+
 
     return false;
   }

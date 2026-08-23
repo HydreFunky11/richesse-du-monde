@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { GameState } from './types/game';
-import { RESOURCE_DEFINITIONS } from './data/board';
+import { RESOURCE_DEFINITIONS, COUNTRY_CONTINENT_MAP } from './data/board';
 import './App.css';
 
 const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || 'http://localhost:3001';
@@ -666,11 +666,21 @@ export default function App() {
         // Achat titres Choix
         const isChoix = cell.type === 'CHOIX_MONDIAL' || cell.type === 'CHOIX_CONTINENTAL';
         const availableChoixTitles = isChoix && (me?.lapsCompleted ?? 0) >= 1
-          ? Object.values(gameState.titles).filter(
-              t => t.ownerId === null && 
-              Object.values(gameState.titles).some(myT => myT.resourceType === t.resourceType && myT.ownerId === me?.id)
-            )
+          ? Object.values(gameState.titles).filter(t => {
+              if (t.ownerId !== null) return false;
+              const ownsResource = Object.values(gameState.titles).some(
+                myT => myT.resourceType === t.resourceType && myT.ownerId === me?.id
+              );
+              if (!ownsResource) return false;
+
+              if (cell.type === 'CHOIX_CONTINENTAL') {
+                const titleContinent = COUNTRY_CONTINENT_MAP[t.country];
+                return titleContinent === cell.continent;
+              }
+              return true;
+            })
           : [];
+
 
         // Vérifier si des actions sont disponibles sur cette case
         const hasRichesseAction = cell.type === 'RICHESSE' && availableTitles.length > 0;
