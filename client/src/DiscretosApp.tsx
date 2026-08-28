@@ -42,9 +42,10 @@ export default function DiscretosApp() {
   const [joined, setJoined] = useState(false);
   const [error, setError] = useState('');
 
-  // Clue input state
+  // Chat input state
   const [clueInput, setClueInput] = useState('');
 
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -67,10 +68,16 @@ export default function DiscretosApp() {
   }, []);
 
   useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [gameState?.clues]);
+
+  useEffect(() => {
     if (logsEndRef.current) {
       logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [gameState?.log, gameState?.clues]);
+  }, [gameState?.log]);
 
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -234,7 +241,7 @@ export default function DiscretosApp() {
               <ul className="text-xs text-slate-400 space-y-2 list-disc list-inside leading-relaxed">
                 <li>Au départ, un lieu secret farfelu ou normal est choisi (ex: *Kebab Spatial*).</li>
                 <li>Tout le monde connaît le lieu et reçoit un rôle, **sauf 1 joueur** : **L'Intrus** 🥸.</li>
-                <li>**Tour par tour** : Chacun son tour, donnez un indice textuel pas trop évident sur le lieu.</li>
+                <li>**Chat en Tour par Tour** : Chacun son tour, envoyez un message dans le chat pour donner un indice pas trop évident.</li>
                 <li>Après **3 tours d'indices complets**, la phase de vote s'ouvre.</li>
                 <li>Découvrez qui est l'imposteur en votant tous ensemble !</li>
               </ul>
@@ -245,24 +252,25 @@ export default function DiscretosApp() {
         /* Game Playing State */
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 p-6 overflow-hidden">
           
-          {/* Left panel: Player List & Votes Status */}
-          <div className="lg:col-span-1 space-y-4 overflow-y-auto max-h-[calc(100vh-220px)] pr-1">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg">
-              <div className="flex justify-between items-center mb-3">
+          {/* Left panel: Player List & Identity Card */}
+          <div className="lg:col-span-1 flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-130px)] pr-1">
+            {/* Player list block */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg flex flex-col gap-3">
+              <div className="flex justify-between items-center">
                 <h3 className="font-bold text-xs text-slate-400 uppercase tracking-wider">Membres</h3>
                 {gameState.status === 'PLAYING' && (
-                  <span className="bg-slate-950 text-cyan-400 font-bold px-2 py-0.5 rounded border border-slate-800 text-xs">
-                    Tour d'indices {gameState.currentRound}/3
+                  <span className="bg-slate-950 text-cyan-400 font-bold px-2 py-0.5 rounded border border-slate-800 text-[10px]">
+                    Tour {gameState.currentRound}/3
                   </span>
                 )}
                 {gameState.status === 'VOTING' && (
-                  <span className="bg-red-950 text-red-400 font-bold px-2 py-0.5 rounded border border-red-900/40 text-xs animate-pulse">
-                    PHASE VOTE 🗳️
+                  <span className="bg-red-950 text-red-400 font-bold px-2 py-0.5 rounded border border-red-900/40 text-[10px] animate-pulse">
+                    VOTE 🗳️
                   </span>
                 )}
               </div>
               
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {gameState.players.map((p) => {
                   const hasVoted = p.hasVotedToAccuse !== null;
                   const votesAgainst = gameState.players.filter(pl => pl.hasVotedToAccuse === p.id).length;
@@ -270,23 +278,23 @@ export default function DiscretosApp() {
                   return (
                     <div
                       key={p.id}
-                      className="p-3 rounded-lg border bg-slate-850 border-slate-750 flex flex-col gap-2 transition"
+                      className="p-2.5 rounded-lg border bg-slate-850 border-slate-750 flex flex-col gap-1.5 transition text-xs"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
-                          <span className="font-semibold text-sm">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
+                          <span className="font-semibold">
                             {p.username} {p.id === socket?.id && '(Vous)'}
                           </span>
                         </div>
                         <div className="flex items-center gap-1">
                           {gameState.status === 'VOTING' && (
-                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${hasVoted ? 'bg-green-950 text-green-400' : 'bg-slate-800 text-slate-550'}`}>
+                            <span className={`text-[8px] px-1 rounded font-bold ${hasVoted ? 'bg-green-950 text-green-400' : 'bg-slate-800 text-slate-550'}`}>
                               {hasVoted ? 'A VOTÉ' : 'ATTENTE'}
                             </span>
                           )}
                           {gameState.status === 'VOTING' && votesAgainst > 0 && (
-                            <span className="text-[9px] bg-red-950/60 text-red-400 px-1.5 py-0.5 rounded font-bold border border-red-900/30">
+                            <span className="text-[8px] bg-red-950/60 text-red-400 px-1 rounded font-bold border border-red-900/30">
                               🗳️ {votesAgainst}
                             </span>
                           )}
@@ -297,7 +305,7 @@ export default function DiscretosApp() {
                       {gameState.status === 'VOTING' && p.id !== socket?.id && !me?.hasVotedToAccuse && (
                         <button
                           onClick={() => handleVote(p.id)}
-                          className="w-full text-center font-bold text-[10px] py-1 bg-red-900 hover:bg-red-800 text-white rounded transition border border-red-700 cursor-pointer"
+                          className="w-full text-center font-bold text-[9px] py-1 bg-red-900 hover:bg-red-800 text-white rounded transition border border-red-700 cursor-pointer"
                         >
                           Voter contre {p.username} 🗳️
                         </button>
@@ -305,7 +313,7 @@ export default function DiscretosApp() {
 
                       {/* Show who voted for whom at FINISHED state */}
                       {gameState.status === 'FINISHED' && p.hasVotedToAccuse && (
-                        <div className="text-[10px] text-slate-400 font-mono">
+                        <div className="text-[9px] text-slate-400 font-mono">
                           👉 A voté contre : <span className="text-white font-bold">{gameState.players.find(pl => pl.id === p.hasVotedToAccuse)?.username}</span>
                         </div>
                       )}
@@ -314,139 +322,172 @@ export default function DiscretosApp() {
                 })}
               </div>
             </div>
-          </div>
 
-          {/* Center Column: Role Card & Turn Clue Input */}
-          <div className="lg:col-span-2 flex flex-col gap-6 justify-between">
-            {/* Identity Card */}
+            {/* Identity Card Details */}
             {me && (
-              <div className="bg-slate-900 border border-slate-850 rounded-2xl p-6 shadow-inner flex flex-col items-center justify-center relative min-h-[300px]">
+              <div className={`border-2 rounded-xl flex flex-col justify-between p-4 text-center shadow-lg h-64 relative bg-slate-900 ${
+                me.isSpy 
+                  ? 'border-red-500 bg-red-950/5 text-red-300' 
+                  : 'border-cyan-500 bg-cyan-950/5 text-cyan-300'
+              }`}>
+                <div className="text-2xl">{me.isSpy ? '🥸' : '🗺️'}</div>
                 
-                {gameState.status === 'FINISHED' && gameState.winner && (
-                  <div className="text-center bg-slate-950/80 border border-cyan-500/30 p-6 rounded-xl shadow-2xl max-w-sm absolute z-30 animate-pulse">
-                    <div className="text-4xl mb-3">🏆</div>
-                    <h3 className="text-lg font-bold text-cyan-400">
-                      {gameState.winner === 'CITIZENS' ? 'Victoire des Citoyens !' : "L'Intrus l'emporte !"}
-                    </h3>
-                    <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-                      {gameState.winReason}
+                <div>
+                  <h3 className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Votre Rôle :</h3>
+                  <h2 className="text-lg font-extrabold text-white mt-0.5 leading-snug">{me.role}</h2>
+                </div>
+
+                {!me.isSpy ? (
+                  <div>
+                    <h3 className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Lieu Secret :</h3>
+                    <h2 className="text-sm font-bold text-cyan-400 mt-0.5 leading-snug">{gameState.location}</h2>
+                  </div>
+                ) : (
+                  <div>
+                    <h3 className="text-[9px] text-red-400 font-bold uppercase tracking-wider">🥸 Infiltration</h3>
+                    <p className="text-[9px] text-slate-500 mt-0.5 leading-relaxed italic">
+                      Écoutez les indices pour deviner le lieu !
                     </p>
                   </div>
                 )}
 
-                {/* Identity Card Details */}
-                <div className={`w-64 h-80 border-2 rounded-xl flex flex-col justify-between p-6 text-center shadow-2xl relative ${
-                  me.isSpy 
-                    ? 'border-red-500 bg-red-950/10 text-red-300' 
-                    : 'border-cyan-500 bg-cyan-950/10 text-cyan-300'
-                }`}>
-                  <div className="text-3xl">{me.isSpy ? '🥸' : '🗺️'}</div>
-                  
-                  <div>
-                    <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Votre Rôle :</h3>
-                    <h2 className="text-2xl font-extrabold text-white mt-1 leading-snug">{me.role}</h2>
-                  </div>
-
-                  {!me.isSpy ? (
-                    <div>
-                      <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Lieu Secret :</h3>
-                      <h2 className="text-lg font-bold text-cyan-400 mt-1 leading-snug">{gameState.location}</h2>
-                    </div>
-                  ) : (
-                    <div>
-                      <h3 className="text-[10px] text-red-400 font-bold uppercase tracking-wider">🥸 Vous êtes l'Intrus</h3>
-                      <p className="text-[9.5px] text-slate-400 mt-1.5 leading-relaxed">
-                        Écoutez bien les indices des autres pour essayer de deviner le lieu et ne pas vous faire griller !
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="text-[9px] text-slate-500 uppercase tracking-widest font-mono">
-                    DISCRETOS CARD
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Turn Clue Submission Input Panel */}
-            {gameState.status === 'PLAYING' && (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg flex flex-col gap-3">
-                {isMyTurnToClue ? (
-                  <form onSubmit={handleSendClue} className="flex flex-col gap-2">
-                    <div className="text-xs font-bold text-cyan-400 animate-pulse">
-                      ✨ C'est votre tour ! Donnez un indice textuel sur le lieu secret :
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={clueInput}
-                        onChange={(e) => setClueInput(e.target.value)}
-                        placeholder="Ex: C'est un endroit bruyant..."
-                        className="flex-1 bg-slate-950 border border-slate-700 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-500"
-                        maxLength={100}
-                        required
-                      />
-                      <button
-                        type="submit"
-                        className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-4 py-2 rounded text-xs transition cursor-pointer"
-                      >
-                        Envoyer 📝
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <div className="text-xs text-slate-400 italic text-center py-2">
-                    📢 Attente de l'indice de <span className="font-bold text-white">{activeCluePlayer?.username}</span>...
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Voting round instructions */}
-            {gameState.status === 'VOTING' && (
-              <div className="bg-slate-900 border border-red-950 p-4 rounded-xl shadow text-center">
-                <div className="text-sm font-bold text-red-400 animate-pulse">🗳️ PHASE DE VOTE ACTIVE</div>
-                <div className="text-xs text-slate-400 mt-1">
-                  {me?.hasVotedToAccuse 
-                    ? "Vous avez voté. En attente du vote des autres joueurs..." 
-                    : "Observez les indices donnés et cliquez sur le bouton de vote à gauche pour accuser l'intrus !"}
+                <div className="text-[8px] text-slate-500 uppercase tracking-widest font-mono">
+                  DISCRETOS CARD
                 </div>
               </div>
             )}
           </div>
 
-          {/* Right Column: Game Logs & Locations List */}
-          <div className="lg:col-span-1 space-y-4">
-            {/* Clues logs (Turn-based indices board) */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg flex flex-col max-h-[300px]">
-              <h3 className="font-bold text-xs text-slate-400 mb-2 uppercase tracking-wider">Indices Donnés</h3>
-              <div className="overflow-y-auto space-y-2 max-h-[220px] pr-1">
+          {/* Center Column: Big Chat Room */}
+          <div className="lg:col-span-2 flex flex-col justify-between bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden min-h-[480px]">
+            
+            {/* Chat Header */}
+            <div className="bg-slate-850 border-b border-slate-800 p-4 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-pulse" />
+                <span className="font-bold text-sm text-slate-200">Discussion des indices</span>
+              </div>
+              {activeCluePlayer && (
+                <div className="text-xs text-slate-400">
+                  C'est au tour de : <span className="text-cyan-400 font-bold">{activeCluePlayer.username}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Chat Body (Messages List) */}
+            <div className="flex-1 p-4 overflow-y-auto space-y-3 flex flex-col justify-end min-h-0">
+              <div className="space-y-3 overflow-y-auto max-h-[360px] pr-1">
                 {gameState.clues.length === 0 ? (
-                  <div className="text-xs text-slate-500 italic">Aucun indice pour le moment.</div>
+                  <div className="text-xs text-slate-500 italic text-center my-8">
+                    La partie commence. Aucun indice n'a été partagé pour le moment.
+                  </div>
                 ) : (
-                  gameState.clues.map((c, idx) => (
-                    <div key={idx} className="bg-slate-950 p-2 rounded border border-slate-850 text-[10px]">
-                      <div className="flex justify-between text-[9px] text-slate-500 mb-0.5">
-                        <span className="font-bold">{c.username}</span>
-                        <span>Tour {c.round}</span>
+                  gameState.clues.map((c, idx) => {
+                    const player = gameState.players.find(p => p.id === c.playerId);
+                    const isSelf = c.playerId === socket?.id;
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`flex flex-col max-w-[80%] ${
+                          isSelf ? 'ml-auto items-end' : 'mr-auto items-start'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1 text-[9px] text-slate-500 mb-0.5 font-mono">
+                          <span className="font-bold" style={{ color: player?.color || '#94A3B8' }}>{c.username}</span>
+                          <span>• Tour {c.round}</span>
+                        </div>
+                        <div
+                          className={`rounded-2xl px-4 py-2.5 text-xs ${
+                            isSelf
+                              ? 'bg-cyan-600 text-white rounded-tr-none'
+                              : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-750'
+                          }`}
+                        >
+                          {c.clueText}
+                        </div>
                       </div>
-                      <p className="text-slate-200 italic">"{c.clueText}"</p>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
+                <div ref={chatEndRef} />
               </div>
             </div>
 
-            {/* List of possible locations for reference */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg">
-              <h3 className="font-bold text-xs text-slate-400 mb-2 uppercase tracking-wider">Lieux (Réf.)</h3>
-              <div className="space-y-1 overflow-y-auto max-h-[140px] font-mono text-[9px] text-slate-400">
+            {/* Chat Input panel */}
+            <div className="bg-slate-850 border-t border-slate-800 p-4">
+              {gameState.status === 'PLAYING' && (
+                isMyTurnToClue ? (
+                  <form onSubmit={handleSendClue} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={clueInput}
+                      onChange={(e) => setClueInput(e.target.value)}
+                      placeholder="Écrivez votre message / indice sur le lieu..."
+                      className="flex-1 bg-slate-950 border border-slate-750 rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                      maxLength={120}
+                      required
+                      autoFocus
+                    />
+                    <button
+                      type="submit"
+                      className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition cursor-pointer flex items-center gap-1 shadow-md hover:shadow-cyan-950/20"
+                    >
+                      Envoyer 🚀
+                    </button>
+                  </form>
+                ) : (
+                  <div className="flex items-center justify-center py-2.5 bg-slate-950/50 rounded-xl border border-slate-800 text-xs text-slate-500 italic">
+                    ⏳ Attente de l'indice de {activeCluePlayer?.username}...
+                  </div>
+                )
+              )}
+
+              {gameState.status === 'VOTING' && (
+                <div className="py-2 px-3 bg-red-950/20 border border-red-900/40 rounded-xl text-center text-xs text-red-400 font-medium animate-pulse">
+                  🗳️ PHASE DE VOTE ACTIVE : Accusez l'intrus en cliquant sur "Voter" dans la liste à gauche !
+                </div>
+              )}
+
+              {gameState.status === 'FINISHED' && gameState.winner && (
+                <div className="py-3 px-4 bg-slate-950/60 border border-cyan-950 rounded-xl text-center">
+                  <div className="text-sm font-bold text-cyan-400">
+                    🏆 {gameState.winner === 'CITIZENS' ? 'Victoire des Citoyens !' : "L'Intrus gagne la partie !"}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                    {gameState.winReason}
+                  </p>
+                </div>
+              )}
+            </div>
+
+          </div>
+
+          {/* Right Column: Reference list of locations & Journal */}
+          <div className="lg:col-span-1 space-y-4">
+            {/* List of locations for reference */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg flex flex-col">
+              <h3 className="font-bold text-xs text-slate-400 mb-2.5 uppercase tracking-wider">Lieux (Réf.)</h3>
+              <div className="space-y-1.5 overflow-y-auto max-h-[200px] font-mono text-[9.5px] text-slate-400 pr-1">
                 {gameState.locationsList.map((loc) => (
-                  <div key={loc} className="flex items-center gap-1">
+                  <div key={loc} className="flex items-center gap-1 py-0.5 border-b border-slate-850/50 last:border-none">
                     <span>📍</span>
-                    <span>{loc}</span>
+                    <span className="truncate">{loc}</span>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Room log history */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg flex flex-col max-h-[220px]">
+              <h3 className="font-bold text-xs text-slate-400 mb-2 uppercase tracking-wider">Journal du salon</h3>
+              <div className="overflow-y-auto font-mono text-[9px] text-slate-450 space-y-1 pr-1">
+                {gameState.log.map((line, idx) => (
+                  <div key={idx} className="border-b border-slate-850/50 pb-0.5 last:border-none">
+                    {line}
+                  </div>
+                ))}
+                <div ref={logsEndRef} />
               </div>
             </div>
           </div>
