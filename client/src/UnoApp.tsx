@@ -384,6 +384,18 @@ export default function UnoApp() {
           ) : (
             <p className="text-center text-slate-500 text-sm">En attente que l'hôte démarre la partie...</p>
           )}
+
+          {/* Section Règles */}
+          <div className="mt-8 pt-6 border-t border-slate-800 text-left w-full">
+            <h3 className="text-xs font-bold text-red-400 uppercase tracking-wider mb-3">📜 Règles du UNO :</h3>
+            <ul className="text-xs text-slate-400 space-y-2 list-disc list-inside leading-relaxed">
+              <li>Débarrassez-vous de toutes vos cartes en premier pour gagner la partie.</li>
+              <li>Vous devez jouer une carte de la même couleur ou du même symbole/chiffre que la carte du dessus.</li>
+              <li>Les cartes spéciales (+2, Passer, Inversion, Super Joker) permettent de piéger le joueur suivant.</li>
+              <li>Vous pouvez empiler (stack) les cartes +2 pour punir le joueur suivant d'une plus grosse pioche.</li>
+              <li>Cliquez sur le bouton **UNO !** avant de jouer votre avant-dernière carte pour avertir les autres.</li>
+            </ul>
+          </div>
         </div>
       </div>
     );

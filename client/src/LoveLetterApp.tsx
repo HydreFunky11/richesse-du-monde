@@ -301,7 +301,7 @@ export default function LoveLetterApp() {
       {gameState.status === 'LOBBY' ? (
         /* Lobby State */
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-sm w-full shadow-2xl">
+          <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md w-full shadow-2xl">
             <div className="text-5xl mb-4 animate-bounce">💌</div>
             <h2 className="text-xl font-bold mb-4">Salon de jeu</h2>
             <div className="space-y-2 mb-6">
@@ -315,9 +315,21 @@ export default function LoveLetterApp() {
                 </div>
               ))}
             </div>
-            <p className="text-slate-500 text-xs leading-relaxed">
+            <p className="text-slate-500 text-xs leading-relaxed mb-6">
               Il faut entre 2 et 4 joueurs pour démarrer une partie.
             </p>
+
+            {/* Section Règles */}
+            <div className="pt-6 border-t border-slate-800 text-left w-full">
+              <h3 className="text-xs font-bold text-pink-400 uppercase tracking-wider mb-3">📜 Règles de Love Letter :</h3>
+              <ul className="text-xs text-slate-400 space-y-2 list-disc list-inside leading-relaxed">
+                <li>Chaque joueur commence la manche avec **1 carte en main**.</li>
+                <li>À votre tour, piochez une carte puis jouez-en une de votre choix pour appliquer son effet.</li>
+                <li>Éliminez les autres courtisans par déduction (Garde, Baron) ou forçage (Prince).</li>
+                <li>Protégez-vous grâce à la Servante (4) ou échangez votre main avec le Roi (6).</li>
+                <li>La manche prend fin si un seul joueur survit ou si la pioche est vide (la carte la plus forte l'emporte).</li>
+              </ul>
+            </div>
           </div>
         </div>
       ) : (

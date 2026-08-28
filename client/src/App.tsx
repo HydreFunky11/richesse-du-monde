@@ -478,11 +478,23 @@ export default function App() {
           ) : (
             <button
               onClick={handleStartGame}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition duration-200"
+              className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition duration-200 cursor-pointer"
             >
               Lancer la Partie 🚀
             </button>
           )}
+
+          {/* Section Règles */}
+          <div className="mt-8 pt-6 border-t border-slate-800 text-left w-full">
+            <h3 className="text-xs font-bold text-amber-500 uppercase tracking-wider mb-3">📜 Règles de Richesses du Monde :</h3>
+            <ul className="text-xs text-slate-400 space-y-2 list-disc list-inside leading-relaxed">
+              <li>Déplacez-vous sur le plateau mondial de 70 cases en lançant les dés.</li>
+              <li>Achetez des concessions de ressources (Pétrole, Or, Café, Houille, Laine...) pour développer votre empire.</li>
+              <li>Si un joueur atterrit sur l'une de vos ressources, il vous paie des redevances basées sur le pourcentage que vous possédez.</li>
+              <li>Complétez des monopoles sur un continent ou dans le monde pour multiplier vos gains.</li>
+              <li>Vendez vos titres aux enchères ou utilisez vos Jokers pour éviter la faillite !</li>
+            </ul>
+          </div>
         </div>
       ) : (
         <>
