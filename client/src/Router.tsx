@@ -4,6 +4,7 @@ import App from './App';
 import UnoApp from './UnoApp';
 import ChaosApp from './ChaosApp';
 import LoveLetterApp from './LoveLetterApp';
+import DiscretosApp from './DiscretosApp';
 
 export default function Router() {
   return (
@@ -13,6 +14,7 @@ export default function Router() {
       <Route path="/uno" element={<UnoApp />} />
       <Route path="/chaos" element={<ChaosApp />} />
       <Route path="/loveletter" element={<LoveLetterApp />} />
+      <Route path="/discretos" element={<DiscretosApp />} />
     </Routes>
   );
 }

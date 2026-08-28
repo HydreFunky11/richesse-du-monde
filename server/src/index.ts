@@ -6,6 +6,7 @@ import { GameEngine } from './engine/gameEngine';
 import { UnoEngine } from './engine/unoEngine';
 import { ChaosEngine } from './engine/chaosEngine';
 import { LoveLetterEngine } from './engine/loveLetterEngine';
+import { DiscretosEngine } from './engine/discretosEngine';
 
 const app = express();
 app.use(cors());
@@ -25,6 +26,7 @@ const games: { [roomCode: string]: GameEngine } = {};
 const unoGames: { [roomCode: string]: UnoEngine } = {};
 const chaosGames: { [roomCode: string]: ChaosEngine } = {};
 const loveLetterGames: { [roomCode: string]: LoveLetterEngine } = {};
+const discretosGames: { [roomCode: string]: DiscretosEngine } = {};
 const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
 
 
@@ -38,7 +40,7 @@ io.on('connection', (socket) => {
 
   socket.on('joinGame', ({ username, roomCode, gameType }: { username: string, roomCode: string, gameType?: string }) => {
     const formattedRoomCode = roomCode.toUpperCase().trim();
-    const type = gameType === 'uno' ? 'uno' : (gameType === 'chaos' ? 'chaos' : (gameType === 'loveletter' ? 'loveletter' : 'richesse'));
+    const type = gameType === 'uno' ? 'uno' : (gameType === 'chaos' ? 'chaos' : (gameType === 'loveletter' ? 'loveletter' : (gameType === 'discretos' ? 'discretos' : 'richesse')));
     (socket as any).gameType = type;
 
     if (type === 'uno') {
@@ -77,6 +79,26 @@ io.on('connection', (socket) => {
         console.log(`[LOVELETTER LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
       } else {
         socket.emit('error', 'Impossible de rejoindre le salon Love Letter (partie commencée ou salon plein).');
+      }
+    } else if (type === 'discretos') {
+      if (!discretosGames[formattedRoomCode]) {
+        discretosGames[formattedRoomCode] = new DiscretosEngine(formattedRoomCode);
+        discretosGames[formattedRoomCode].setOnTickCallback(() => {
+          io.to(formattedRoomCode).emit('discretosStateUpdate', discretosGames[formattedRoomCode].getState());
+        });
+      }
+      const game = discretosGames[formattedRoomCode];
+      const color = PLAYER_COLORS[game.getPlayers().length] || '#6B7280';
+      const success = game.addPlayer(socket.id, username, color);
+
+      if (success) {
+        socket.join(formattedRoomCode);
+        (socket as any).roomCode = formattedRoomCode;
+        (socket as any).username = username;
+        io.to(formattedRoomCode).emit('discretosStateUpdate', game.getState());
+        console.log(`[DISCRETOS LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+      } else {
+        socket.emit('error', 'Impossible de rejoindre le salon Discretos (partie commencée ou salon plein).');
       }
     } else {
       if (!games[formattedRoomCode]) {
@@ -419,6 +441,44 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('loveletterStateUpdate', game.getState());
   });
 
+  // ─── Discretos handlers ────────────────────────────────────────────────────
+
+  socket.on('discretos:startGame', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !discretosGames[roomCode]) return;
+    const game = discretosGames[roomCode];
+    if (game.startGame()) {
+      io.to(roomCode).emit('discretosStateUpdate', game.getState());
+      console.log(`[DISCRETOS] Partie démarrée dans ${roomCode}`);
+    }
+  });
+
+  socket.on('discretos:accusePlayer', ({ targetId }: { targetId: string | null }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !discretosGames[roomCode]) return;
+    const game = discretosGames[roomCode];
+    if (game.accusePlayer(socket.id, targetId)) {
+      io.to(roomCode).emit('discretosStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('discretos:guessLocation', ({ locationName }: { locationName: string }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !discretosGames[roomCode]) return;
+    const game = discretosGames[roomCode];
+    if (game.guessLocation(socket.id, locationName)) {
+      io.to(roomCode).emit('discretosStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('discretos:resetGame', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !discretosGames[roomCode]) return;
+    const game = discretosGames[roomCode];
+    game.resetGame();
+    io.to(roomCode).emit('discretosStateUpdate', game.getState());
+  });
+
   // ─── Disconnect ────────────────────────────────────────────────────────────
 
   socket.on('disconnect', () => {
@@ -442,6 +502,15 @@ io.on('connection', (socket) => {
       console.log(`[LOVELETTER] Déconnexion de ${username} du salon ${roomCode}`);
       if (game.getPlayers().length === 0) {
         delete loveLetterGames[roomCode];
+      }
+    } else if (gameType === 'discretos' && roomCode && discretosGames[roomCode]) {
+      const game = discretosGames[roomCode];
+      game.removePlayer(socket.id);
+      io.to(roomCode).emit('discretosStateUpdate', game.getState());
+      console.log(`[DISCRETOS] Déconnexion de ${username} du salon ${roomCode}`);
+      if (game.getPlayers().length === 0) {
+        game.destroy();
+        delete discretosGames[roomCode];
       }
     } else if (gameType === 'chaos' && roomCode && chaosGames[roomCode]) {
       const game = chaosGames[roomCode];

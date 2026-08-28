@@ -48,6 +48,17 @@ const GAMES: GameCard[] = [
     badgeColor: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
   },
   {
+    emoji: '🥸',
+    title: 'Discretos',
+    description: "Le jeu d'espionnage et de bluff - infiltrez-vous dans des lieux loufoques sans vous faire repérer, ou menez l'enquête pour trouver l'intrus.",
+    route: '/discretos',
+    gradient: 'from-cyan-500 to-blue-600',
+    ringColor: 'ring-cyan-500',
+    players: '3 à 8 joueurs',
+    badge: 'Bluff',
+    badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+  },
+  {
     emoji: '🎭',
     title: 'Chaos Board',
     description: 'Le jeu du chaos de Magic The Noah - avancez, combattez des monstres, pariez, et modifiez dynamiquement le plateau après votre élimination.',
