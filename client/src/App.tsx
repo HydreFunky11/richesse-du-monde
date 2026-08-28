@@ -33,10 +33,7 @@ export default function App() {
   const prevOwnedTitlesCountRef = useRef<number | null>(null);
   const prevHasJokerRef = useRef<boolean | null>(null);
   const prevDiceRollRef = useRef<[number, number] | null>(null);
-
-
-
-
+  const [soundsEnabled, setSoundsEnabled] = useState(true);
 
 
 
@@ -163,7 +160,7 @@ export default function App() {
 
     // Détecte un NOUVEAU double (valeur différente du dernier lancé enregistré)
     const isNewRoll = !prev || prev[0] !== d1 || prev[1] !== d2;
-    if (isNewRoll && d1 === d2) {
+    if (isNewRoll && d1 === d2 && soundsEnabled) {
       const audio = new Audio('/fahhhhhhhhhhhhhh.mp3');
       audio.volume = 0.25;
       audio.play().catch(() => {}); // ignore autoplay block silently
@@ -422,9 +419,16 @@ export default function App() {
                 socket.emit('resetGame');
               }
             }}
-            className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-bold py-1.5 px-3 rounded-lg text-[10px] border border-slate-700 transition"
+            className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-bold py-1.5 px-3 rounded-lg text-[10px] border border-slate-700 transition cursor-pointer"
           >
             🔄 Réinitialiser la Partie
+          </button>
+
+          <button
+            onClick={() => setSoundsEnabled(prev => !prev)}
+            className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-bold py-1.5 px-3 rounded-lg text-[10px] border border-slate-700 transition flex items-center gap-1 cursor-pointer font-sans"
+          >
+            {soundsEnabled ? '🔊 Sons : ON' : '🔇 Sons : OFF'}
           </button>
 
           {isHost && (
