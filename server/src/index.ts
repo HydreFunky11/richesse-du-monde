@@ -56,22 +56,8 @@ io.on('connection', (socket) => {
         socket.emit('error', 'Impossible de rejoindre le salon UNO (partie commencée ou salon plein).');
       }
     } else if (type === 'chaos') {
-      if (!chaosGames[formattedRoomCode]) {
-        chaosGames[formattedRoomCode] = new ChaosEngine(formattedRoomCode);
-      }
-      const game = chaosGames[formattedRoomCode];
-      const color = PLAYER_COLORS[game.getPlayers().length] || '#6B7280';
-      const success = game.addPlayer(socket.id, username, color);
-
-      if (success) {
-        socket.join(formattedRoomCode);
-        (socket as any).roomCode = formattedRoomCode;
-        (socket as any).username = username;
-        io.to(formattedRoomCode).emit('chaosStateUpdate', game.getState());
-        console.log(`[CHAOS LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
-      } else {
-        socket.emit('error', 'Impossible de rejoindre le salon Chaos (partie commencée ou salon plein).');
-      }
+      socket.emit('error', 'Le jeu Chaos Board est temporairement fermé.');
+      return;
     } else {
       if (!games[formattedRoomCode]) {
         games[formattedRoomCode] = new GameEngine(formattedRoomCode);

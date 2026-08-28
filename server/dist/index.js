@@ -9,7 +9,6 @@ const socket_io_1 = require("socket.io");
 const cors_1 = __importDefault(require("cors"));
 const gameEngine_1 = require("./engine/gameEngine");
 const unoEngine_1 = require("./engine/unoEngine");
-const chaosEngine_1 = require("./engine/chaosEngine");
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
@@ -53,22 +52,8 @@ io.on('connection', (socket) => {
             }
         }
         else if (type === 'chaos') {
-            if (!chaosGames[formattedRoomCode]) {
-                chaosGames[formattedRoomCode] = new chaosEngine_1.ChaosEngine(formattedRoomCode);
-            }
-            const game = chaosGames[formattedRoomCode];
-            const color = PLAYER_COLORS[game.getPlayers().length] || '#6B7280';
-            const success = game.addPlayer(socket.id, username, color);
-            if (success) {
-                socket.join(formattedRoomCode);
-                socket.roomCode = formattedRoomCode;
-                socket.username = username;
-                io.to(formattedRoomCode).emit('chaosStateUpdate', game.getState());
-                console.log(`[CHAOS LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
-            }
-            else {
-                socket.emit('error', 'Impossible de rejoindre le salon Chaos (partie commencée ou salon plein).');
-            }
+            socket.emit('error', 'Le jeu Chaos Board est temporairement fermé.');
+            return;
         }
         else {
             if (!games[formattedRoomCode]) {

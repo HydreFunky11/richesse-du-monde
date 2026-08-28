@@ -10,6 +10,7 @@ interface GameCard {
   players: string;
   badge: string;
   badgeColor: string;
+  isClosed?: boolean;
 }
 
 const GAMES: GameCard[] = [
@@ -45,6 +46,7 @@ const GAMES: GameCard[] = [
     players: '2 à 6 joueurs',
     badge: 'Survie',
     badgeColor: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+    isClosed: true,
   },
 ];
 
@@ -69,22 +71,28 @@ export default function HomePage() {
         {GAMES.map((game) => (
           <button
             key={game.route}
-            onClick={() => navigate(game.route)}
+            onClick={() => !game.isClosed && navigate(game.route)}
+            disabled={game.isClosed}
             className={`
               group relative bg-slate-900 border border-slate-800 rounded-2xl p-8
-              text-left cursor-pointer
-              hover:border-slate-600 hover:bg-slate-800/80
-              transition-all duration-200 shadow-xl hover:shadow-2xl
-              hover:-translate-y-1
+              text-left transition-all duration-200 shadow-xl
+              ${game.isClosed 
+                ? 'opacity-40 cursor-not-allowed border-slate-900' 
+                : 'cursor-pointer hover:border-slate-600 hover:bg-slate-800/80 hover:shadow-2xl hover:-translate-y-1'
+              }
             `}
           >
             {/* Badge */}
-            <span className={`absolute top-4 right-4 text-xs font-semibold px-2.5 py-1 rounded-full border ${game.badgeColor}`}>
-              {game.badge}
+            <span className={`absolute top-4 right-4 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+              game.isClosed 
+                ? 'bg-slate-950/40 text-slate-500 border-slate-800' 
+                : game.badgeColor
+            }`}>
+              {game.isClosed ? 'Fermé' : game.badge}
             </span>
 
             {/* Emoji */}
-            <div className="text-5xl mb-5 group-hover:scale-110 transition-transform duration-200">
+            <div className={`text-5xl mb-5 transition-transform duration-200 ${!game.isClosed && 'group-hover:scale-110'}`}>
               {game.emoji}
             </div>
 
@@ -103,8 +111,8 @@ export default function HomePage() {
               <span className="text-xs text-slate-500 flex items-center gap-1.5">
                 <span>👥</span> {game.players}
               </span>
-              <span className={`text-sm font-bold bg-gradient-to-r ${game.gradient} bg-clip-text text-transparent group-hover:underline`}>
-                Jouer →
+              <span className={`text-sm font-bold bg-gradient-to-r ${game.gradient} bg-clip-text text-transparent ${!game.isClosed && 'group-hover:underline'}`}>
+                {game.isClosed ? 'Fermé 🔒' : 'Jouer →'}
               </span>
             </div>
           </button>
