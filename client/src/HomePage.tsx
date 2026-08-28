@@ -70,6 +70,17 @@ const GAMES: GameCard[] = [
     badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
   },
   {
+    emoji: '🦖',
+    title: 'King of Tokyo',
+    description: "Le jeu de dés et de combat de monstres géants - baffez vos adversaires et devenez le Roi suprême de Tokyo City.",
+    route: '/kingoftokyo',
+    gradient: 'from-red-600 to-amber-600',
+    ringColor: 'ring-red-500',
+    players: '2 à 6 joueurs',
+    badge: 'Combat / Dés',
+    badgeColor: 'bg-red-500/20 text-red-300 border-red-500/30'
+  },
+  {
     emoji: '🎭',
     title: 'Chaos Board',
     description: 'Le jeu du chaos de Magic The Noah - avancez, combattez des monstres, pariez, et modifiez dynamiquement le plateau après votre élimination.',

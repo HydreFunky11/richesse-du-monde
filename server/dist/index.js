@@ -12,6 +12,7 @@ const unoEngine_1 = require("./engine/unoEngine");
 const loveLetterEngine_1 = require("./engine/loveLetterEngine");
 const discretosEngine_1 = require("./engine/discretosEngine");
 const skyjoEngine_1 = require("./engine/skyjoEngine");
+const kingoftokyoEngine_1 = require("./engine/kingoftokyoEngine");
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
@@ -29,6 +30,7 @@ const chaosGames = {};
 const loveLetterGames = {};
 const discretosGames = {};
 const skyjoGames = {};
+const kingOfTokyoGames = {};
 const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
 app.get('/health', (req, res) => {
     res.send({ status: 'ok', activeGames: Object.keys(games).length });
@@ -37,7 +39,7 @@ io.on('connection', (socket) => {
     console.log(`Un joueur s'est connecté : ${socket.id}`);
     socket.on('joinGame', ({ username, roomCode, gameType }) => {
         const formattedRoomCode = roomCode.toUpperCase().trim();
-        const type = gameType === 'uno' ? 'uno' : (gameType === 'chaos' ? 'chaos' : (gameType === 'loveletter' ? 'loveletter' : (gameType === 'discretos' ? 'discretos' : (gameType === 'skyjo' ? 'skyjo' : 'richesse'))));
+        const type = gameType === 'uno' ? 'uno' : (gameType === 'chaos' ? 'chaos' : (gameType === 'loveletter' ? 'loveletter' : (gameType === 'discretos' ? 'discretos' : (gameType === 'skyjo' ? 'skyjo' : (gameType === 'kingoftokyo' ? 'kingoftokyo' : 'richesse')))));
         socket.gameType = type;
         if (type === 'uno') {
             if (!unoGames[formattedRoomCode]) {
@@ -113,6 +115,24 @@ io.on('connection', (socket) => {
             }
             else {
                 socket.emit('error', 'Impossible de rejoindre le salon Skyjo (partie commencée ou salon plein).');
+            }
+        }
+        else if (type === 'kingoftokyo') {
+            if (!kingOfTokyoGames[formattedRoomCode]) {
+                kingOfTokyoGames[formattedRoomCode] = new kingoftokyoEngine_1.KingOfTokyoEngine(formattedRoomCode);
+            }
+            const game = kingOfTokyoGames[formattedRoomCode];
+            const color = PLAYER_COLORS[game.getPlayers().length] || '#6B7280';
+            const success = game.addPlayer(socket.id, username, color);
+            if (success) {
+                socket.join(formattedRoomCode);
+                socket.roomCode = formattedRoomCode;
+                socket.username = username;
+                io.to(formattedRoomCode).emit('kingStateUpdate', game.getState());
+                console.log(`[KING LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+            }
+            else {
+                socket.emit('error', 'Impossible de rejoindre le salon King of Tokyo (partie commencée ou salon plein).');
             }
         }
         else {
@@ -561,6 +581,79 @@ io.on('connection', (socket) => {
         game.resetGame();
         io.to(roomCode).emit('skyjoStateUpdate', game.getState());
     });
+    // ─── King of Tokyo handlers ────────────────────────────────────────────────
+    socket.on('king:startGame', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !kingOfTokyoGames[roomCode])
+            return;
+        const game = kingOfTokyoGames[roomCode];
+        if (game.startGame()) {
+            io.to(roomCode).emit('kingStateUpdate', game.getState());
+            console.log(`[KING] Partie démarrée dans ${roomCode}`);
+        }
+    });
+    socket.on('king:toggleKeep', ({ index }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !kingOfTokyoGames[roomCode])
+            return;
+        const game = kingOfTokyoGames[roomCode];
+        if (game.toggleKeep(socket.id, index)) {
+            io.to(roomCode).emit('kingStateUpdate', game.getState());
+        }
+    });
+    socket.on('king:rollDice', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !kingOfTokyoGames[roomCode])
+            return;
+        const game = kingOfTokyoGames[roomCode];
+        if (game.rollDice(socket.id)) {
+            io.to(roomCode).emit('kingStateUpdate', game.getState());
+        }
+    });
+    socket.on('king:resolveDice', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !kingOfTokyoGames[roomCode])
+            return;
+        const game = kingOfTokyoGames[roomCode];
+        if (game.resolveDice(socket.id)) {
+            io.to(roomCode).emit('kingStateUpdate', game.getState());
+        }
+    });
+    socket.on('king:respondYield', ({ yieldTokyo }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !kingOfTokyoGames[roomCode])
+            return;
+        const game = kingOfTokyoGames[roomCode];
+        if (game.respondYield(socket.id, yieldTokyo)) {
+            io.to(roomCode).emit('kingStateUpdate', game.getState());
+        }
+    });
+    socket.on('king:buyCard', ({ cardId }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !kingOfTokyoGames[roomCode])
+            return;
+        const game = kingOfTokyoGames[roomCode];
+        if (game.buyCard(socket.id, cardId)) {
+            io.to(roomCode).emit('kingStateUpdate', game.getState());
+        }
+    });
+    socket.on('king:endTurn', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !kingOfTokyoGames[roomCode])
+            return;
+        const game = kingOfTokyoGames[roomCode];
+        if (game.endTurn(socket.id)) {
+            io.to(roomCode).emit('kingStateUpdate', game.getState());
+        }
+    });
+    socket.on('king:resetGame', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !kingOfTokyoGames[roomCode])
+            return;
+        const game = kingOfTokyoGames[roomCode];
+        game.resetGame();
+        io.to(roomCode).emit('kingStateUpdate', game.getState());
+    });
     // ─── Disconnect ────────────────────────────────────────────────────────────
     socket.on('disconnect', () => {
         const roomCode = socket.roomCode;
@@ -601,6 +694,15 @@ io.on('connection', (socket) => {
             console.log(`[SKYJO] Déconnexion de ${username} du salon ${roomCode}`);
             if (game.getPlayers().length === 0) {
                 delete skyjoGames[roomCode];
+            }
+        }
+        else if (gameType === 'kingoftokyo' && roomCode && kingOfTokyoGames[roomCode]) {
+            const game = kingOfTokyoGames[roomCode];
+            game.removePlayer(socket.id);
+            io.to(roomCode).emit('kingStateUpdate', game.getState());
+            console.log(`[KING] Déconnexion de ${username} du salon ${roomCode}`);
+            if (game.getPlayers().length === 0) {
+                delete kingOfTokyoGames[roomCode];
             }
         }
         else if (gameType === 'discretos' && roomCode && discretosGames[roomCode]) {
