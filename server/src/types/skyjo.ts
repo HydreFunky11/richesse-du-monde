@@ -20,7 +20,9 @@ export interface SkyjoGameState {
   currentPlayerIndex: number;
   discardPile: SkyjoCard[];
   drawPileCount: number;
-  drawnCard: SkyjoCard | null; // Currently drawn card from draw pile (waiting to be placed or discarded)
+  drawnCard: SkyjoCard | null; // Currently drawn card
+  isDrawnFromDiscard: boolean; // True if the card in hand came from discard pile (cannot be discarded)
+  mustRevealCard: boolean; // True after discarding a drawn card from draw pile; player must reveal a face-down card to finish turn
   roundEnderId: string | null; // Player who turned all their cards face up first
   log: string[];
   winner: SkyjoPlayer | null;

@@ -27,6 +27,8 @@ interface SkyjoGameState {
   discardPile: SkyjoCard[];
   drawPileCount: number;
   drawnCard: SkyjoCard | null;
+  isDrawnFromDiscard: boolean;
+  mustRevealCard: boolean;
   roundEnderId: string | null;
   log: string[];
   winner: SkyjoPlayer | null;
@@ -41,9 +43,6 @@ export default function SkyjoApp() {
   const [joined, setJoined] = useState(false);
   const [error, setError] = useState('');
 
-  // Local drawing states
-  const [drewFromDiscard, setDrewFromDiscard] = useState(false);
-
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,10 +53,6 @@ export default function SkyjoApp() {
       setGameState(state);
       setJoined(true);
       setError('');
-      // Reset local flags on state change
-      if (!state.drawnCard) {
-        setDrewFromDiscard(false);
-      }
     });
 
     s.on('error', (msg: string) => {
@@ -94,7 +89,12 @@ export default function SkyjoApp() {
   const handleDrawFromDiscard = () => {
     if (socket) {
       socket.emit('skyjo:drawFromDiscardPile');
-      setDrewFromDiscard(true);
+    }
+  };
+
+  const handleDiscardDrawnCard = () => {
+    if (socket) {
+      socket.emit('skyjo:discardDrawnCard');
     }
   };
 
@@ -109,25 +109,16 @@ export default function SkyjoApp() {
     const isMyTurn = gameState.players[gameState.currentPlayerIndex]?.id === socket.id;
     if (!isMyTurn || gameState.status !== 'PLAYING') return;
 
-    if (drewFromDiscard) {
-      socket.emit('skyjo:swapWithDiscard', { row, col });
-      setDrewFromDiscard(false);
-    } else if (gameState.drawnCard) {
-      // Prompt option: swap or discard
-      const action = window.confirm(`Voulez-vous ÉCHANGER votre carte en position [${row+1}, ${col+1}] avec la carte piochée (${gameState.drawnCard.value}) ?\n(Annuler = Défausser la carte piochée et retourner cette carte)`)
-        ? 'swap'
-        : 'discard_reveal';
-
-      if (action === 'swap') {
-        socket.emit('skyjo:swapDrawnCard', { row, col });
-      } else {
-        const targetCard = gameState.players[gameState.currentPlayerIndex].grid[row][col];
-        if (targetCard.faceUp) {
-          alert("⚠️ Vous ne pouvez pas choisir cette carte pour la retourner car elle est déjà face visible !");
-          return;
-        }
-        socket.emit('skyjo:discardDrawnCardAndReveal', { row, col });
+    if (gameState.mustRevealCard) {
+      const targetCard = gameState.players[gameState.currentPlayerIndex].grid[row][col];
+      if (targetCard.faceUp) {
+        setError("⚠️ Vous devez choisir une carte face cachée à révéler !");
+        setTimeout(() => setError(''), 3000);
+        return;
       }
+      socket.emit('skyjo:revealCard', { row, col });
+    } else if (gameState.drawnCard) {
+      socket.emit('skyjo:swapDrawnCard', { row, col });
     }
   };
 
@@ -362,28 +353,36 @@ export default function SkyjoApp() {
                 <span className="text-[10px] text-slate-400 uppercase font-semibold mb-1">Pioche ({gameState.drawPileCount})</span>
                 <button
                   onClick={handleDrawFromDraw}
-                  disabled={!isMyTurn || !!gameState.drawnCard || drewFromDiscard}
+                  disabled={!isMyTurn || !!gameState.drawnCard || gameState.mustRevealCard}
                   className={`w-20 h-28 rounded-lg border-2 flex items-center justify-center font-bold text-2xl shadow-xl transition transform select-none ${
-                    isMyTurn && !gameState.drawnCard && !drewFromDiscard
-                      ? 'bg-slate-850 border-emerald-500 hover:-translate-y-1 cursor-pointer hover:bg-slate-800'
-                      : 'bg-slate-900 border-slate-800 text-slate-650 opacity-60'
+                    isMyTurn && !gameState.drawnCard && !gameState.mustRevealCard
+                      ? 'bg-slate-850 border-emerald-500 hover:-translate-y-1 cursor-pointer hover:bg-slate-800 text-white'
+                      : 'bg-slate-900 border-slate-850 text-slate-700 opacity-60'
                   }`}
                 >
                   🃟
                 </button>
               </div>
 
-              {/* Drawn Card display */}
+              {/* Drawn Card display with discard option */}
               {gameState.drawnCard && (
-                <div className="text-center flex flex-col items-center">
-                  <span className="text-[10px] text-emerald-400 font-bold uppercase mb-1">Piochée</span>
+                <div className="text-center flex flex-col items-center gap-1.5">
+                  <span className="text-[10px] text-emerald-400 font-bold uppercase">Piochée</span>
                   <div
-                    className={`w-20 h-28 rounded-lg border-2 flex flex-col items-center justify-center font-extrabold text-3xl shadow-2xl animate-bounce ${getCardColor(
+                    className={`w-20 h-28 rounded-lg border-2 flex flex-col items-center justify-center font-extrabold text-3xl shadow-2xl ${getCardColor(
                       gameState.drawnCard.value
                     )}`}
                   >
                     <span>{gameState.drawnCard.value}</span>
                   </div>
+                  {isMyTurn && !gameState.isDrawnFromDiscard && (
+                    <button
+                      onClick={handleDiscardDrawnCard}
+                      className="bg-red-950/80 hover:bg-red-900 text-red-400 hover:text-red-200 border border-red-900/50 font-bold text-[9px] px-2 py-0.5 rounded cursor-pointer transition"
+                    >
+                      🗑️ Défausser
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -393,15 +392,15 @@ export default function SkyjoApp() {
                 {gameState.discardPile.length > 0 ? (
                   <button
                     onClick={handleDrawFromDiscard}
-                    disabled={!isMyTurn || !!gameState.drawnCard || drewFromDiscard}
+                    disabled={!isMyTurn || !!gameState.drawnCard || gameState.mustRevealCard}
                     className={`w-20 h-28 rounded-lg border-2 flex items-center justify-center font-extrabold text-3xl shadow-xl transition transform select-none ${
                       gameState.discardPile[gameState.discardPile.length - 1]
                         ? getCardColor(gameState.discardPile[gameState.discardPile.length - 1].value)
                         : ''
                     } ${
-                      isMyTurn && !gameState.drawnCard && !drewFromDiscard
+                      isMyTurn && !gameState.drawnCard && !gameState.mustRevealCard
                         ? 'hover:-translate-y-1 border-white hover:border-emerald-400 cursor-pointer'
-                        : 'border-slate-800'
+                        : 'border-slate-850 opacity-60'
                     }`}
                   >
                     {gameState.discardPile[gameState.discardPile.length - 1]?.value}
@@ -457,6 +456,12 @@ export default function SkyjoApp() {
                   </div>
                 )}
 
+                {error && (
+                  <div className="bg-red-950/60 border border-red-550/30 text-red-400 text-xs px-3 py-1.5 rounded-lg mb-4 w-full max-w-md text-center">
+                    {error}
+                  </div>
+                )}
+
                 <div className="flex justify-between items-center w-full max-w-md mb-4">
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full" style={{ backgroundColor: me.color }} />
@@ -479,7 +484,7 @@ export default function SkyjoApp() {
                       {rowArr.map((card, cIdx) => {
                         const canClick =
                           gameState.status === 'REVEAL_TWO' ||
-                          (isMyTurn && (drewFromDiscard || !!gameState.drawnCard));
+                          (isMyTurn && (!!gameState.drawnCard || gameState.mustRevealCard));
 
                         return (
                           <button
@@ -503,11 +508,11 @@ export default function SkyjoApp() {
                 {/* Turn assistance instructions */}
                 {isMyTurn && (
                   <div className="text-[10px] text-slate-400 italic mt-4 text-center">
-                    {drewFromDiscard
-                      ? "📍 Cliquez sur une carte de votre grille pour l'échanger avec la carte de la défausse."
+                    {gameState.mustRevealCard
+                      ? "📍 Cliquez sur l'une de vos cartes cachées pour la révéler."
                       : gameState.drawnCard
-                      ? "📍 Cliquez sur une carte de votre grille pour l'échanger ou la retourner."
-                      : "📍 Piochez une carte cachée ou prenez la défausse."}
+                      ? "📍 Cliquez sur l'une de vos cartes pour l'échanger avec la carte piochée."
+                      : "📍 Piochez dans la pioche cachée ou récupérez la défausse."}
                   </div>
                 )}
               </div>

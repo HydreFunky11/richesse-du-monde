@@ -517,15 +517,6 @@ io.on('connection', (socket) => {
             io.to(roomCode).emit('skyjoStateUpdate', game.getState());
         }
     });
-    socket.on('skyjo:swapWithDiscard', ({ row, col }) => {
-        const roomCode = socket.roomCode;
-        if (!roomCode || !skyjoGames[roomCode])
-            return;
-        const game = skyjoGames[roomCode];
-        if (game.swapWithDiscard(socket.id, row, col)) {
-            io.to(roomCode).emit('skyjoStateUpdate', game.getState());
-        }
-    });
     socket.on('skyjo:swapDrawnCard', ({ row, col }) => {
         const roomCode = socket.roomCode;
         if (!roomCode || !skyjoGames[roomCode])
@@ -535,12 +526,21 @@ io.on('connection', (socket) => {
             io.to(roomCode).emit('skyjoStateUpdate', game.getState());
         }
     });
-    socket.on('skyjo:discardDrawnCardAndReveal', ({ row, col }) => {
+    socket.on('skyjo:discardDrawnCard', () => {
         const roomCode = socket.roomCode;
         if (!roomCode || !skyjoGames[roomCode])
             return;
         const game = skyjoGames[roomCode];
-        if (game.discardDrawnCardAndReveal(socket.id, row, col)) {
+        if (game.discardDrawnCard(socket.id)) {
+            io.to(roomCode).emit('skyjoStateUpdate', game.getState());
+        }
+    });
+    socket.on('skyjo:revealCard', ({ row, col }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !skyjoGames[roomCode])
+            return;
+        const game = skyjoGames[roomCode];
+        if (game.revealCard(socket.id, row, col)) {
             io.to(roomCode).emit('skyjoStateUpdate', game.getState());
         }
     });

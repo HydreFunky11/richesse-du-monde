@@ -1,5 +1,27 @@
 import { SkyjoGameState, SkyjoPlayer, SkyjoCard } from '../types/skyjo';
 
+const LOCATIONS = [
+  // Keeping this file structure consistent
+];
+
+const CARD_DISTRIBUTION = [
+  { val: -2, count: 5 },
+  { val: 0, count: 15 },
+  { val: -1, count: 10 },
+  { val: 1, count: 10 },
+  { val: 2, count: 10 },
+  { val: 3, count: 10 },
+  { val: 4, count: 10 },
+  { val: 5, count: 10 },
+  { val: 6, count: 10 },
+  { val: 7, count: 10 },
+  { val: 8, count: 10 },
+  { val: 9, count: 10 },
+  { val: 10, count: 10 },
+  { val: 11, count: 10 },
+  { val: 12, count: 10 }
+];
+
 export class SkyjoEngine {
   private roomCode: string;
   private state: SkyjoGameState;
@@ -14,6 +36,8 @@ export class SkyjoEngine {
       discardPile: [],
       drawPileCount: 0,
       drawnCard: null,
+      isDrawnFromDiscard: false,
+      mustRevealCard: false,
       roundEnderId: null,
       log: ['Salon de jeu créé. En attente des joueurs...'],
       winner: null
@@ -70,23 +94,15 @@ export class SkyjoEngine {
     const deck: SkyjoCard[] = [];
     let idCounter = 0;
 
-    const addCards = (val: number, count: number) => {
-      for (let i = 0; i < count; i++) {
+    CARD_DISTRIBUTION.forEach(item => {
+      for (let i = 0; i < item.count; i++) {
         deck.push({
-          id: `card_${val}_${idCounter++}`,
-          value: val,
+          id: `card_${item.val}_${idCounter++}`,
+          value: item.val,
           faceUp: false
         });
       }
-    };
-
-    addCards(-2, 5);
-    addCards(0, 15);
-    for (let v = -1; v <= 12; v++) {
-      if (v !== 0) {
-        addCards(v, 10);
-      }
-    }
+    });
 
     // Shuffle deck
     for (let i = deck.length - 1; i > 0; i--) {
@@ -123,6 +139,8 @@ export class SkyjoEngine {
 
     this.state.drawPileCount = this.deck.length;
     this.state.drawnCard = null;
+    this.state.isDrawnFromDiscard = false;
+    this.state.mustRevealCard = false;
     this.state.roundEnderId = null;
     this.state.status = 'REVEAL_TWO';
     this.state.log.push('Nouvelle manche ! Choisissez 2 cartes de votre grille à retourner face visible.');
@@ -175,7 +193,7 @@ export class SkyjoEngine {
   }
 
   public drawFromDrawPile(socketId: string): boolean {
-    if (this.state.status !== 'PLAYING' || this.state.drawnCard) return false;
+    if (this.state.status !== 'PLAYING' || this.state.drawnCard || this.state.mustRevealCard) return false;
 
     const activePlayer = this.state.players[this.state.currentPlayerIndex];
     if (activePlayer.id !== socketId) return false;
@@ -189,6 +207,8 @@ export class SkyjoEngine {
 
     card.faceUp = true;
     this.state.drawnCard = card;
+    this.state.isDrawnFromDiscard = false;
+    this.state.mustRevealCard = false;
     this.state.drawPileCount = this.deck.length;
     this.state.log.push(`${activePlayer.username} a pioché une carte cachée de valeur ${card.value}.`);
 
@@ -196,40 +216,25 @@ export class SkyjoEngine {
   }
 
   public drawFromDiscardPile(socketId: string): boolean {
-    if (this.state.status !== 'PLAYING' || this.state.drawnCard || this.state.discardPile.length === 0) return false;
+    if (this.state.status !== 'PLAYING' || this.state.drawnCard || this.state.mustRevealCard || this.state.discardPile.length === 0) return false;
 
     const activePlayer = this.state.players[this.state.currentPlayerIndex];
     if (activePlayer.id !== socketId) return false;
 
-    // Check if we can proceed. The player does not place it in drawnCard, they immediately swap it.
-    // So we just log the action and wait for the swap command.
-    return true;
-  }
+    const card = this.state.discardPile.pop();
+    if (!card) return false;
 
-  public swapWithDiscard(socketId: string, row: number, col: number): boolean {
-    if (this.state.status !== 'PLAYING' || this.state.drawnCard || this.state.discardPile.length === 0) return false;
+    card.faceUp = true;
+    this.state.drawnCard = card;
+    this.state.isDrawnFromDiscard = true;
+    this.state.mustRevealCard = false;
+    this.state.log.push(`${activePlayer.username} a pioché la carte de la défausse de valeur ${card.value}.`);
 
-    const activePlayer = this.state.players[this.state.currentPlayerIndex];
-    if (activePlayer.id !== socketId) return false;
-
-    const targetCard = activePlayer.grid[row]?.[col];
-    if (!targetCard) return false;
-
-    const discardCard = this.state.discardPile.pop()!;
-    discardCard.faceUp = true;
-
-    activePlayer.grid[row][col] = discardCard;
-    targetCard.faceUp = true;
-    this.state.discardPile.push(targetCard);
-
-    this.state.log.push(`${activePlayer.username} a échangé la carte de la défausse (${discardCard.value}) avec sa carte en position [${row+1}, ${col+1}] (qui était de valeur ${targetCard.value}).`);
-
-    this.endTurnTasks(activePlayer);
     return true;
   }
 
   public swapDrawnCard(socketId: string, row: number, col: number): boolean {
-    if (this.state.status !== 'PLAYING' || !this.state.drawnCard) return false;
+    if (this.state.status !== 'PLAYING' || !this.state.drawnCard || this.state.mustRevealCard) return false;
 
     const activePlayer = this.state.players[this.state.currentPlayerIndex];
     if (activePlayer.id !== socketId) return false;
@@ -243,14 +248,30 @@ export class SkyjoEngine {
     this.state.discardPile.push(targetCard);
 
     this.state.drawnCard = null;
-    this.state.log.push(`${activePlayer.username} a remplacé sa carte en position [${row+1}, ${col+1}] par la carte piochée de valeur ${drawn.value}. L'ancienne carte (${targetCard.value}) est défaussée.`);
+    this.state.isDrawnFromDiscard = false;
+    this.state.log.push(`${activePlayer.username} a remplacé sa carte en position [${row+1}, ${col+1}] par la carte de valeur ${drawn.value}. L'ancienne carte (${targetCard.value}) est défaussée.`);
 
     this.endTurnTasks(activePlayer);
     return true;
   }
 
-  public discardDrawnCardAndReveal(socketId: string, row: number, col: number): boolean {
-    if (this.state.status !== 'PLAYING' || !this.state.drawnCard) return false;
+  public discardDrawnCard(socketId: string): boolean {
+    if (this.state.status !== 'PLAYING' || !this.state.drawnCard || this.state.isDrawnFromDiscard || this.state.mustRevealCard) return false;
+
+    const activePlayer = this.state.players[this.state.currentPlayerIndex];
+    if (activePlayer.id !== socketId) return false;
+
+    const drawn = this.state.drawnCard;
+    this.state.discardPile.push(drawn);
+    this.state.drawnCard = null;
+    this.state.mustRevealCard = true;
+
+    this.state.log.push(`${activePlayer.username} a défaussé la carte piochée (${drawn.value}) et doit maintenant révéler une carte cachée de sa grille.`);
+    return true;
+  }
+
+  public revealCard(socketId: string, row: number, col: number): boolean {
+    if (this.state.status !== 'PLAYING' || !this.state.mustRevealCard) return false;
 
     const activePlayer = this.state.players[this.state.currentPlayerIndex];
     if (activePlayer.id !== socketId) return false;
@@ -258,12 +279,10 @@ export class SkyjoEngine {
     const targetCard = activePlayer.grid[row]?.[col];
     if (!targetCard || targetCard.faceUp) return false;
 
-    const drawn = this.state.drawnCard;
-    this.state.discardPile.push(drawn);
     targetCard.faceUp = true;
+    this.state.mustRevealCard = false;
 
-    this.state.drawnCard = null;
-    this.state.log.push(`${activePlayer.username} a défaussé la carte piochée (${drawn.value}) et a révélé sa carte en position [${row+1}, ${col+1}] qui est un ${targetCard.value}.`);
+    this.state.log.push(`${activePlayer.username} a révélé sa carte cachée en position [${row+1}, ${col+1}] qui est un ${targetCard.value}.`);
 
     this.endTurnTasks(activePlayer);
     return true;
@@ -434,6 +453,8 @@ export class SkyjoEngine {
     this.state.discardPile = [];
     this.state.drawPileCount = 0;
     this.state.drawnCard = null;
+    this.state.isDrawnFromDiscard = false;
+    this.state.mustRevealCard = false;
     this.state.roundEnderId = null;
     this.state.winner = null;
     this.state.log = ['Partie réinitialisée. En attente du départ...'];
