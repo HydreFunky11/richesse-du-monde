@@ -29,6 +29,38 @@ const LOCATIONS = [
     {
         name: "Pôle Emploi pour Licornes 🦄",
         roles: ["Conseiller désabusé", "Licorne sans magie", "Vendeur de paillettes d'occasion", "Arc-en-cieliste professionnel", "Chasseur de têtes féérique", "Pégase fatigué"]
+    },
+    {
+        name: "Supermarché 🛒",
+        roles: ["Caissier fatigué", "Client avec coupons", "Chef de rayon", "Vigile suspect", "Voleur à la tire", "Client perdu"]
+    },
+    {
+        name: "Hôpital 🏥",
+        roles: ["Médecin urgentiste", "Infirmier débordé", "Patient plâtré", "Chirurgien concentré", "Visiteur bruyant", "Interne fatigué"]
+    },
+    {
+        name: "École Primaire 🏫",
+        roles: ["Maître d'école", "Élève bavard", "Directeur stressé", "Agent de cantine", "Concierge ronchon", "Parent d'élève en retard"]
+    },
+    {
+        name: "Mairie 🏛️",
+        roles: ["Maire souriant", "Secrétaire d'accueil", "Citoyen qui râle", "Agent d'urbanisme", "Adjoint au maire", "Journaliste local"]
+    },
+    {
+        name: "Gare ferroviaire 🚉",
+        roles: ["Conducteur de train", "Contrôleur de billets", "Voyageur pressé", "Chef de gare", "Vendeur de sandwichs", "Pickpocket agile"]
+    },
+    {
+        name: "Plage de sable 🏖️",
+        roles: ["Touriste en maillot", "Vendeur de beignets", "Sauveteur aux aguets", "Enfant qui fait un château", "Surfeur cool", "Bronzo-addict"]
+    },
+    {
+        name: "Cinéma 🎬",
+        roles: ["Spectateur avec pop-corn", "Ouvreur de salle", "Vendeur de tickets", "Projectionniste caché", "Réalisateur incognito", "Personne qui parle fort"]
+    },
+    {
+        name: "Restaurant Chic 🍽️",
+        roles: ["Chef cuisinier", "Serveur guindé", "Sommelier expert", "Client riche", "Critique gastronomique", "Plongeur fatigué"]
     }
 ];
 class DiscretosEngine {
