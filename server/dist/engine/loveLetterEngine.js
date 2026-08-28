@@ -143,22 +143,30 @@ class LoveLetterEngine {
         if (!activePlayer || activePlayer.id !== socketId || this.state.status !== 'PLAYING') {
             return false;
         }
-        // Find card in hand
-        const cardIdx = activePlayer.hand.findIndex(c => c.id === cardId);
-        if (cardIdx === -1)
-            return false;
-        const card = activePlayer.hand[cardIdx];
-        // COMTESSE restriction check
-        const hasComtesse = activePlayer.hand.some(c => c.type === 'COMTESSE');
-        const hasKingOrPrince = activePlayer.hand.some(c => c.type === 'ROI' || c.type === 'PRINCE');
-        if (hasComtesse && hasKingOrPrince && card.type !== 'COMTESSE') {
-            // Must discard Comtesse first
-            return false;
+        let card = null;
+        const isTargetConfirmation = this.state.targetSelectionNeeded && this.state.targetSelectionNeeded.cardId === cardId;
+        if (isTargetConfirmation) {
+            // Card was already removed from hand during targeting setup, fetch from top of discard pile
+            card = activePlayer.discardPile[activePlayer.discardPile.length - 1];
         }
-        // Remove from hand
-        activePlayer.hand.splice(cardIdx, 1);
-        activePlayer.discardPile.push(card);
-        this.state.log.push(`🃏 ${activePlayer.username} a joué : ${card.name}.`);
+        else {
+            // Find card in hand
+            const cardIdx = activePlayer.hand.findIndex(c => c.id === cardId);
+            if (cardIdx === -1)
+                return false;
+            card = activePlayer.hand[cardIdx];
+            // COMTESSE restriction check
+            const hasComtesse = activePlayer.hand.some(c => c.type === 'COMTESSE');
+            const hasKingOrPrince = activePlayer.hand.some(c => c.type === 'ROI' || c.type === 'PRINCE');
+            if (hasComtesse && hasKingOrPrince && card.type !== 'COMTESSE') {
+                // Must discard Comtesse first
+                return false;
+            }
+            // Remove from hand and put in discard pile
+            activePlayer.hand.splice(cardIdx, 1);
+            activePlayer.discardPile.push(card);
+            this.state.log.push(`🃏 ${activePlayer.username} a joué : ${card.name}.`);
+        }
         // Princesse self-elimination
         if (card.type === 'PRINCESSE') {
             this.eliminatePlayer(activePlayer, 'Défausse forcée de la Princesse');

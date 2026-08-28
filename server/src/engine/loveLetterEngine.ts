@@ -163,24 +163,32 @@ export class LoveLetterEngine {
       return false;
     }
 
-    // Find card in hand
-    const cardIdx = activePlayer.hand.findIndex(c => c.id === cardId);
-    if (cardIdx === -1) return false;
+    let card: any = null;
+    const isTargetConfirmation = this.state.targetSelectionNeeded && this.state.targetSelectionNeeded.cardId === cardId;
 
-    const card = activePlayer.hand[cardIdx];
+    if (isTargetConfirmation) {
+      // Card was already removed from hand during targeting setup, fetch from top of discard pile
+      card = activePlayer.discardPile[activePlayer.discardPile.length - 1];
+    } else {
+      // Find card in hand
+      const cardIdx = activePlayer.hand.findIndex(c => c.id === cardId);
+      if (cardIdx === -1) return false;
 
-    // COMTESSE restriction check
-    const hasComtesse = activePlayer.hand.some(c => c.type === 'COMTESSE');
-    const hasKingOrPrince = activePlayer.hand.some(c => c.type === 'ROI' || c.type === 'PRINCE');
-    if (hasComtesse && hasKingOrPrince && card.type !== 'COMTESSE') {
-      // Must discard Comtesse first
-      return false;
+      card = activePlayer.hand[cardIdx];
+
+      // COMTESSE restriction check
+      const hasComtesse = activePlayer.hand.some(c => c.type === 'COMTESSE');
+      const hasKingOrPrince = activePlayer.hand.some(c => c.type === 'ROI' || c.type === 'PRINCE');
+      if (hasComtesse && hasKingOrPrince && card.type !== 'COMTESSE') {
+        // Must discard Comtesse first
+        return false;
+      }
+
+      // Remove from hand and put in discard pile
+      activePlayer.hand.splice(cardIdx, 1);
+      activePlayer.discardPile.push(card);
+      this.state.log.push(`🃏 ${activePlayer.username} a joué : ${card.name}.`);
     }
-
-    // Remove from hand
-    activePlayer.hand.splice(cardIdx, 1);
-    activePlayer.discardPile.push(card);
-    this.state.log.push(`🃏 ${activePlayer.username} a joué : ${card.name}.`);
 
     // Princesse self-elimination
     if (card.type === 'PRINCESSE') {
