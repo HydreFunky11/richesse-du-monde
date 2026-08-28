@@ -67,18 +67,16 @@ class DiscretosEngine {
     roomCode;
     state;
     selectedLocation = null;
-    timerInterval = null;
-    onTickCallback = null;
     constructor(roomCode) {
         this.roomCode = roomCode;
         this.state = {
             status: 'LOBBY',
             players: [],
+            currentPlayerIndex: 0,
+            currentRound: 1,
             location: null,
             locationsList: LOCATIONS.map(l => l.name),
-            timerDuration: 360, // 6 minutes
-            timerRemaining: 360,
-            timerActive: false,
+            clues: [],
             log: ['Salon de jeu créé. En attente des joueurs...'],
             winner: null,
             winReason: null
@@ -89,9 +87,6 @@ class DiscretosEngine {
     }
     getState() {
         return this.state;
-    }
-    setOnTickCallback(callback) {
-        this.onTickCallback = callback;
     }
     addPlayer(id, username, color) {
         if (this.state.status !== 'LOBBY' || this.state.players.length >= 8) {
@@ -148,106 +143,97 @@ class DiscretosEngine {
         this.state.status = 'PLAYING';
         this.state.winner = null;
         this.state.winReason = null;
-        this.state.timerRemaining = this.state.timerDuration;
-        this.state.timerActive = true;
-        this.state.log.push('La partie de Discretos commence ! Posez-vous des questions pour démasquer l\'intrus.');
-        // Start timer interval
-        this.startInterval();
+        this.state.currentPlayerIndex = 0;
+        this.state.currentRound = 1;
+        this.state.clues = [];
+        this.state.log.push('La partie de Discretos commence ! Donnez à tour de rôle un indice pas trop évident.');
         return true;
     }
-    startInterval() {
-        this.stopInterval();
-        this.timerInterval = setInterval(() => {
-            if (this.state.timerActive && this.state.timerRemaining > 0) {
-                this.state.timerRemaining--;
-                if (this.state.timerRemaining <= 0) {
-                    this.state.timerActive = false;
-                    this.state.status = 'REVEAL';
-                    this.state.log.push('⏱️ Le temps est écoulé ! Vote final requis ou l\'intrus gagne.');
-                    this.stopInterval();
-                }
-                if (this.onTickCallback) {
-                    this.onTickCallback();
-                }
+    submitClue(socketId, clueText) {
+        if (this.state.status !== 'PLAYING')
+            return false;
+        const activePlayer = this.state.players[this.state.currentPlayerIndex];
+        if (!activePlayer || activePlayer.id !== socketId)
+            return false;
+        const cleanClue = clueText.trim();
+        if (!cleanClue)
+            return false;
+        this.state.clues.push({
+            playerId: activePlayer.id,
+            username: activePlayer.username,
+            clueText: cleanClue,
+            round: this.state.currentRound
+        });
+        this.state.log.push(`📝 Indice de ${activePlayer.username} (Tour ${this.state.currentRound}) : "${cleanClue}"`);
+        // Advance turn
+        this.state.currentPlayerIndex++;
+        // Check if round finished
+        if (this.state.currentPlayerIndex >= this.state.players.length) {
+            this.state.currentPlayerIndex = 0;
+            this.state.currentRound++;
+            if (this.state.currentRound > 3) {
+                this.state.status = 'VOTING';
+                this.state.log.push("⏱️ Fin des 3 tours d'indices ! Place aux accusations de l'imposteur.");
             }
-        }, 1000);
-    }
-    stopInterval() {
-        if (this.timerInterval) {
-            clearInterval(this.timerInterval);
-            this.timerInterval = null;
+            else {
+                this.state.log.push(`--- Début du tour d'indices ${this.state.currentRound} ---`);
+            }
         }
+        return true;
     }
     accusePlayer(voterId, targetId) {
-        if (this.state.status !== 'PLAYING' && this.state.status !== 'REVEAL') {
+        if (this.state.status !== 'VOTING') {
             return false;
         }
         const voter = this.state.players.find(p => p.id === voterId);
         if (!voter)
             return false;
         voter.hasVotedToAccuse = targetId;
-        if (targetId) {
-            const target = this.state.players.find(p => p.id === targetId);
-            this.state.log.push(`📣 ${voter.username} suspecte ${target ? target.username : targetId}.`);
-        }
-        else {
-            this.state.log.push(`📣 ${voter.username} retire sa suspicion.`);
-        }
-        // Check if majority of all players (including the accused themselves? Yes, simple majority of all active players)
-        // is reached for any player.
-        const activeCount = this.state.players.length;
-        const majority = Math.floor(activeCount / 2) + 1;
-        for (const player of this.state.players) {
-            const votesForHim = this.state.players.filter(p => p.hasVotedToAccuse === player.id).length;
-            if (votesForHim >= majority) {
-                // Accused! Resolve game
-                this.stopInterval();
-                this.state.status = 'FINISHED';
-                if (player.isSpy) {
-                    this.state.winner = 'CITIZENS';
-                    this.state.winReason = `Félicitations ! L'intrus ${player.username} a été démasqué avec ${votesForHim} votes !`;
-                    this.state.log.push(`👑 CITOYENS GAGNENT : L'intrus était bien ${player.username}.`);
+        const target = this.state.players.find(p => p.id === targetId);
+        this.state.log.push(`📣 ${voter.username} vote contre ${target.username}.`);
+        // Check if everyone voted
+        const allVoted = this.state.players.every(p => p.hasVotedToAccuse !== null);
+        if (allVoted) {
+            // Tally votes
+            const voteTally = {};
+            this.state.players.forEach(p => {
+                const targetId = p.hasVotedToAccuse;
+                voteTally[targetId] = (voteTally[targetId] || 0) + 1;
+            });
+            // Find player with most votes
+            let maxVotes = -1;
+            let accusedId = '';
+            this.state.players.forEach(p => {
+                const votes = voteTally[p.id] || 0;
+                if (votes > maxVotes) {
+                    maxVotes = votes;
+                    accusedId = p.id;
                 }
-                else {
-                    const spy = this.state.players.find(p => p.isSpy);
-                    this.state.winner = 'SPY';
-                    this.state.winReason = `Erreur ! Les citoyens ont accusé ${player.username} à tort. L'intrus était ${spy.username}.`;
-                    this.state.log.push(`🥸 L'INTRUS GAGNE : ${spy.username} a réussi à monter les citoyens les uns contre les autres.`);
-                }
-                return true;
+            });
+            const accusedPlayer = this.state.players.find(p => p.id === accusedId);
+            const spy = this.state.players.find(p => p.isSpy);
+            this.state.status = 'FINISHED';
+            if (accusedPlayer.isSpy) {
+                this.state.winner = 'CITIZENS';
+                this.state.winReason = `L'intrus ${accusedPlayer.username} a été démasqué avec le plus grand nombre de votes ! Le lieu était : ${this.selectedLocation?.name}.`;
+                this.state.log.push(`👑 CITOYENS GAGNENT : L'intrus était bien ${accusedPlayer.username}.`);
+            }
+            else {
+                this.state.winner = 'SPY';
+                this.state.winReason = `L'intrus ${spy.username} gagne ! Le village a failli en accusant ${accusedPlayer.username} (rôle: ${accusedPlayer.role}). Le lieu était : ${this.selectedLocation?.name}.`;
+                this.state.log.push(`🥸 L'INTRUS GAGNE : Les citoyens se sont trompés d'intrus.`);
             }
         }
         return true;
     }
-    guessLocation(spyId, locationName) {
-        if (this.state.status !== 'PLAYING') {
-            return false;
-        }
-        const player = this.state.players.find(p => p.id === spyId);
-        if (!player || !player.isSpy || !this.selectedLocation) {
-            return false;
-        }
-        this.stopInterval();
-        this.state.status = 'FINISHED';
-        if (locationName === this.selectedLocation.name) {
-            this.state.winner = 'SPY';
-            this.state.winReason = `L'intrus ${player.username} s'est révélé et a correctement deviné le lieu : ${locationName} !`;
-            this.state.log.push(`🥸 L'INTRUS GAGNE : ${player.username} a deviné le lieu correct !`);
-        }
-        else {
-            this.state.winner = 'CITIZENS';
-            this.state.winReason = `L'intrus ${player.username} s'est trompé de lieu ! Il a deviné ${locationName} mais c'était ${this.selectedLocation.name}.`;
-            this.state.log.push(`👑 CITOYENS GAGNENT : Mauvaise déduction de l'intrus !`);
-        }
-        return true;
-    }
     resetGame() {
-        this.stopInterval();
         this.state.status = 'LOBBY';
         this.state.location = null;
         this.state.winner = null;
         this.state.winReason = null;
-        this.state.timerActive = false;
+        this.state.currentPlayerIndex = 0;
+        this.state.currentRound = 1;
+        this.state.clues = [];
         this.state.players.forEach(p => {
             p.role = 'Spectateur';
             p.isSpy = false;
@@ -257,7 +243,7 @@ class DiscretosEngine {
         return true;
     }
     destroy() {
-        this.stopInterval();
+        // No-op since timer is removed
     }
 }
 exports.DiscretosEngine = DiscretosEngine;

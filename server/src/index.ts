@@ -83,9 +83,6 @@ io.on('connection', (socket) => {
     } else if (type === 'discretos') {
       if (!discretosGames[formattedRoomCode]) {
         discretosGames[formattedRoomCode] = new DiscretosEngine(formattedRoomCode);
-        discretosGames[formattedRoomCode].setOnTickCallback(() => {
-          io.to(formattedRoomCode).emit('discretosStateUpdate', discretosGames[formattedRoomCode].getState());
-        });
       }
       const game = discretosGames[formattedRoomCode];
       const color = PLAYER_COLORS[game.getPlayers().length] || '#6B7280';
@@ -453,20 +450,20 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('discretos:accusePlayer', ({ targetId }: { targetId: string | null }) => {
+  socket.on('discretos:submitClue', ({ clueText }: { clueText: string }) => {
     const roomCode = (socket as any).roomCode;
     if (!roomCode || !discretosGames[roomCode]) return;
     const game = discretosGames[roomCode];
-    if (game.accusePlayer(socket.id, targetId)) {
+    if (game.submitClue(socket.id, clueText)) {
       io.to(roomCode).emit('discretosStateUpdate', game.getState());
     }
   });
 
-  socket.on('discretos:guessLocation', ({ locationName }: { locationName: string }) => {
+  socket.on('discretos:accusePlayer', ({ targetId }: { targetId: string }) => {
     const roomCode = (socket as any).roomCode;
     if (!roomCode || !discretosGames[roomCode]) return;
     const game = discretosGames[roomCode];
-    if (game.guessLocation(socket.id, locationName)) {
+    if (game.accusePlayer(socket.id, targetId)) {
       io.to(roomCode).emit('discretosStateUpdate', game.getState());
     }
   });
