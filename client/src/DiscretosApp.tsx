@@ -276,18 +276,24 @@ export default function DiscretosApp() {
                 {gameState.players.map((p) => {
                   const hasVoted = p.hasVotedToAccuse !== null;
                   const votesAgainst = gameState.players.filter(pl => pl.hasVotedToAccuse === p.id).length;
+                  const isMe = p.id === socket?.id;
 
                   return (
                     <div
                       key={p.id}
-                      className="p-2.5 rounded-lg border bg-slate-850 border-slate-750 flex flex-col gap-1.5 transition text-xs"
+                      className={`p-2.5 rounded-lg border bg-slate-850 flex flex-col gap-1.5 transition text-xs ${
+                        gameState.status === 'FINISHED' && p.isSpy ? 'border-red-500/50' : 'border-slate-750'
+                      }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
                           <span className="font-semibold">
-                            {p.username} {p.id === socket?.id && '(Vous)'}
+                            {p.username} {isMe && '(Vous)'}
                           </span>
+                          {gameState.status === 'FINISHED' && p.isSpy && (
+                            <span className="text-[8px] bg-red-950 text-red-400 px-1.5 py-0.5 rounded font-bold border border-red-800">🥸 IMPOSTEUR</span>
+                          )}
                         </div>
                         <div className="flex items-center gap-1">
                           {gameState.status === 'VOTING' && (
@@ -303,8 +309,15 @@ export default function DiscretosApp() {
                         </div>
                       </div>
 
+                      {/* In FINISHED, reveal each player's character */}
+                      {gameState.status === 'FINISHED' && (
+                        <div className={`text-[9px] font-mono px-2 py-0.5 rounded border ${p.isSpy ? 'bg-red-950/30 border-red-900/40 text-red-300' : 'bg-slate-900/60 border-slate-800 text-cyan-300'}`}>
+                          🎭 {p.role}
+                        </div>
+                      )}
+
                       {/* Vote/Accuse button during voting round */}
-                      {gameState.status === 'VOTING' && p.id !== socket?.id && !me?.hasVotedToAccuse && (
+                      {gameState.status === 'VOTING' && !isMe && !me?.hasVotedToAccuse && (
                         <button
                           onClick={() => handleVote(p.id)}
                           className="w-full text-center font-bold text-[9px] py-1 bg-red-900 hover:bg-red-800 text-white rounded transition border border-red-700 cursor-pointer"
@@ -327,44 +340,28 @@ export default function DiscretosApp() {
 
             {/* Identity Card Details */}
             {me && (
-              <div className={`border-2 rounded-xl flex flex-col justify-between p-4 text-center shadow-lg relative bg-slate-900 ${
-                me.isSpy 
-                  ? 'border-red-500 bg-red-950/5 text-red-300' 
-                  : 'border-cyan-500 bg-cyan-950/5 text-cyan-300'
-              }`}>
-                <div className="text-2xl mb-1">{me.isSpy ? '🥸' : '🎭'}</div>
+              <div className="border-2 border-cyan-500/50 rounded-xl flex flex-col gap-3 p-4 text-center shadow-lg relative bg-slate-900">
+                <div className="text-2xl">🎭</div>
 
                 {/* Theme — visible to everyone */}
                 {gameState.themeName && (
-                  <div className="mb-2">
+                  <div>
                     <h3 className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Thème du Round :</h3>
                     <h2 className="text-xs font-extrabold text-amber-400 mt-0.5">{gameState.themeName}</h2>
                   </div>
                 )}
 
                 {/* Character */}
-                <div className="mb-2">
+                <div>
                   <h3 className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Votre Personnage :</h3>
                   <h2 className="text-xl font-extrabold text-white mt-0.5 leading-snug">{me.role}</h2>
                 </div>
 
-                {me.isSpy ? (
-                  <div>
-                    <h3 className="text-[9px] text-red-400 font-bold uppercase tracking-wider">🥸 Vous êtes l'Imposteur !</h3>
-                    <p className="text-[9px] text-slate-500 mt-0.5 leading-relaxed italic">
-                      Les autres joueurs ont un personnage <em>similaire</em> mais <em>différent</em> du vôtre. Écoutez leurs indices pour deviner lequel !
-                    </p>
-                  </div>
-                ) : (
-                  <div>
-                    <h3 className="text-[9px] text-cyan-400 font-bold uppercase tracking-wider">🧍 Vous êtes Citoyen</h3>
-                    <p className="text-[9px] text-slate-500 mt-0.5 leading-relaxed italic">
-                      Tous les citoyens partagent ce personnage. L'imposteur a un personnage différent du même thème !
-                    </p>
-                  </div>
-                )}
+                <p className="text-[9px] text-slate-500 leading-relaxed italic">
+                  Donnez des indices sans nommer votre personnage. Êtes-vous l'imposteur ? Vous ne le saurez qu'à la fin !
+                </p>
 
-                <div className="text-[8px] text-slate-500 uppercase tracking-widest font-mono mt-2">
+                <div className="text-[8px] text-slate-500 uppercase tracking-widest font-mono">
                   DISCRETOS CARD
                 </div>
               </div>

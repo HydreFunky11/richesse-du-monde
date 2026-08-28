@@ -116,6 +116,17 @@ class DiscretosEngine {
         return this.state.players;
     }
     getState() {
+        // During PLAYING and VOTING, hide isSpy — nobody knows if they're the impostor
+        if (this.state.status === 'PLAYING' || this.state.status === 'VOTING') {
+            return {
+                ...this.state,
+                players: this.state.players.map(p => ({ ...p, isSpy: false })),
+                // Also hide spyCharacter and citizen character from the broadcast
+                // (clients only see their own role via p.role, which is already personalised per-player)
+                spyCharacter: null,
+                location: null,
+            };
+        }
         return this.state;
     }
     addPlayer(id, username, color) {
