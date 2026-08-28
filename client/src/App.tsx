@@ -165,7 +165,7 @@ export default function App() {
     const isNewRoll = !prev || prev[0] !== d1 || prev[1] !== d2;
     if (isNewRoll && d1 === d2) {
       const audio = new Audio('/fahhhhhhhhhhhhhh.mp3');
-      audio.volume = 0.8;
+      audio.volume = 0.25;
       audio.play().catch(() => {}); // ignore autoplay block silently
     }
 
@@ -899,7 +899,7 @@ export default function App() {
                                     )}
                                     <button
                                       onClick={handlePassTurn}
-                                      disabled={cell.type === 'ENCHERES' && Object.values(gameState.titles).some(t => t.ownerId === me?.id)}
+                                      disabled={cell.type === 'ENCHERES' && (me?.lapsCompleted ?? 0) >= 1 && Object.values(gameState.titles).some(t => t.ownerId === me?.id)}
                                       className="w-full bg-slate-800 hover:bg-slate-750 disabled:bg-slate-900 disabled:text-slate-550 disabled:border-slate-850 text-white font-bold py-2 rounded-lg border border-slate-700 text-xs transition"
                                     >
                                       Terminer mon tour ➡️
@@ -1493,7 +1493,7 @@ export default function App() {
 
               {/* Bouton de Fermeture / Passage de Tour */}
               <div className="border-t border-slate-800 pt-3">
-                {!(cell.type === 'ENCHERES' && Object.values(gameState.titles).some((t) => t.ownerId === me?.id)) ? (
+                {!(cell.type === 'ENCHERES' && (me?.lapsCompleted ?? 0) >= 1 && Object.values(gameState.titles).some((t) => t.ownerId === me?.id)) ? (
                   <button
                     onClick={handlePassTurn}
                     className="w-full bg-slate-800 hover:bg-slate-750 text-slate-200 font-bold py-1.5 rounded text-xs transition border border-slate-700"

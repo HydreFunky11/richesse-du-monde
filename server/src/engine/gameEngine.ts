@@ -302,7 +302,7 @@ export class GameEngine {
     if (cell.type === 'ENCHERES' && currentPlayer.hasJokerCard) {
       currentPlayer.hasJokerCard = false;
       this.state.log.push(`🃏 ${currentPlayer.username} utilise son Joker pour annuler les enchères.`);
-      this.passTurn(playerId);
+      this.passTurn(playerId, true);
       return true;
     }
     return false;
@@ -456,7 +456,7 @@ export class GameEngine {
     this.nextTurn();
   }
 
-  public passTurn(playerId: string): boolean {
+  public passTurn(playerId: string, forcePass: boolean = false): boolean {
     const currentPlayer = this.getCurrentPlayer();
     if (!currentPlayer || currentPlayer.id !== playerId) return false;
     if (this.state.lastDiceRoll === null) return false;
@@ -464,10 +464,12 @@ export class GameEngine {
 
     // Empêcher de passer son tour sans vendre si on est sur la case Enchères et qu'on possède des titres
     const cell = this.state.board[currentPlayer.position];
-    if (cell.type === 'ENCHERES') {
-      const hasTitles = Object.values(this.state.titles).some(t => t.ownerId === currentPlayer.id);
-      if (hasTitles) {
-        return false;
+    if (cell.type === 'ENCHERES' && !forcePass) {
+      if (currentPlayer.lapsCompleted >= 1) {
+        const hasTitles = Object.values(this.state.titles).some(t => t.ownerId === currentPlayer.id);
+        if (hasTitles) {
+          return false;
+        }
       }
     }
 
