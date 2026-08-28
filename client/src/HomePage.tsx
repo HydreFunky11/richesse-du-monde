@@ -35,6 +35,17 @@ const GAMES: GameCard[] = [
     badge: 'Cartes',
     badgeColor: 'bg-red-500/20 text-red-300 border-red-500/30',
   },
+  {
+    emoji: '🎭',
+    title: 'Chaos Board',
+    description: 'Le jeu du chaos de Magic The Noah - avancez, combattez des monstres, pariez, et modifiez dynamiquement le plateau après votre élimination.',
+    route: '/chaos',
+    gradient: 'from-orange-500 to-red-600',
+    ringColor: 'ring-orange-500',
+    players: '2 à 6 joueurs',
+    badge: 'Survie',
+    badgeColor: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+  },
 ];
 
 export default function HomePage() {
@@ -54,7 +65,7 @@ export default function HomePage() {
       </div>
 
       {/* Game cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
         {GAMES.map((game) => (
           <button
             key={game.route}

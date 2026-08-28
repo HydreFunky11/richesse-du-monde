@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import { GameEngine } from './engine/gameEngine';
 import { UnoEngine } from './engine/unoEngine';
+import { ChaosEngine } from './engine/chaosEngine';
 
 const app = express();
 app.use(cors());
@@ -21,7 +22,9 @@ const PORT = process.env.PORT || 3001;
 
 const games: { [roomCode: string]: GameEngine } = {};
 const unoGames: { [roomCode: string]: UnoEngine } = {};
+const chaosGames: { [roomCode: string]: ChaosEngine } = {};
 const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
+
 
 app.get('/health', (req, res) => {
   res.send({ status: 'ok', activeGames: Object.keys(games).length });
@@ -32,7 +35,7 @@ io.on('connection', (socket) => {
 
   socket.on('joinGame', ({ username, roomCode, gameType }: { username: string, roomCode: string, gameType?: string }) => {
     const formattedRoomCode = roomCode.toUpperCase().trim();
-    const type = gameType === 'uno' ? 'uno' : 'richesse';
+    const type = gameType === 'uno' ? 'uno' : (gameType === 'chaos' ? 'chaos' : 'richesse');
     (socket as any).gameType = type;
 
     if (type === 'uno') {
@@ -51,6 +54,23 @@ io.on('connection', (socket) => {
         console.log(`[UNO LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
       } else {
         socket.emit('error', 'Impossible de rejoindre le salon UNO (partie commencée ou salon plein).');
+      }
+    } else if (type === 'chaos') {
+      if (!chaosGames[formattedRoomCode]) {
+        chaosGames[formattedRoomCode] = new ChaosEngine(formattedRoomCode);
+      }
+      const game = chaosGames[formattedRoomCode];
+      const color = PLAYER_COLORS[game.getPlayers().length] || '#6B7280';
+      const success = game.addPlayer(socket.id, username, color);
+
+      if (success) {
+        socket.join(formattedRoomCode);
+        (socket as any).roomCode = formattedRoomCode;
+        (socket as any).username = username;
+        io.to(formattedRoomCode).emit('chaosStateUpdate', game.getState());
+        console.log(`[CHAOS LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+      } else {
+        socket.emit('error', 'Impossible de rejoindre le salon Chaos (partie commencée ou salon plein).');
       }
     } else {
       if (!games[formattedRoomCode]) {
@@ -299,6 +319,62 @@ io.on('connection', (socket) => {
     console.log(`[UNO] Partie réinitialisée dans le salon ${roomCode}`);
   });
 
+  // ─── Chaos Board handlers ──────────────────────────────────────────────────
+
+  socket.on('chaos:startGame', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !chaosGames[roomCode]) return;
+    const game = chaosGames[roomCode];
+    if (game.startGame()) {
+      io.to(roomCode).emit('chaosStateUpdate', game.getState());
+      console.log(`[CHAOS] Partie démarrée dans ${roomCode}`);
+    }
+  });
+
+  socket.on('chaos:rollDice', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !chaosGames[roomCode]) return;
+    const game = chaosGames[roomCode];
+    if (game.rollDice(socket.id)) {
+      io.to(roomCode).emit('chaosStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('chaos:playAction', ({ actionType, params }: { actionType: string, params: any }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !chaosGames[roomCode]) return;
+    const game = chaosGames[roomCode];
+    if (game.playAction(socket.id, actionType, params)) {
+      io.to(roomCode).emit('chaosStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('chaos:modifyCell', ({ cellIndex, newType }: { cellIndex: number, newType: any }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !chaosGames[roomCode]) return;
+    const game = chaosGames[roomCode];
+    if (game.modifyCell(socket.id, cellIndex, newType)) {
+      io.to(roomCode).emit('chaosStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('chaos:passTurn', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !chaosGames[roomCode]) return;
+    const game = chaosGames[roomCode];
+    if (game.passTurn(socket.id)) {
+      io.to(roomCode).emit('chaosStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('chaos:resetGame', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !chaosGames[roomCode]) return;
+    const game = chaosGames[roomCode];
+    game.resetGame();
+    io.to(roomCode).emit('chaosStateUpdate', game.getState());
+  });
+
   // ─── Disconnect ────────────────────────────────────────────────────────────
 
   socket.on('disconnect', () => {
@@ -312,9 +388,25 @@ io.on('connection', (socket) => {
       game.removePlayer(socket.id);
       io.to(roomCode).emit('unoStateUpdate', game.getState());
       console.log(`[UNO] Déconnexion de ${username} du salon ${roomCode}`);
-      // Clean up empty rooms
       if (game.getPlayers().length === 0) {
         delete unoGames[roomCode];
+      }
+    } else if (gameType === 'chaos' && roomCode && chaosGames[roomCode]) {
+      const game = chaosGames[roomCode];
+      // Simple lobby check
+      if (game.getState().status === 'LOBBY') {
+        game.getState().players = game.getState().players.filter(p => p.id !== socket.id);
+        game.getState().log.push(`⚠️ ${username} a quitté le salon.`);
+      } else {
+        const p = game.getState().players.find(pl => pl.id === socket.id);
+        if (p) {
+          p.isEliminated = true;
+          game.getState().log.push(`⚠️ ${username} s'est déconnecté et a été éliminé.`);
+        }
+      }
+      io.to(roomCode).emit('chaosStateUpdate', game.getState());
+      if (game.getPlayers().length === 0) {
+        delete chaosGames[roomCode];
       }
     } else if (roomCode && games[roomCode]) {
       const game = games[roomCode];

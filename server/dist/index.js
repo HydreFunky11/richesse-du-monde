@@ -9,6 +9,7 @@ const socket_io_1 = require("socket.io");
 const cors_1 = __importDefault(require("cors"));
 const gameEngine_1 = require("./engine/gameEngine");
 const unoEngine_1 = require("./engine/unoEngine");
+const chaosEngine_1 = require("./engine/chaosEngine");
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
@@ -22,6 +23,7 @@ const io = new socket_io_1.Server(httpServer, {
 const PORT = process.env.PORT || 3001;
 const games = {};
 const unoGames = {};
+const chaosGames = {};
 const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
 app.get('/health', (req, res) => {
     res.send({ status: 'ok', activeGames: Object.keys(games).length });
@@ -30,7 +32,7 @@ io.on('connection', (socket) => {
     console.log(`Un joueur s'est connecté : ${socket.id}`);
     socket.on('joinGame', ({ username, roomCode, gameType }) => {
         const formattedRoomCode = roomCode.toUpperCase().trim();
-        const type = gameType === 'uno' ? 'uno' : 'richesse';
+        const type = gameType === 'uno' ? 'uno' : (gameType === 'chaos' ? 'chaos' : 'richesse');
         socket.gameType = type;
         if (type === 'uno') {
             if (!unoGames[formattedRoomCode]) {
@@ -48,6 +50,24 @@ io.on('connection', (socket) => {
             }
             else {
                 socket.emit('error', 'Impossible de rejoindre le salon UNO (partie commencée ou salon plein).');
+            }
+        }
+        else if (type === 'chaos') {
+            if (!chaosGames[formattedRoomCode]) {
+                chaosGames[formattedRoomCode] = new chaosEngine_1.ChaosEngine(formattedRoomCode);
+            }
+            const game = chaosGames[formattedRoomCode];
+            const color = PLAYER_COLORS[game.getPlayers().length] || '#6B7280';
+            const success = game.addPlayer(socket.id, username, color);
+            if (success) {
+                socket.join(formattedRoomCode);
+                socket.roomCode = formattedRoomCode;
+                socket.username = username;
+                io.to(formattedRoomCode).emit('chaosStateUpdate', game.getState());
+                console.log(`[CHAOS LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+            }
+            else {
+                socket.emit('error', 'Impossible de rejoindre le salon Chaos (partie commencée ou salon plein).');
             }
         }
         else {
@@ -285,6 +305,61 @@ io.on('connection', (socket) => {
         io.to(roomCode).emit('unoStateUpdate', game.getState());
         console.log(`[UNO] Partie réinitialisée dans le salon ${roomCode}`);
     });
+    // ─── Chaos Board handlers ──────────────────────────────────────────────────
+    socket.on('chaos:startGame', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !chaosGames[roomCode])
+            return;
+        const game = chaosGames[roomCode];
+        if (game.startGame()) {
+            io.to(roomCode).emit('chaosStateUpdate', game.getState());
+            console.log(`[CHAOS] Partie démarrée dans ${roomCode}`);
+        }
+    });
+    socket.on('chaos:rollDice', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !chaosGames[roomCode])
+            return;
+        const game = chaosGames[roomCode];
+        if (game.rollDice(socket.id)) {
+            io.to(roomCode).emit('chaosStateUpdate', game.getState());
+        }
+    });
+    socket.on('chaos:playAction', ({ actionType, params }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !chaosGames[roomCode])
+            return;
+        const game = chaosGames[roomCode];
+        if (game.playAction(socket.id, actionType, params)) {
+            io.to(roomCode).emit('chaosStateUpdate', game.getState());
+        }
+    });
+    socket.on('chaos:modifyCell', ({ cellIndex, newType }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !chaosGames[roomCode])
+            return;
+        const game = chaosGames[roomCode];
+        if (game.modifyCell(socket.id, cellIndex, newType)) {
+            io.to(roomCode).emit('chaosStateUpdate', game.getState());
+        }
+    });
+    socket.on('chaos:passTurn', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !chaosGames[roomCode])
+            return;
+        const game = chaosGames[roomCode];
+        if (game.passTurn(socket.id)) {
+            io.to(roomCode).emit('chaosStateUpdate', game.getState());
+        }
+    });
+    socket.on('chaos:resetGame', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !chaosGames[roomCode])
+            return;
+        const game = chaosGames[roomCode];
+        game.resetGame();
+        io.to(roomCode).emit('chaosStateUpdate', game.getState());
+    });
     // ─── Disconnect ────────────────────────────────────────────────────────────
     socket.on('disconnect', () => {
         const roomCode = socket.roomCode;
@@ -295,9 +370,27 @@ io.on('connection', (socket) => {
             game.removePlayer(socket.id);
             io.to(roomCode).emit('unoStateUpdate', game.getState());
             console.log(`[UNO] Déconnexion de ${username} du salon ${roomCode}`);
-            // Clean up empty rooms
             if (game.getPlayers().length === 0) {
                 delete unoGames[roomCode];
+            }
+        }
+        else if (gameType === 'chaos' && roomCode && chaosGames[roomCode]) {
+            const game = chaosGames[roomCode];
+            // Simple lobby check
+            if (game.getState().status === 'LOBBY') {
+                game.getState().players = game.getState().players.filter(p => p.id !== socket.id);
+                game.getState().log.push(`⚠️ ${username} a quitté le salon.`);
+            }
+            else {
+                const p = game.getState().players.find(pl => pl.id === socket.id);
+                if (p) {
+                    p.isEliminated = true;
+                    game.getState().log.push(`⚠️ ${username} s'est déconnecté et a été éliminé.`);
+                }
+            }
+            io.to(roomCode).emit('chaosStateUpdate', game.getState());
+            if (game.getPlayers().length === 0) {
+                delete chaosGames[roomCode];
             }
         }
         else if (roomCode && games[roomCode]) {
