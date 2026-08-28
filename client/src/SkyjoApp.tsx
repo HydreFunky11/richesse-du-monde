@@ -344,78 +344,12 @@ export default function SkyjoApp() {
             })}
           </div>
 
-          {/* Center Column: Board piles & Active Player Grid */}
-          <div className="lg:col-span-2 flex flex-col justify-between gap-6">
-            {/* Draw and Discard pile row */}
-            <div className="bg-slate-900 border border-slate-850 rounded-xl p-4 flex items-center justify-center gap-12 shadow-md">
-              {/* Draw Pile */}
-              <div className="text-center flex flex-col items-center">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold mb-1">Pioche ({gameState.drawPileCount})</span>
-                <button
-                  onClick={handleDrawFromDraw}
-                  disabled={!isMyTurn || !!gameState.drawnCard || gameState.mustRevealCard}
-                  className={`w-20 h-28 rounded-lg border-2 flex items-center justify-center font-bold text-2xl shadow-xl transition transform select-none ${
-                    isMyTurn && !gameState.drawnCard && !gameState.mustRevealCard
-                      ? 'bg-slate-850 border-emerald-500 hover:-translate-y-1 cursor-pointer hover:bg-slate-800 text-white'
-                      : 'bg-slate-900 border-slate-850 text-slate-700 opacity-60'
-                  }`}
-                >
-                  🃟
-                </button>
-              </div>
-
-              {/* Drawn Card display with discard option */}
-              {gameState.drawnCard && (
-                <div className="text-center flex flex-col items-center gap-1.5">
-                  <span className="text-[10px] text-emerald-400 font-bold uppercase">Piochée</span>
-                  <div
-                    className={`w-20 h-28 rounded-lg border-2 flex flex-col items-center justify-center font-extrabold text-3xl shadow-2xl ${getCardColor(
-                      gameState.drawnCard.value
-                    )}`}
-                  >
-                    <span>{gameState.drawnCard.value}</span>
-                  </div>
-                  {isMyTurn && !gameState.isDrawnFromDiscard && (
-                    <button
-                      onClick={handleDiscardDrawnCard}
-                      className="bg-red-950/80 hover:bg-red-900 text-red-400 hover:text-red-200 border border-red-900/50 font-bold text-[9px] px-2 py-0.5 rounded cursor-pointer transition"
-                    >
-                      🗑️ Défausser
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Discard Pile */}
-              <div className="text-center flex flex-col items-center">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold mb-1">Défausse</span>
-                {gameState.discardPile.length > 0 ? (
-                  <button
-                    onClick={handleDrawFromDiscard}
-                    disabled={!isMyTurn || !!gameState.drawnCard || gameState.mustRevealCard}
-                    className={`w-20 h-28 rounded-lg border-2 flex items-center justify-center font-extrabold text-3xl shadow-xl transition transform select-none ${
-                      gameState.discardPile[gameState.discardPile.length - 1]
-                        ? getCardColor(gameState.discardPile[gameState.discardPile.length - 1].value)
-                        : ''
-                    } ${
-                      isMyTurn && !gameState.drawnCard && !gameState.mustRevealCard
-                        ? 'hover:-translate-y-1 border-white hover:border-emerald-400 cursor-pointer'
-                        : 'border-slate-850 opacity-60'
-                    }`}
-                  >
-                    {gameState.discardPile[gameState.discardPile.length - 1]?.value}
-                  </button>
-                ) : (
-                  <div className="w-20 h-28 rounded-lg border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-600 italic text-xs">
-                    Vide
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* My Own Grid */}
+          {/* Center Column: Active Player Grid (Large, right in the center) */}
+          <div className="lg:col-span-2 flex flex-col justify-between">
             {me && (
-              <div className="bg-slate-900 border border-slate-850 rounded-2xl p-6 shadow-inner flex flex-col items-center relative">
+              <div className={`bg-slate-900 border rounded-2xl p-6 shadow-inner flex flex-col items-center relative transition-all duration-300 ${
+                isMyTurn ? 'border-emerald-500 shadow-[0_0_25px_rgba(16,185,129,0.25)]' : 'border-slate-850'
+              }`}>
                 
                 {/* Overlay for round end */}
                 {gameState.status === 'ROUND_END' && (
@@ -456,9 +390,16 @@ export default function SkyjoApp() {
                   </div>
                 )}
 
-                {error && (
-                  <div className="bg-red-950/60 border border-red-550/30 text-red-400 text-xs px-3 py-1.5 rounded-lg mb-4 w-full max-w-md text-center">
-                    {error}
+                {/* Large Pulsing Turn Notification Banner */}
+                {isMyTurn ? (
+                  <div className="w-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-center py-2.5 rounded-xl font-bold text-xs mb-6 animate-pulse uppercase tracking-wider flex items-center justify-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 block" />
+                    🟢 C'est votre tour de jouer !
+                  </div>
+                ) : (
+                  <div className="w-full bg-slate-950/40 border border-slate-850 text-slate-500 text-center py-2.5 rounded-xl font-medium text-[10px] mb-6 uppercase tracking-wider flex items-center justify-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-slate-700 block animate-ping" />
+                    Tour de : {gameState.players[gameState.currentPlayerIndex]?.username}
                   </div>
                 )}
 
@@ -468,12 +409,7 @@ export default function SkyjoApp() {
                     <span className="font-bold text-sm text-slate-200">Votre Grille</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-slate-400">Cumulé : **{me.totalScore}** pts</span>
-                    {isMyTurn && (
-                      <span className="bg-emerald-500/20 text-emerald-400 font-bold px-2.5 py-0.5 rounded text-[10px] animate-pulse">
-                        C'est votre tour !
-                      </span>
-                    )}
+                    <span className="text-xs text-slate-400 font-mono">Cumulé : <span className="text-white font-bold">{me.totalScore}</span> pts</span>
                   </div>
                 </div>
 
@@ -507,7 +443,7 @@ export default function SkyjoApp() {
 
                 {/* Turn assistance instructions */}
                 {isMyTurn && (
-                  <div className="text-[10px] text-slate-400 italic mt-4 text-center">
+                  <div className="text-[10px] text-emerald-400 bg-emerald-950/20 border border-emerald-900/30 font-semibold mt-4 text-center px-4 py-2 rounded-lg w-full max-w-md">
                     {gameState.mustRevealCard
                       ? "📍 Cliquez sur l'une de vos cartes cachées pour la révéler."
                       : gameState.drawnCard
@@ -519,18 +455,89 @@ export default function SkyjoApp() {
             )}
           </div>
 
-          {/* Right Column: Game Logs */}
+          {/* Right Column: Board piles & Game Logs */}
           <div className="lg:col-span-1 space-y-4 flex flex-col justify-between">
+            {/* Draw and Discard pile (Vertical layout) */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-4 shadow-lg items-center">
+              <h3 className="font-bold text-xs text-slate-400 uppercase tracking-wider self-start">Pioches</h3>
+              
+              <div className="flex gap-4 items-center justify-center w-full">
+                {/* Draw Pile */}
+                <div className="text-center flex flex-col items-center">
+                  <span className="text-[9px] text-slate-400 uppercase font-semibold mb-1">Pioche ({gameState.drawPileCount})</span>
+                  <button
+                    onClick={handleDrawFromDraw}
+                    disabled={!isMyTurn || !!gameState.drawnCard || gameState.mustRevealCard}
+                    className={`w-16 h-24 rounded-lg border-2 flex items-center justify-center font-bold text-lg shadow-xl transition transform select-none ${
+                      isMyTurn && !gameState.drawnCard && !gameState.mustRevealCard
+                        ? 'bg-slate-850 border-emerald-500 hover:-translate-y-1 cursor-pointer hover:bg-slate-800 text-white'
+                        : 'bg-slate-900 border-slate-850 text-slate-700 opacity-60'
+                    }`}
+                  >
+                    🃟
+                  </button>
+                </div>
+
+                {/* Drawn Card display with discard option */}
+                {gameState.drawnCard && (
+                  <div className="text-center flex flex-col items-center gap-1">
+                    <span className="text-[9px] text-emerald-400 font-bold uppercase mb-1">Piochée</span>
+                    <div
+                      className={`w-16 h-24 rounded-lg border-2 flex flex-col items-center justify-center font-extrabold text-2xl shadow-xl ${getCardColor(
+                        gameState.drawnCard.value
+                      )}`}
+                    >
+                      <span>{gameState.drawnCard.value}</span>
+                    </div>
+                    {isMyTurn && !gameState.isDrawnFromDiscard && (
+                      <button
+                        onClick={handleDiscardDrawnCard}
+                        className="bg-red-950/85 hover:bg-red-900 text-red-400 border border-red-900/40 font-bold text-[8px] px-1.5 py-0.5 rounded cursor-pointer transition w-full"
+                      >
+                        🗑️ Jetter
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Discard Pile */}
+                <div className="text-center flex flex-col items-center">
+                  <span className="text-[9px] text-slate-400 uppercase font-semibold mb-1">Défausse</span>
+                  {gameState.discardPile.length > 0 ? (
+                    <button
+                      onClick={handleDrawFromDiscard}
+                      disabled={!isMyTurn || !!gameState.drawnCard || gameState.mustRevealCard}
+                      className={`w-16 h-24 rounded-lg border-2 flex items-center justify-center font-extrabold text-2xl shadow-xl transition transform select-none ${
+                        gameState.discardPile[gameState.discardPile.length - 1]
+                          ? getCardColor(gameState.discardPile[gameState.discardPile.length - 1].value)
+                          : ''
+                      } ${
+                        isMyTurn && !gameState.drawnCard && !gameState.mustRevealCard
+                          ? 'hover:-translate-y-1 border-white hover:border-emerald-400 cursor-pointer'
+                          : 'border-slate-850 opacity-60'
+                      }`}
+                    >
+                      {gameState.discardPile[gameState.discardPile.length - 1]?.value}
+                    </button>
+                  ) : (
+                    <div className="w-16 h-24 rounded-lg border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-650 italic text-[10px]">
+                      Vide
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Round end / ender alert */}
             {gameState.roundEnderId && (
               <div className="bg-emerald-950/20 border border-emerald-500/30 p-3 rounded-xl shadow text-xs">
-                <span className="font-bold text-emerald-400 block mb-0.5">🏁 Fin de manche</span>
-                Un joueur a retourné toutes ses cartes. Dernier tour en cours.
+                <span className="font-bold text-emerald-400 block mb-0.5 font-sans">🏁 Fin de manche</span>
+                Un joueur a retourné toutes ses cartes. Dernier tour de table !
               </div>
             )}
 
             {/* Game Logs */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg flex-1 flex flex-col max-h-[400px]">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg flex-1 flex flex-col max-h-[300px]">
               <h3 className="font-bold text-xs text-slate-400 mb-3 uppercase tracking-wider">Journal du salon</h3>
               <div className="overflow-y-auto font-mono text-[10px] text-slate-350 space-y-1.5 pr-1">
                 {gameState.log.map((line, idx) => (
@@ -540,9 +547,7 @@ export default function SkyjoApp() {
                 ))}
                 <div ref={logsEndRef} />
               </div>
-            </div>
-          </div>
-
+            </div>     </div>
         </div>
       )}
     </div>
