@@ -1,72 +1,100 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DiscretosEngine = void 0;
-const LOCATIONS = [
+const THEMES = [
     {
-        name: "Kebab Spatial 🛸",
-        roles: ["Chef Kebabier cosmique", "Client affamé", "Livreur Deliveroo en jetpack", "Critique gastronomique galactique", "Cafard de l'espace caché", "Robot-aspirateur fou"]
+        name: '🧙 Sorciers & Vieux Sages',
+        characters: ['Gandalf', 'Dumbledore', 'Merlin', 'Docteur Strange', 'Yoda', 'Gargamel', 'Radagast le Brun', 'Nicolas Flamel']
     },
     {
-        name: "Piscine de Lave Municipale 🌋",
-        roles: ["Maître-nageur en slip pare-feu", "Baigneur téméraire", "Vendeur de glaces fondues", "Volcanologue en vacances", "Diablotin qui barbote", "Bouée canard en kevlar"]
+        name: '🦸 Super-Héros Surpuissants',
+        characters: ['Saitama', 'Goku', 'Superman', 'Thor', 'Hulk', 'Captain Marvel', 'Flash', 'Silver Surfer']
     },
     {
-        name: "Bureau du Père Noël en Été ☀️",
-        roles: ["Père Noël en short", "Lutin syndicaliste en grève", "Renne qui fait la sieste", "Vendeur de climatiseurs", "Inspecteur des impôts des jouets", "Bonhomme de neige fondu"]
+        name: '🦹 Grands Méchants Charismatiques',
+        characters: ['Le Joker', 'Thanos', 'Lex Luthor', 'Magneto', 'Walter White', 'Hannibal Lecter', 'Doctor Doom', 'Megatron']
     },
     {
-        name: "Salon de Coiffure pour Chauves 💈",
-        roles: ["Coiffeur optimiste", "Client qui espère un miracle", "Vendeur de perruques en carton", "Lustreur de crânes professionnel", "Balayeur de poussière imaginaire", "Chauve insouciant"]
+        name: '🔍 Détectives & Enquêteurs Géniaux',
+        characters: ['Sherlock Holmes', 'Hercule Poirot', 'Columbo', 'Batman', 'L (Death Note)', 'Adrian Monk', 'Jessica Fletcher', 'Benoit Blanc']
     },
     {
-        name: "Planque des Super-Héros Nuls 🦸‍♂️",
-        roles: ["Homme-Papillon", "Captain Procrastination", "L'Incroyable Homme-Éponge", "Traducteur de miaulements de chats", "Super-Râleur", "Pigeon-Man"]
+        name: '🤖 Robots & Intelligences Artificielles',
+        characters: ['R2-D2', 'C-3PO', 'Wall-E', 'Terminator', 'Optimus Prime', 'Megatron', 'HAL 9000', 'Data (Star Trek)', 'RoboCop', 'Ultron']
     },
     {
-        name: "Club de Tricot pour Dinosaures 🧶",
-        roles: ["T-Rex en colère (bras trop courts)", "Vélociraptor pressé", "Diplodocus qui s'emmêle le cou", "Tricoteuse professionnelle", "Vendeur de laine préhistorique", "Tricératops débutant"]
+        name: '🧹 Personnages qui Nettoient / Rangent',
+        characters: ['Monsieur Propre', 'Bob l\'Éponge', 'Cendrillon', 'Alfred Pennyworth', 'Fantomas', 'Wall-E', 'Marie Kondo']
     },
     {
-        name: "Pôle Emploi pour Licornes 🦄",
-        roles: ["Conseiller désabusé", "Licorne sans magie", "Vendeur de paillettes d'occasion", "Arc-en-cieliste professionnel", "Chasseur de têtes féérique", "Pégase fatigué"]
+        name: '🏋️ Guerriers & Combattants Légendaires',
+        characters: ['Rocky Balboa', 'Bruce Lee', 'Achille', 'Leonidas (300)', 'Aragorn', 'Geralt de Riv', 'Kratos', 'Mulan', 'Conan le Barbare']
     },
     {
-        name: "Supermarché 🛒",
-        roles: ["Caissier fatigué", "Client avec coupons", "Chef de rayon", "Vigile suspect", "Voleur à la tire", "Client perdu"]
+        name: '👴 Pères Sages & Mentors',
+        characters: ['Obi-Wan Kenobi', 'Mufasa', 'Iroh (Avatar)', 'Splinter (TMNT)', 'Pa Kent', 'Alfred Pennyworth', 'Hedwig le hibou', 'Morgan Freeman (en vrai)']
     },
     {
-        name: "Hôpital 🏥",
-        roles: ["Médecin urgentiste", "Infirmier débordé", "Patient plâtré", "Chirurgien concentré", "Visiteur bruyant", "Interne fatigué"]
+        name: '🎭 Clowns & Bouffons Célèbres',
+        characters: ['Pennywise', 'Le Joker (Ledger)', 'Krusty le Clown', 'Ronald McDonald', 'Pipo le Clown', 'Le Bouffon (Roi Lear)', 'Arlequin']
     },
     {
-        name: "École Primaire 🏫",
-        roles: ["Maître d'école", "Élève bavard", "Directeur stressé", "Agent de cantine", "Concierge ronchon", "Parent d'élève en retard"]
+        name: '🧛 Monstres & Créatures Légendaires',
+        characters: ['Dracula', 'Frankenstein', 'Le Loup-Garou', 'La Momie', 'Godzilla', 'King Kong', 'La Créature du Lagon Noir', 'Medusa']
     },
     {
-        name: "Mairie 🏛️",
-        roles: ["Maire souriant", "Secrétaire d'accueil", "Citoyen qui râle", "Agent d'urbanisme", "Adjoint au maire", "Journaliste local"]
+        name: '🧜 Personnages des Fonds Marins',
+        characters: ['Ariel (La Petite Sirène)', 'Aquaman', 'Nemo', 'Bob l\'Éponge', 'Patrick l\'Étoile', 'Le Roi Triton', 'Ursula', 'Davy Jones']
     },
     {
-        name: "Gare ferroviaire 🚉",
-        roles: ["Conducteur de train", "Contrôleur de billets", "Voyageur pressé", "Chef de gare", "Vendeur de sandwichs", "Pickpocket agile"]
+        name: '👸 Princesses & Reines Puissantes',
+        characters: ['Mulan', 'Moana', 'Elsa', 'Merida (Rebelle)', 'Daenerys Targaryen', 'Reine des Neiges', 'Cléopâtre', 'Princesse Leia']
     },
     {
-        name: "Plage de sable 🏖️",
-        roles: ["Touriste en maillot", "Vendeur de beignets", "Sauveteur aux aguets", "Enfant qui fait un château", "Surfeur cool", "Bronzo-addict"]
+        name: '🤠 Cowboys & Hors-La-Loi',
+        characters: ['Jesse James', 'Billy the Kid', 'Doc Holliday', 'Wyatt Earp', 'Woody (Toy Story)', 'Clint Eastwood (The Good)', 'Django', 'John Marston']
     },
     {
-        name: "Cinéma 🎬",
-        roles: ["Spectateur avec pop-corn", "Ouvreur de salle", "Vendeur de tickets", "Projectionniste caché", "Réalisateur incognito", "Personne qui parle fort"]
+        name: '🧑‍🚀 Explorateurs de l\'Espace',
+        characters: ['Neil Armstrong', 'Buzz l\'Éclair', 'Captain Kirk', 'Spock', 'Han Solo', 'Ripley (Alien)', 'Matt Damon (Seul sur Mars)', 'Wall-E']
     },
     {
-        name: "Restaurant Chic 🍽️",
-        roles: ["Chef cuisinier", "Serveur guindé", "Sommelier expert", "Client riche", "Critique gastronomique", "Plongeur fatigué"]
-    }
+        name: '🦊 Renards & Filous Rusés',
+        characters: ['Renard (Zootopie)', 'Goupil', 'Loki', 'Jack Sparrow', 'Arsène Lupin', 'Tom (Tom & Jerry)', 'Wile E. Coyote', 'Ratatouille (Rémi)']
+    },
+    {
+        name: '🎸 Rockstars & Légendes de la Musique',
+        characters: ['Freddie Mercury', 'David Bowie', 'Elvis Presley', 'Jimi Hendrix', 'Kurt Cobain', 'Mick Jagger', 'Amy Winehouse', 'Prince']
+    },
+    {
+        name: '🏃 Coureurs & Personnages Ultra-Rapides',
+        characters: ['Flash', 'Sonic', 'Forrest Gump', 'Usain Bolt', 'Naruto', 'Road Runner', 'Quicksilver', 'Speedy Gonzales']
+    },
+    {
+        name: '🐉 Dresseurs & Maîtres de Bêtes',
+        characters: ['Dresseur Pokémon (Sacha)', 'Daenerys Targaryen', 'Tarzan', 'Hiccup (Dragons)', 'Steve Irwin', 'Beastmaster', 'Sigourney Weaver (Gorilles)']
+    },
+    {
+        name: '🍕 Personnages qui Mangent Tout le Temps',
+        characters: ['Scooby-Doo', 'Shaggy Rogers', 'Homer Simpson', 'Kirby', 'Garfield', 'Gargantua', 'Takeshi (Beyblade)', 'Luffy (One Piece)']
+    },
+    {
+        name: '🕵️ Espions & Agents Secrets',
+        characters: ['James Bond', 'Ethan Hunt (Mission Impossible)', 'Jason Bourne', 'Natasha Romanoff (Black Widow)', 'OSS 117', 'Austin Powers', 'Alias (Sydney Bristow)', 'George Smiley']
+    },
 ];
+function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
 class DiscretosEngine {
     roomCode;
     state;
-    selectedLocation = null;
+    selectedTheme = null;
     constructor(roomCode) {
         this.roomCode = roomCode;
         this.state = {
@@ -75,7 +103,9 @@ class DiscretosEngine {
             currentPlayerIndex: 0,
             currentRound: 1,
             location: null,
-            locationsList: LOCATIONS.map(l => l.name),
+            spyCharacter: null,
+            themeName: null,
+            locationsList: THEMES.map(t => t.name),
             clues: [],
             log: ['Salon de jeu créé. En attente des joueurs...'],
             winner: null,
@@ -114,30 +144,29 @@ class DiscretosEngine {
         if (this.state.players.length < 3 || this.state.status !== 'LOBBY') {
             return false;
         }
-        // Pick location
-        const locIdx = Math.floor(Math.random() * LOCATIONS.length);
-        this.selectedLocation = LOCATIONS[locIdx];
-        this.state.location = this.selectedLocation.name;
+        // Pick a theme
+        const themeIdx = Math.floor(Math.random() * THEMES.length);
+        this.selectedTheme = THEMES[themeIdx];
+        this.state.themeName = this.selectedTheme.name;
+        // Shuffle characters from the pool
+        const shuffledChars = shuffle(this.selectedTheme.characters);
+        // Need at least 2 different characters: one for citizens, one for spy
+        const citizenCharacter = shuffledChars[0];
+        const spyCharacter = shuffledChars[1] ?? shuffledChars[0]; // fallback (shouldn't happen with pools of 7+)
+        this.state.location = citizenCharacter; // shown to citizens
+        this.state.spyCharacter = spyCharacter; // shown only to spy
         // Pick spy
         const spyIdx = Math.floor(Math.random() * this.state.players.length);
-        const spyPlayer = this.state.players[spyIdx];
-        // Assign roles
-        const shuffledRoles = [...this.selectedLocation.roles];
-        for (let i = shuffledRoles.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffledRoles[i], shuffledRoles[j]] = [shuffledRoles[j], shuffledRoles[i]];
-        }
-        let roleIdx = 0;
+        // Assign characters
         this.state.players.forEach((p, idx) => {
             p.hasVotedToAccuse = null;
             if (idx === spyIdx) {
                 p.isSpy = true;
-                p.role = "L'Intrus 🥸 (Discretos)";
+                p.role = spyCharacter; // spy gets THEIR character
             }
             else {
                 p.isSpy = false;
-                p.role = shuffledRoles[roleIdx % shuffledRoles.length];
-                roleIdx++;
+                p.role = citizenCharacter; // all citizens get the same character
             }
         });
         this.state.status = 'PLAYING';
@@ -146,7 +175,8 @@ class DiscretosEngine {
         this.state.currentPlayerIndex = 0;
         this.state.currentRound = 1;
         this.state.clues = [];
-        this.state.log.push('La partie de Discretos commence ! Donnez à tour de rôle un indice pas trop évident.');
+        this.state.log.push(`🎭 La partie commence ! Thème : ${this.selectedTheme.name}`);
+        this.state.log.push('Donnez à tour de rôle un indice sur votre personnage sans le nommer directement !');
         return true;
     }
     submitClue(socketId, clueText) {
@@ -197,8 +227,8 @@ class DiscretosEngine {
             // Tally votes
             const voteTally = {};
             this.state.players.forEach(p => {
-                const targetId = p.hasVotedToAccuse;
-                voteTally[targetId] = (voteTally[targetId] || 0) + 1;
+                const tId = p.hasVotedToAccuse;
+                voteTally[tId] = (voteTally[tId] || 0) + 1;
             });
             // Find player with most votes
             let maxVotes = -1;
@@ -215,12 +245,12 @@ class DiscretosEngine {
             this.state.status = 'FINISHED';
             if (accusedPlayer.isSpy) {
                 this.state.winner = 'CITIZENS';
-                this.state.winReason = `L'intrus ${accusedPlayer.username} a été démasqué avec le plus grand nombre de votes ! Le lieu était : ${this.selectedLocation?.name}.`;
-                this.state.log.push(`👑 CITOYENS GAGNENT : L'intrus était bien ${accusedPlayer.username}.`);
+                this.state.winReason = `L'intrus ${accusedPlayer.username} a été démasqué ! Il jouait le rôle de "${this.state.spyCharacter}" (thème : ${this.state.themeName}). Les citoyens incarnaient "${this.state.location}".`;
+                this.state.log.push(`👑 CITOYENS GAGNENT : L'intrus était bien ${accusedPlayer.username} (${this.state.spyCharacter}).`);
             }
             else {
                 this.state.winner = 'SPY';
-                this.state.winReason = `L'intrus ${spy.username} gagne ! Le village a failli en accusant ${accusedPlayer.username} (rôle: ${accusedPlayer.role}). Le lieu était : ${this.selectedLocation?.name}.`;
+                this.state.winReason = `L'intrus ${spy.username} gagne ! Le village a failli en accusant ${accusedPlayer.username}. L'intrus était "${this.state.spyCharacter}", les citoyens étaient "${this.state.location}" (thème : ${this.state.themeName}).`;
                 this.state.log.push(`🥸 L'INTRUS GAGNE : Les citoyens se sont trompés d'intrus.`);
             }
         }
@@ -229,6 +259,8 @@ class DiscretosEngine {
     resetGame() {
         this.state.status = 'LOBBY';
         this.state.location = null;
+        this.state.spyCharacter = null;
+        this.state.themeName = null;
         this.state.winner = null;
         this.state.winReason = null;
         this.state.currentPlayerIndex = 0;
@@ -243,7 +275,7 @@ class DiscretosEngine {
         return true;
     }
     destroy() {
-        // No-op since timer is removed
+        // No-op
     }
 }
 exports.DiscretosEngine = DiscretosEngine;

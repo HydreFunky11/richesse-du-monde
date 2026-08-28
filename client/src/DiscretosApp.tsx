@@ -25,8 +25,10 @@ interface DiscretosGameState {
   players: DiscretosPlayer[];
   currentPlayerIndex: number;
   currentRound: number;
-  location: string | null;
-  locationsList: string[];
+  location: string | null;        // The citizen character name
+  spyCharacter: string | null;    // The impostor's character (only shown to spy)
+  themeName: string | null;       // The theme name, shown to everyone
+  locationsList: string[];        // List of theme names for reference
   clues: DiscretosClue[];
   log: string[];
   winner: 'CITIZENS' | 'SPY' | null;
@@ -239,11 +241,11 @@ export default function DiscretosApp() {
             <div className="pt-6 border-t border-slate-800 text-left w-full">
               <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-3">📜 Règles de Discretos :</h3>
               <ul className="text-xs text-slate-400 space-y-2 list-disc list-inside leading-relaxed">
-                <li>Au départ, un lieu secret farfelu ou normal est choisi (ex: *Kebab Spatial*).</li>
-                <li>Tout le monde connaît le lieu et reçoit un rôle, **sauf 1 joueur** : **L'Intrus** 🥸.</li>
-                <li>**Chat en Tour par Tour** : Chacun son tour, envoyez un message dans le chat pour donner un indice pas trop évident.</li>
-                <li>Après **3 tours d'indices complets**, la phase de vote s'ouvre.</li>
-                <li>Découvrez qui est l'imposteur en votant tous ensemble !</li>
+                <li>Un <strong>thème secret</strong> est tiré (ex: <em>🧙 Sorciers & Vieux Sages</em>). Tous les citoyens reçoivent le <strong>même personnage</strong> (ex: Gandalf).</li>
+                <li><strong>1 joueur</strong> est l'<strong>Imposteur 🥸</strong> : il reçoit un <strong>personnage différent du même thème</strong> (ex: Dumbledore) sans le savoir !</li>
+                <li><strong>Chat Tour par Tour</strong> : chacun envoie un message pour donner un <em>indice sur son personnage</em> sans le nommer.</li>
+                <li>Après <strong>3 tours</strong>, la phase de vote s'ouvre pour démasquer l'imposteur.</li>
+                <li>Les citoyens doivent repérer l'imposteur grâce aux différences subtiles dans ses indices !</li>
               </ul>
             </div>
           </div>
@@ -325,33 +327,44 @@ export default function DiscretosApp() {
 
             {/* Identity Card Details */}
             {me && (
-              <div className={`border-2 rounded-xl flex flex-col justify-between p-4 text-center shadow-lg h-64 relative bg-slate-900 ${
+              <div className={`border-2 rounded-xl flex flex-col justify-between p-4 text-center shadow-lg relative bg-slate-900 ${
                 me.isSpy 
                   ? 'border-red-500 bg-red-950/5 text-red-300' 
                   : 'border-cyan-500 bg-cyan-950/5 text-cyan-300'
               }`}>
-                <div className="text-2xl">{me.isSpy ? '🥸' : '🗺️'}</div>
-                
-                <div>
-                  <h3 className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Votre Rôle :</h3>
-                  <h2 className="text-lg font-extrabold text-white mt-0.5 leading-snug">{me.role}</h2>
+                <div className="text-2xl mb-1">{me.isSpy ? '🥸' : '🎭'}</div>
+
+                {/* Theme — visible to everyone */}
+                {gameState.themeName && (
+                  <div className="mb-2">
+                    <h3 className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Thème du Round :</h3>
+                    <h2 className="text-xs font-extrabold text-amber-400 mt-0.5">{gameState.themeName}</h2>
+                  </div>
+                )}
+
+                {/* Character */}
+                <div className="mb-2">
+                  <h3 className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Votre Personnage :</h3>
+                  <h2 className="text-xl font-extrabold text-white mt-0.5 leading-snug">{me.role}</h2>
                 </div>
 
-                {!me.isSpy ? (
+                {me.isSpy ? (
                   <div>
-                    <h3 className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Lieu Secret :</h3>
-                    <h2 className="text-sm font-bold text-cyan-400 mt-0.5 leading-snug">{gameState.location}</h2>
+                    <h3 className="text-[9px] text-red-400 font-bold uppercase tracking-wider">🥸 Vous êtes l'Imposteur !</h3>
+                    <p className="text-[9px] text-slate-500 mt-0.5 leading-relaxed italic">
+                      Les autres joueurs ont un personnage <em>similaire</em> mais <em>différent</em> du vôtre. Écoutez leurs indices pour deviner lequel !
+                    </p>
                   </div>
                 ) : (
                   <div>
-                    <h3 className="text-[9px] text-red-400 font-bold uppercase tracking-wider">🥸 Infiltration</h3>
+                    <h3 className="text-[9px] text-cyan-400 font-bold uppercase tracking-wider">🧍 Vous êtes Citoyen</h3>
                     <p className="text-[9px] text-slate-500 mt-0.5 leading-relaxed italic">
-                      Écoutez les indices pour deviner le lieu !
+                      Tous les citoyens partagent ce personnage. L'imposteur a un personnage différent du même thème !
                     </p>
                   </div>
                 )}
 
-                <div className="text-[8px] text-slate-500 uppercase tracking-widest font-mono">
+                <div className="text-[8px] text-slate-500 uppercase tracking-widest font-mono mt-2">
                   DISCRETOS CARD
                 </div>
               </div>
@@ -423,7 +436,7 @@ export default function DiscretosApp() {
                       type="text"
                       value={clueInput}
                       onChange={(e) => setClueInput(e.target.value)}
-                      placeholder="Écrivez votre message / indice sur le lieu..."
+                      placeholder="Écrivez un indice sur votre personnage sans le nommer..."
                       className="flex-1 bg-slate-950 border border-slate-750 rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
                       maxLength={120}
                       required
@@ -463,16 +476,15 @@ export default function DiscretosApp() {
 
           </div>
 
-          {/* Right Column: Reference list of locations & Journal */}
+          {/* Right Column: Reference list of themes & Journal */}
           <div className="lg:col-span-1 space-y-4">
-            {/* List of locations for reference */}
+            {/* List of themes for reference */}
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg flex flex-col">
-              <h3 className="font-bold text-xs text-slate-400 mb-2.5 uppercase tracking-wider">Lieux (Réf.)</h3>
+              <h3 className="font-bold text-xs text-slate-400 mb-2.5 uppercase tracking-wider">Thèmes (Réf.)</h3>
               <div className="space-y-1.5 overflow-y-auto max-h-[200px] font-mono text-[9.5px] text-slate-400 pr-1">
-                {gameState.locationsList.map((loc) => (
-                  <div key={loc} className="flex items-center gap-1 py-0.5 border-b border-slate-850/50 last:border-none">
-                    <span>📍</span>
-                    <span className="truncate">{loc}</span>
+                {gameState.locationsList.map((theme) => (
+                  <div key={theme} className="flex items-center gap-1 py-0.5 border-b border-slate-850/50 last:border-none">
+                    <span className="truncate">{theme}</span>
                   </div>
                 ))}
               </div>
