@@ -37,6 +37,17 @@ const GAMES: GameCard[] = [
     badgeColor: 'bg-red-500/20 text-red-300 border-red-500/30',
   },
   {
+    emoji: '❤️',
+    title: 'Love Letter',
+    description: "Le jeu de cartes minimaliste d'influence et de bluff - éliminez les autres courtisans et livrez vos mots d'amour à la Princesse.",
+    route: '/loveletter',
+    gradient: 'from-pink-500 to-rose-600',
+    ringColor: 'ring-pink-500',
+    players: '2 à 4 joueurs',
+    badge: 'Déduction',
+    badgeColor: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
+  },
+  {
     emoji: '🎭',
     title: 'Chaos Board',
     description: 'Le jeu du chaos de Magic The Noah - avancez, combattez des monstres, pariez, et modifiez dynamiquement le plateau après votre élimination.',
@@ -67,7 +78,7 @@ export default function HomePage() {
       </div>
 
       {/* Game cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-6xl">
         {GAMES.map((game) => (
           <button
             key={game.route}

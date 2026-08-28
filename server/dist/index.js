@@ -9,6 +9,7 @@ const socket_io_1 = require("socket.io");
 const cors_1 = __importDefault(require("cors"));
 const gameEngine_1 = require("./engine/gameEngine");
 const unoEngine_1 = require("./engine/unoEngine");
+const loveLetterEngine_1 = require("./engine/loveLetterEngine");
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
@@ -23,6 +24,7 @@ const PORT = process.env.PORT || 3001;
 const games = {};
 const unoGames = {};
 const chaosGames = {};
+const loveLetterGames = {};
 const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
 app.get('/health', (req, res) => {
     res.send({ status: 'ok', activeGames: Object.keys(games).length });
@@ -31,7 +33,7 @@ io.on('connection', (socket) => {
     console.log(`Un joueur s'est connecté : ${socket.id}`);
     socket.on('joinGame', ({ username, roomCode, gameType }) => {
         const formattedRoomCode = roomCode.toUpperCase().trim();
-        const type = gameType === 'uno' ? 'uno' : (gameType === 'chaos' ? 'chaos' : 'richesse');
+        const type = gameType === 'uno' ? 'uno' : (gameType === 'chaos' ? 'chaos' : (gameType === 'loveletter' ? 'loveletter' : 'richesse'));
         socket.gameType = type;
         if (type === 'uno') {
             if (!unoGames[formattedRoomCode]) {
@@ -54,6 +56,24 @@ io.on('connection', (socket) => {
         else if (type === 'chaos') {
             socket.emit('error', 'Le jeu Chaos Board est temporairement fermé.');
             return;
+        }
+        else if (type === 'loveletter') {
+            if (!loveLetterGames[formattedRoomCode]) {
+                loveLetterGames[formattedRoomCode] = new loveLetterEngine_1.LoveLetterEngine(formattedRoomCode);
+            }
+            const game = loveLetterGames[formattedRoomCode];
+            const color = PLAYER_COLORS[game.getPlayers().length] || '#6B7280';
+            const success = game.addPlayer(socket.id, username, color);
+            if (success) {
+                socket.join(formattedRoomCode);
+                socket.roomCode = formattedRoomCode;
+                socket.username = username;
+                io.to(formattedRoomCode).emit('loveletterStateUpdate', game.getState());
+                console.log(`[LOVELETTER LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+            }
+            else {
+                socket.emit('error', 'Impossible de rejoindre le salon Love Letter (partie commencée ou salon plein).');
+            }
         }
         else {
             if (!games[formattedRoomCode]) {
@@ -345,6 +365,43 @@ io.on('connection', (socket) => {
         game.resetGame();
         io.to(roomCode).emit('chaosStateUpdate', game.getState());
     });
+    // ─── Love Letter handlers ──────────────────────────────────────────────────
+    socket.on('loveletter:startGame', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !loveLetterGames[roomCode])
+            return;
+        const game = loveLetterGames[roomCode];
+        if (game.startGame()) {
+            io.to(roomCode).emit('loveletterStateUpdate', game.getState());
+            console.log(`[LOVELETTER] Partie démarrée dans ${roomCode}`);
+        }
+    });
+    socket.on('loveletter:playCard', ({ cardId, targetPlayerId, guessedCardType }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !loveLetterGames[roomCode])
+            return;
+        const game = loveLetterGames[roomCode];
+        if (game.playCard(socket.id, cardId, targetPlayerId, guessedCardType)) {
+            io.to(roomCode).emit('loveletterStateUpdate', game.getState());
+        }
+    });
+    socket.on('loveletter:nextRound', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !loveLetterGames[roomCode])
+            return;
+        const game = loveLetterGames[roomCode];
+        if (game.nextRound()) {
+            io.to(roomCode).emit('loveletterStateUpdate', game.getState());
+        }
+    });
+    socket.on('loveletter:resetGame', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !loveLetterGames[roomCode])
+            return;
+        const game = loveLetterGames[roomCode];
+        game.resetGame();
+        io.to(roomCode).emit('loveletterStateUpdate', game.getState());
+    });
     // ─── Disconnect ────────────────────────────────────────────────────────────
     socket.on('disconnect', () => {
         const roomCode = socket.roomCode;
@@ -357,6 +414,15 @@ io.on('connection', (socket) => {
             console.log(`[UNO] Déconnexion de ${username} du salon ${roomCode}`);
             if (game.getPlayers().length === 0) {
                 delete unoGames[roomCode];
+            }
+        }
+        else if (gameType === 'loveletter' && roomCode && loveLetterGames[roomCode]) {
+            const game = loveLetterGames[roomCode];
+            game.removePlayer(socket.id);
+            io.to(roomCode).emit('loveletterStateUpdate', game.getState());
+            console.log(`[LOVELETTER] Déconnexion de ${username} du salon ${roomCode}`);
+            if (game.getPlayers().length === 0) {
+                delete loveLetterGames[roomCode];
             }
         }
         else if (gameType === 'chaos' && roomCode && chaosGames[roomCode]) {
