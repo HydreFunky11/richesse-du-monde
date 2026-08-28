@@ -155,11 +155,12 @@ export class SkyjoEngine {
     const card = player.grid[row]?.[col];
     if (!card || card.faceUp) return false;
 
-    card.faceUp = true;
-
-    // Count face up cards for this player
+    // Count face up cards for this player before revealing
     let faceUpCount = 0;
     player.grid.forEach(r => r.forEach(c => { if (c.faceUp) faceUpCount++; }));
+    if (faceUpCount >= 2) return false;
+
+    card.faceUp = true;
 
     this.state.log.push(`${player.username} a retourné une carte de valeur ${card.value}.`);
 

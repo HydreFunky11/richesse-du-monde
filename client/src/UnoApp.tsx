@@ -38,7 +38,7 @@ interface UnoGameState {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || 'http://localhost:3001';
 
 const COLOR_BG: Record<UnoColor, string> = {
   rouge: 'bg-red-600',
