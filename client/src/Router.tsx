@@ -5,6 +5,7 @@ import UnoApp from './UnoApp';
 import ChaosApp from './ChaosApp';
 import LoveLetterApp from './LoveLetterApp';
 import DiscretosApp from './DiscretosApp';
+import SkyjoApp from './SkyjoApp';
 
 export default function Router() {
   return (
@@ -15,6 +16,7 @@ export default function Router() {
       <Route path="/chaos" element={<ChaosApp />} />
       <Route path="/loveletter" element={<LoveLetterApp />} />
       <Route path="/discretos" element={<DiscretosApp />} />
+      <Route path="/skyjo" element={<SkyjoApp />} />
     </Routes>
   );
 }

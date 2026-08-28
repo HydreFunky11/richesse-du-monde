@@ -59,6 +59,17 @@ const GAMES: GameCard[] = [
     badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
   },
   {
+    emoji: '🃟',
+    title: 'Skyjo',
+    description: "Le jeu de cartes d'opportunisme et de tactique - retournez, échangez et alignez vos cartes pour obtenir le score le plus faible possible.",
+    route: '/skyjo',
+    gradient: 'from-emerald-500 to-teal-600',
+    ringColor: 'ring-emerald-500',
+    players: '2 à 8 joueurs',
+    badge: 'Tactique',
+    badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+  },
+  {
     emoji: '🎭',
     title: 'Chaos Board',
     description: 'Le jeu du chaos de Magic The Noah - avancez, combattez des monstres, pariez, et modifiez dynamiquement le plateau après votre élimination.',
@@ -89,7 +100,7 @@ export default function HomePage() {
       </div>
 
       {/* Game cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-6xl">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-6xl">
         {GAMES.map((game) => (
           <button
             key={game.route}

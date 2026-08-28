@@ -7,6 +7,7 @@ import { UnoEngine } from './engine/unoEngine';
 import { ChaosEngine } from './engine/chaosEngine';
 import { LoveLetterEngine } from './engine/loveLetterEngine';
 import { DiscretosEngine } from './engine/discretosEngine';
+import { SkyjoEngine } from './engine/skyjoEngine';
 
 const app = express();
 app.use(cors());
@@ -27,6 +28,7 @@ const unoGames: { [roomCode: string]: UnoEngine } = {};
 const chaosGames: { [roomCode: string]: ChaosEngine } = {};
 const loveLetterGames: { [roomCode: string]: LoveLetterEngine } = {};
 const discretosGames: { [roomCode: string]: DiscretosEngine } = {};
+const skyjoGames: { [roomCode: string]: SkyjoEngine } = {};
 const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
 
 
@@ -40,7 +42,7 @@ io.on('connection', (socket) => {
 
   socket.on('joinGame', ({ username, roomCode, gameType }: { username: string, roomCode: string, gameType?: string }) => {
     const formattedRoomCode = roomCode.toUpperCase().trim();
-    const type = gameType === 'uno' ? 'uno' : (gameType === 'chaos' ? 'chaos' : (gameType === 'loveletter' ? 'loveletter' : (gameType === 'discretos' ? 'discretos' : 'richesse')));
+    const type = gameType === 'uno' ? 'uno' : (gameType === 'chaos' ? 'chaos' : (gameType === 'loveletter' ? 'loveletter' : (gameType === 'discretos' ? 'discretos' : (gameType === 'skyjo' ? 'skyjo' : 'richesse'))));
     (socket as any).gameType = type;
 
     if (type === 'uno') {
@@ -96,6 +98,23 @@ io.on('connection', (socket) => {
         console.log(`[DISCRETOS LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
       } else {
         socket.emit('error', 'Impossible de rejoindre le salon Discretos (partie commencée ou salon plein).');
+      }
+    } else if (type === 'skyjo') {
+      if (!skyjoGames[formattedRoomCode]) {
+        skyjoGames[formattedRoomCode] = new SkyjoEngine(formattedRoomCode);
+      }
+      const game = skyjoGames[formattedRoomCode];
+      const color = PLAYER_COLORS[game.getPlayers().length] || '#6B7280';
+      const success = game.addPlayer(socket.id, username, color);
+
+      if (success) {
+        socket.join(formattedRoomCode);
+        (socket as any).roomCode = formattedRoomCode;
+        (socket as any).username = username;
+        io.to(formattedRoomCode).emit('skyjoStateUpdate', game.getState());
+        console.log(`[SKYJO LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+      } else {
+        socket.emit('error', 'Impossible de rejoindre le salon Skyjo (partie commencée ou salon plein).');
       }
     } else {
       if (!games[formattedRoomCode]) {
@@ -476,6 +495,89 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('discretosStateUpdate', game.getState());
   });
 
+  // ─── Skyjo handlers ────────────────────────────────────────────────────────
+
+  socket.on('skyjo:startGame', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !skyjoGames[roomCode]) return;
+    const game = skyjoGames[roomCode];
+    if (game.startGame()) {
+      io.to(roomCode).emit('skyjoStateUpdate', game.getState());
+      console.log(`[SKYJO] Partie démarrée dans ${roomCode}`);
+    }
+  });
+
+  socket.on('skyjo:revealCardInitial', ({ row, col }: { row: number, col: number }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !skyjoGames[roomCode]) return;
+    const game = skyjoGames[roomCode];
+    if (game.revealCardInitial(socket.id, row, col)) {
+      io.to(roomCode).emit('skyjoStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('skyjo:drawFromDrawPile', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !skyjoGames[roomCode]) return;
+    const game = skyjoGames[roomCode];
+    if (game.drawFromDrawPile(socket.id)) {
+      io.to(roomCode).emit('skyjoStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('skyjo:drawFromDiscardPile', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !skyjoGames[roomCode]) return;
+    const game = skyjoGames[roomCode];
+    if (game.drawFromDiscardPile(socket.id)) {
+      io.to(roomCode).emit('skyjoStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('skyjo:swapWithDiscard', ({ row, col }: { row: number, col: number }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !skyjoGames[roomCode]) return;
+    const game = skyjoGames[roomCode];
+    if (game.swapWithDiscard(socket.id, row, col)) {
+      io.to(roomCode).emit('skyjoStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('skyjo:swapDrawnCard', ({ row, col }: { row: number, col: number }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !skyjoGames[roomCode]) return;
+    const game = skyjoGames[roomCode];
+    if (game.swapDrawnCard(socket.id, row, col)) {
+      io.to(roomCode).emit('skyjoStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('skyjo:discardDrawnCardAndReveal', ({ row, col }: { row: number, col: number }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !skyjoGames[roomCode]) return;
+    const game = skyjoGames[roomCode];
+    if (game.discardDrawnCardAndReveal(socket.id, row, col)) {
+      io.to(roomCode).emit('skyjoStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('skyjo:nextRound', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !skyjoGames[roomCode]) return;
+    const game = skyjoGames[roomCode];
+    if (game.nextRound()) {
+      io.to(roomCode).emit('skyjoStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('skyjo:resetGame', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !skyjoGames[roomCode]) return;
+    const game = skyjoGames[roomCode];
+    game.resetGame();
+    io.to(roomCode).emit('skyjoStateUpdate', game.getState());
+  });
+
   // ─── Disconnect ────────────────────────────────────────────────────────────
 
   socket.on('disconnect', () => {
@@ -499,6 +601,23 @@ io.on('connection', (socket) => {
       console.log(`[LOVELETTER] Déconnexion de ${username} du salon ${roomCode}`);
       if (game.getPlayers().length === 0) {
         delete loveLetterGames[roomCode];
+      }
+    } else if (gameType === 'discretos' && roomCode && discretosGames[roomCode]) {
+      const game = discretosGames[roomCode];
+      game.removePlayer(socket.id);
+      io.to(roomCode).emit('discretosStateUpdate', game.getState());
+      console.log(`[DISCRETOS] Déconnexion de ${username} du salon ${roomCode}`);
+      if (game.getPlayers().length === 0) {
+        game.destroy();
+        delete discretosGames[roomCode];
+      }
+    } else if (gameType === 'skyjo' && roomCode && skyjoGames[roomCode]) {
+      const game = skyjoGames[roomCode];
+      game.removePlayer(socket.id);
+      io.to(roomCode).emit('skyjoStateUpdate', game.getState());
+      console.log(`[SKYJO] Déconnexion de ${username} du salon ${roomCode}`);
+      if (game.getPlayers().length === 0) {
+        delete skyjoGames[roomCode];
       }
     } else if (gameType === 'discretos' && roomCode && discretosGames[roomCode]) {
       const game = discretosGames[roomCode];
