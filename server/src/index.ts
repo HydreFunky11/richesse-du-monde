@@ -9,6 +9,7 @@ import { LoveLetterEngine } from './engine/loveLetterEngine';
 import { DiscretosEngine } from './engine/discretosEngine';
 import { SkyjoEngine } from './engine/skyjoEngine';
 import { KingOfTokyoEngine } from './engine/kingoftokyoEngine';
+import { DungeonMayhemEngine } from './engine/dungeonMayhemEngine';
 
 const app = express();
 app.use(cors());
@@ -31,6 +32,7 @@ const loveLetterGames: { [roomCode: string]: LoveLetterEngine } = {};
 const discretosGames: { [roomCode: string]: DiscretosEngine } = {};
 const skyjoGames: { [roomCode: string]: SkyjoEngine } = {};
 const kingOfTokyoGames: { [roomCode: string]: KingOfTokyoEngine } = {};
+const mayhemGames: { [roomCode: string]: DungeonMayhemEngine } = {};
 const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
 
 
@@ -44,7 +46,7 @@ io.on('connection', (socket) => {
 
   socket.on('joinGame', ({ username, roomCode, gameType }: { username: string, roomCode: string, gameType?: string }) => {
     const formattedRoomCode = roomCode.toUpperCase().trim();
-    const type = gameType === 'uno' ? 'uno' : (gameType === 'chaos' ? 'chaos' : (gameType === 'loveletter' ? 'loveletter' : (gameType === 'discretos' ? 'discretos' : (gameType === 'skyjo' ? 'skyjo' : (gameType === 'kingoftokyo' ? 'kingoftokyo' : 'richesse')))));
+    const type = gameType === 'uno' ? 'uno' : (gameType === 'chaos' ? 'chaos' : (gameType === 'loveletter' ? 'loveletter' : (gameType === 'discretos' ? 'discretos' : (gameType === 'skyjo' ? 'skyjo' : (gameType === 'kingoftokyo' ? 'kingoftokyo' : (gameType === 'mayhem' || gameType === 'dungeonmayhem' ? 'mayhem' : 'richesse'))))));
     (socket as any).gameType = type;
 
     if (type === 'uno') {
@@ -134,6 +136,23 @@ io.on('connection', (socket) => {
         console.log(`[KING LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
       } else {
         socket.emit('error', 'Impossible de rejoindre le salon King of Tokyo (partie commencée ou salon plein).');
+      }
+    } else if (type === 'mayhem') {
+      if (!mayhemGames[formattedRoomCode]) {
+        mayhemGames[formattedRoomCode] = new DungeonMayhemEngine(formattedRoomCode);
+      }
+      const game = mayhemGames[formattedRoomCode];
+      const color = PLAYER_COLORS[game.getPlayers().length] || '#6B7280';
+      const success = game.addPlayer(socket.id, username, color);
+
+      if (success) {
+        socket.join(formattedRoomCode);
+        (socket as any).roomCode = formattedRoomCode;
+        (socket as any).username = username;
+        io.to(formattedRoomCode).emit('mayhemStateUpdate', game.getState());
+        console.log(`[MAYHEM LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+      } else {
+        socket.emit('error', 'Impossible de rejoindre le salon Dungeon Mayhem (partie commencée ou salon plein).');
       }
     } else {
       if (!games[formattedRoomCode]) {
@@ -671,6 +690,52 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('kingStateUpdate', game.getState());
   });
 
+  // ─── Dungeon Mayhem Sockets ──────────────────────────────────────────────────
+
+  socket.on('mayhem:selectCharacter', ({ characterClass }: { characterClass: any }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !mayhemGames[roomCode]) return;
+    const game = mayhemGames[roomCode];
+    if (game.selectCharacter(socket.id, characterClass)) {
+      io.to(roomCode).emit('mayhemStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('mayhem:startGame', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !mayhemGames[roomCode]) return;
+    const game = mayhemGames[roomCode];
+    if (game.startGame()) {
+      io.to(roomCode).emit('mayhemStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('mayhem:playCard', ({ cardId, targetPlayerId, targetShieldId }: { cardId: string; targetPlayerId?: string; targetShieldId?: string }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !mayhemGames[roomCode]) return;
+    const game = mayhemGames[roomCode];
+    if (game.playCard(socket.id, cardId, targetPlayerId, targetShieldId)) {
+      io.to(roomCode).emit('mayhemStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('mayhem:endTurn', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !mayhemGames[roomCode]) return;
+    const game = mayhemGames[roomCode];
+    if (game.endTurn(socket.id)) {
+      io.to(roomCode).emit('mayhemStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('mayhem:resetGame', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !mayhemGames[roomCode]) return;
+    const game = mayhemGames[roomCode];
+    game.resetGame();
+    io.to(roomCode).emit('mayhemStateUpdate', game.getState());
+  });
+
   // ─── Disconnect ────────────────────────────────────────────────────────────
 
   socket.on('disconnect', () => {
@@ -720,14 +785,13 @@ io.on('connection', (socket) => {
       if (game.getPlayers().length === 0) {
         delete kingOfTokyoGames[roomCode];
       }
-    } else if (gameType === 'discretos' && roomCode && discretosGames[roomCode]) {
-      const game = discretosGames[roomCode];
+    } else if (gameType === 'mayhem' && roomCode && mayhemGames[roomCode]) {
+      const game = mayhemGames[roomCode];
       game.removePlayer(socket.id);
-      io.to(roomCode).emit('discretosStateUpdate', game.getState());
-      console.log(`[DISCRETOS] Déconnexion de ${username} du salon ${roomCode}`);
+      io.to(roomCode).emit('mayhemStateUpdate', game.getState());
+      console.log(`[MAYHEM] Déconnexion de ${username} du salon ${roomCode}`);
       if (game.getPlayers().length === 0) {
-        game.destroy();
-        delete discretosGames[roomCode];
+        delete mayhemGames[roomCode];
       }
     } else if (gameType === 'chaos' && roomCode && chaosGames[roomCode]) {
       const game = chaosGames[roomCode];

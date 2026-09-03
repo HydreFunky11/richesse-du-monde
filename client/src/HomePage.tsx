@@ -81,6 +81,17 @@ const GAMES: GameCard[] = [
     badgeColor: 'bg-red-500/20 text-red-300 border-red-500/30'
   },
   {
+    emoji: '⚔️',
+    title: 'Dungeon Mayhem',
+    description: "La bagarre chaotique dans le donjon - incarnez le Barbare, le Paladin, le Voleur ou le Magicien et soyez le dernier survivant !",
+    route: '/dungeonmayhem',
+    gradient: 'from-amber-600 via-orange-600 to-red-700',
+    ringColor: 'ring-amber-500',
+    players: '2 à 4 joueurs',
+    badge: 'Combat / Cartes',
+    badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+  },
+  {
     emoji: '🎭',
     title: 'Chaos Board',
     description: 'Le jeu du chaos de Magic The Noah - avancez, combattez des monstres, pariez, et modifiez dynamiquement le plateau après votre élimination.',

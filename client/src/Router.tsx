@@ -7,6 +7,7 @@ import LoveLetterApp from './LoveLetterApp';
 import DiscretosApp from './DiscretosApp';
 import SkyjoApp from './SkyjoApp';
 import KingOfTokyoApp from './KingOfTokyoApp';
+import DungeonMayhemApp from './DungeonMayhemApp';
 
 export default function Router() {
   return (
@@ -19,6 +20,8 @@ export default function Router() {
       <Route path="/discretos" element={<DiscretosApp />} />
       <Route path="/skyjo" element={<SkyjoApp />} />
       <Route path="/kingoftokyo" element={<KingOfTokyoApp />} />
+      <Route path="/dungeonmayhem" element={<DungeonMayhemApp />} />
+      <Route path="/mayhem" element={<DungeonMayhemApp />} />
     </Routes>
   );
 }
