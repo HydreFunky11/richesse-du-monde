@@ -10,6 +10,7 @@ import { DiscretosEngine } from './engine/discretosEngine';
 import { SkyjoEngine } from './engine/skyjoEngine';
 import { KingOfTokyoEngine } from './engine/kingoftokyoEngine';
 import { DungeonMayhemEngine } from './engine/dungeonMayhemEngine';
+import { ClashEngine } from './engine/clashEngine';
 
 const app = express();
 app.use(cors());
@@ -33,6 +34,7 @@ const discretosGames: { [roomCode: string]: DiscretosEngine } = {};
 const skyjoGames: { [roomCode: string]: SkyjoEngine } = {};
 const kingOfTokyoGames: { [roomCode: string]: KingOfTokyoEngine } = {};
 const mayhemGames: { [roomCode: string]: DungeonMayhemEngine } = {};
+const clashGames: { [roomCode: string]: ClashEngine } = {};
 const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
 
 
@@ -46,7 +48,7 @@ io.on('connection', (socket) => {
 
   socket.on('joinGame', ({ username, roomCode, gameType }: { username: string, roomCode: string, gameType?: string }) => {
     const formattedRoomCode = roomCode.toUpperCase().trim();
-    const type = gameType === 'uno' ? 'uno' : (gameType === 'chaos' ? 'chaos' : (gameType === 'loveletter' ? 'loveletter' : (gameType === 'discretos' ? 'discretos' : (gameType === 'skyjo' ? 'skyjo' : (gameType === 'kingoftokyo' ? 'kingoftokyo' : (gameType === 'mayhem' || gameType === 'dungeonmayhem' ? 'mayhem' : 'richesse'))))));
+    const type = gameType === 'uno' ? 'uno' : (gameType === 'chaos' ? 'chaos' : (gameType === 'loveletter' ? 'loveletter' : (gameType === 'discretos' ? 'discretos' : (gameType === 'skyjo' ? 'skyjo' : (gameType === 'kingoftokyo' ? 'kingoftokyo' : (gameType === 'mayhem' || gameType === 'dungeonmayhem' ? 'mayhem' : (gameType === 'clash' ? 'clash' : 'richesse')))))));
     (socket as any).gameType = type;
 
     if (type === 'uno') {
@@ -153,6 +155,23 @@ io.on('connection', (socket) => {
         console.log(`[MAYHEM LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
       } else {
         socket.emit('error', 'Impossible de rejoindre le salon Dungeon Mayhem (partie commencée ou salon plein).');
+      }
+    } else if (type === 'clash') {
+      if (!clashGames[formattedRoomCode] || clashGames[formattedRoomCode].getState().status === 'FINISHED' || clashGames[formattedRoomCode].getPlayers().length === 0) {
+        clashGames[formattedRoomCode] = new ClashEngine(formattedRoomCode);
+      }
+      const game = clashGames[formattedRoomCode];
+      const color = PLAYER_COLORS[game.getPlayers().length] || '#3B82F6';
+      const success = game.addPlayer(socket.id, username, color);
+
+      if (success) {
+        socket.join(formattedRoomCode);
+        (socket as any).roomCode = formattedRoomCode;
+        (socket as any).username = username;
+        io.to(formattedRoomCode).emit('clashStateUpdate', game.getState());
+        console.log(`[CLASH LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+      } else {
+        socket.emit('error', 'Impossible de rejoindre le salon Clash (partie commencée ou salon plein).');
       }
     } else {
       if (!games[formattedRoomCode] || games[formattedRoomCode].getStatus() === 'FINISHED' || games[formattedRoomCode].getPlayers().length === 0 || games[formattedRoomCode].getPlayers().every(p => p.isBankrupt)) {
@@ -736,6 +755,46 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('mayhemStateUpdate', game.getState());
   });
 
+  // ─── CLASH OF REALMS ───────────────────────────────────────────────────────
+
+  socket.on('clash:startGame', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !clashGames[roomCode]) return;
+    const game = clashGames[roomCode];
+    if (game.startGame()) {
+      game.startLoop((state) => {
+        io.to(roomCode).emit('clashStateUpdate', state);
+      });
+      io.to(roomCode).emit('clashStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('clash:addBot', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !clashGames[roomCode]) return;
+    const game = clashGames[roomCode];
+    if (game.addBot()) {
+      io.to(roomCode).emit('clashStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('clash:playCard', ({ cardId, x, y }: { cardId: any, x: number, y: number }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !clashGames[roomCode]) return;
+    const game = clashGames[roomCode];
+    if (game.playCard(socket.id, cardId, x, y)) {
+      io.to(roomCode).emit('clashStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('clash:resetGame', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !clashGames[roomCode]) return;
+    const game = clashGames[roomCode];
+    game.resetGame();
+    io.to(roomCode).emit('clashStateUpdate', game.getState());
+  });
+
   // ─── Disconnect ────────────────────────────────────────────────────────────
 
   socket.on('disconnect', () => {
@@ -792,6 +851,15 @@ io.on('connection', (socket) => {
       console.log(`[MAYHEM] Déconnexion de ${username} du salon ${roomCode}`);
       if (game.getPlayers().length === 0 || game.getPlayers().every(p => p.isEliminated)) {
         delete mayhemGames[roomCode];
+      }
+    } else if (gameType === 'clash' && roomCode && clashGames[roomCode]) {
+      const game = clashGames[roomCode];
+      game.removePlayer(socket.id);
+      io.to(roomCode).emit('clashStateUpdate', game.getState());
+      console.log(`[CLASH] Déconnexion de ${username} du salon ${roomCode}`);
+      if (game.getPlayers().length === 0) {
+        game.stopLoop();
+        delete clashGames[roomCode];
       }
     } else if (gameType === 'chaos' && roomCode && chaosGames[roomCode]) {
       const game = chaosGames[roomCode];

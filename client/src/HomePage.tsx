@@ -20,6 +20,20 @@ interface GameTheme {
 
 const GAMES: GameTheme[] = [
   {
+    emoji: '👑',
+    title: 'Clash of Realms',
+    subtitle: 'Arène de Cartes en Temps Réel',
+    description: 'Duel stratégique en direct style Clash Royale ! Gérez votre jauge d\'Élixir, invoquez géants, archères et dragons pour anéantir les tours ennemies.',
+    route: '/clash',
+    fontClass: 'font-display font-black tracking-wide',
+    cardTheme: 'bg-gradient-to-b from-purple-950/70 via-slate-950 to-blue-950/40',
+    borderTheme: 'border-purple-500/50 hover:border-amber-400 hover:shadow-purple-900/50',
+    titleGradient: 'from-amber-300 via-purple-400 to-pink-500',
+    badge: 'NOUVEAU • TEMPS RÉEL ⚡',
+    badgeStyle: 'bg-purple-950 text-purple-300 border-purple-500/50 animate-pulse',
+    players: '1v1 ou contre IA 🤖',
+  },
+  {
     emoji: '⚔️',
     title: 'Dungeon Mayhem',
     subtitle: 'Grimoire & Bagarre Médiévale',
