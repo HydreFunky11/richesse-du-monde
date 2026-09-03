@@ -1,183 +1,264 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { soundFx } from './utils/audio';
 
-interface GameCard {
+interface GameTheme {
   emoji: string;
   title: string;
+  subtitle: string;
   description: string;
   route: string;
-  gradient: string;
-  ringColor: string;
-  players: string;
+  fontClass: string;
+  cardTheme: string;
+  borderTheme: string;
+  titleGradient: string;
   badge: string;
-  badgeColor: string;
+  badgeStyle: string;
+  players: string;
   isClosed?: boolean;
 }
 
-const GAMES: GameCard[] = [
+const GAMES: GameTheme[] = [
   {
-    emoji: '🌍',
-    title: 'Richesses du Monde',
-    description: "Le jeu économique de stratégie mondiale - achetez des titres de ressources, enchérissez, et dominez l'économie planétaire.",
-    route: '/richesse',
-    gradient: 'from-amber-500 to-orange-600',
-    ringColor: 'ring-amber-500',
-    players: '2 à 6 joueurs',
-    badge: 'Stratégie',
-    badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  },
-  {
-    emoji: '🃏',
-    title: 'UNO',
-    description: 'Le jeu de cartes classique - jouez vos cartes, changez les couleurs, piégez vos adversaires et criez UNO !',
-    route: '/uno',
-    gradient: 'from-red-500 to-rose-600',
-    ringColor: 'ring-red-500',
-    players: '2 à 10 joueurs',
-    badge: 'Cartes',
-    badgeColor: 'bg-red-500/20 text-red-300 border-red-500/30',
-  },
-  {
-    emoji: '❤️',
-    title: 'Love Letter',
-    description: "Le jeu de cartes minimaliste d'influence et de bluff - éliminez les autres courtisans et livrez vos mots d'amour à la Princesse.",
-    route: '/loveletter',
-    gradient: 'from-pink-500 to-rose-600',
-    ringColor: 'ring-pink-500',
-    players: '2 à 4 joueurs',
-    badge: 'Déduction',
-    badgeColor: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
-  },
-  {
-    emoji: '🥸',
-    title: 'Discretos',
-    description: "Le jeu d'espionnage et de bluff - infiltrez-vous dans des lieux loufoques sans vous faire repérer, ou menez l'enquête pour trouver l'intrus.",
-    route: '/discretos',
-    gradient: 'from-cyan-500 to-blue-600',
-    ringColor: 'ring-cyan-500',
-    players: '3 à 8 joueurs',
-    badge: 'Bluff',
-    badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
-  },
-  {
-    emoji: '🃟',
-    title: 'Skyjo',
-    description: "Le jeu de cartes d'opportunisme et de tactique - retournez, échangez et alignez vos cartes pour obtenir le score le plus faible possible.",
-    route: '/skyjo',
-    gradient: 'from-emerald-500 to-teal-600',
-    ringColor: 'ring-emerald-500',
-    players: '2 à 8 joueurs',
-    badge: 'Tactique',
-    badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+    emoji: '⚔️',
+    title: 'Dungeon Mayhem',
+    subtitle: 'Grimoire & Bagarre Médiévale',
+    description: 'Affrontez-vous dans le donjon avec des decks asymétriques : Barbare déchaîné, Paladine blindée, Voleur fourbe ou Magicien destructeur !',
+    route: '/dungeonmayhem',
+    fontClass: 'font-medieval',
+    cardTheme: 'bg-gradient-to-b from-stone-900 via-stone-950 to-amber-950/40',
+    borderTheme: 'border-amber-600/50 hover:border-amber-400 hover:shadow-amber-900/40',
+    titleGradient: 'from-amber-300 via-orange-400 to-red-500',
+    badge: 'COMBAT & HÉROS',
+    badgeStyle: 'bg-amber-950 text-amber-300 border-amber-500/40',
+    players: '2 à 4 Héros',
   },
   {
     emoji: '🦖',
     title: 'King of Tokyo',
-    description: "Le jeu de dés et de combat de monstres géants - baffez vos adversaires et devenez le Roi suprême de Tokyo City.",
+    subtitle: 'Kaiju & Destruction de Masse',
+    description: 'Lancez les dés, distribuez des baffes magistrales, occupez Tokyo City, amassez de l\'énergie et achetez des super-pouvoirs mutants.',
     route: '/kingoftokyo',
-    gradient: 'from-red-600 to-amber-600',
-    ringColor: 'ring-red-500',
-    players: '2 à 6 joueurs',
-    badge: 'Combat / Dés',
-    badgeColor: 'bg-red-500/20 text-red-300 border-red-500/30'
+    fontClass: 'font-comic tracking-wider text-3xl',
+    cardTheme: 'bg-gradient-to-b from-zinc-900 via-slate-950 to-red-950/40',
+    borderTheme: 'border-red-600/50 hover:border-red-400 hover:shadow-red-900/50',
+    titleGradient: 'from-red-400 via-rose-500 to-amber-400',
+    badge: 'DÉS & BAFES',
+    badgeStyle: 'bg-red-950 text-red-300 border-red-500/40',
+    players: '2 à 6 Monstres',
   },
   {
-    emoji: '⚔️',
-    title: 'Dungeon Mayhem',
-    description: "La bagarre chaotique dans le donjon - incarnez le Barbare, le Paladin, le Voleur ou le Magicien et soyez le dernier survivant !",
-    route: '/dungeonmayhem',
-    gradient: 'from-amber-600 via-orange-600 to-red-700',
-    ringColor: 'ring-amber-500',
-    players: '2 à 4 joueurs',
-    badge: 'Combat / Cartes',
-    badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+    emoji: '🌍',
+    title: 'Richesses du Monde',
+    subtitle: 'Haute Finance & Art Déco',
+    description: 'Le grand jeu économique mondial. Acquérez des concessions minières, organisez des enchères impitoyables et dominez la planète.',
+    route: '/richesse',
+    fontClass: 'font-luxury italic text-2xl',
+    cardTheme: 'bg-gradient-to-b from-emerald-950/70 via-slate-950 to-amber-950/30',
+    borderTheme: 'border-emerald-500/40 hover:border-amber-400 hover:shadow-emerald-900/40',
+    titleGradient: 'from-amber-200 via-emerald-300 to-yellow-500',
+    badge: 'STRATÉGIE & MONOPOLE',
+    badgeStyle: 'bg-emerald-950 text-emerald-300 border-emerald-500/40',
+    players: '2 à 6 Magnats',
+  },
+  {
+    emoji: '🥸',
+    title: 'Discretos',
+    subtitle: 'Dossier Secret Défense',
+    description: 'Tout le monde incarne le même personnage secret... sauf l\'intrus qui a reçu un alter-égo ! Donnez des indices subtils au tour par tour.',
+    route: '/discretos',
+    fontClass: 'font-typewriter',
+    cardTheme: 'bg-gradient-to-b from-slate-900 via-slate-950 to-cyan-950/30',
+    borderTheme: 'border-cyan-600/40 hover:border-cyan-400 hover:shadow-cyan-900/40',
+    titleGradient: 'from-cyan-300 via-blue-400 to-teal-300',
+    badge: 'INFILTRATION & BLUFF',
+    badgeStyle: 'bg-cyan-950 text-cyan-300 border-cyan-500/40',
+    players: '3 à 8 Agents',
+  },
+  {
+    emoji: '🃟',
+    title: 'Skyjo',
+    subtitle: 'Casino Scandinave & Tactique',
+    description: 'Révélez, échangez et alignez vos cartes de 12 colonnes. Éliminez les lignes identiques et obtenez le score le plus bas possible.',
+    route: '/skyjo',
+    fontClass: 'font-display font-extrabold',
+    cardTheme: 'bg-gradient-to-b from-slate-900 via-teal-950/40 to-slate-950',
+    borderTheme: 'border-teal-500/40 hover:border-teal-300 hover:shadow-teal-900/40',
+    titleGradient: 'from-teal-300 via-emerald-400 to-cyan-400',
+    badge: 'TACTIQUE & CHANCE',
+    badgeStyle: 'bg-teal-950 text-teal-300 border-teal-500/40',
+    players: '2 à 8 Joueurs',
+  },
+  {
+    emoji: '🃏',
+    title: 'UNO',
+    subtitle: 'Classique Pop & Trahisons',
+    description: 'Le roi des jeux de cartes d\'ambiance. Empilez les +2, changez de sens, posez des jokers +4 et n\'oubliez surtout pas de crier UNO !',
+    route: '/uno',
+    fontClass: 'font-display font-black tracking-tight',
+    cardTheme: 'bg-gradient-to-b from-slate-900 via-rose-950/40 to-slate-950',
+    borderTheme: 'border-rose-500/40 hover:border-rose-300 hover:shadow-rose-900/40',
+    titleGradient: 'from-yellow-400 via-red-500 to-blue-500',
+    badge: 'POP & AMBIANCE',
+    badgeStyle: 'bg-rose-950 text-rose-300 border-rose-500/40',
+    players: '2 à 10 Joueurs',
+  },
+  {
+    emoji: '💌',
+    title: 'Love Letter',
+    subtitle: 'Cour Royale & Déduction',
+    description: 'Gardes, Prêtres, Barons et Princesse. 16 cartes seulement pour un chef-d\'œuvre de déduction, de bluff et de prise de risque rapide.',
+    route: '/loveletter',
+    fontClass: 'font-medieval font-bold',
+    cardTheme: 'bg-gradient-to-b from-slate-900 via-pink-950/30 to-purple-950/40',
+    borderTheme: 'border-pink-500/40 hover:border-pink-300 hover:shadow-pink-900/40',
+    titleGradient: 'from-pink-300 via-rose-400 to-purple-400',
+    badge: 'DÉDUCTION & BLUFF',
+    badgeStyle: 'bg-pink-950 text-pink-300 border-pink-500/40',
+    players: '2 à 4 Courtisans',
   },
   {
     emoji: '🎭',
     title: 'Chaos Board',
-    description: 'Le jeu du chaos de Magic The Noah - avancez, combattez des monstres, pariez, et modifiez dynamiquement le plateau après votre élimination.',
+    subtitle: 'Le Jeu du Hasard Total',
+    description: 'Inspiré de Magic The Noah : avancez sur un plateau instable, combattez des monstres et modifiez le monde même après votre mort !',
     route: '/chaos',
-    gradient: 'from-orange-500 to-red-600',
-    ringColor: 'ring-orange-500',
-    players: '2 à 6 joueurs',
-    badge: 'Survie',
-    badgeColor: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+    fontClass: 'font-comic tracking-wide text-2xl',
+    cardTheme: 'bg-gradient-to-b from-orange-950/40 via-slate-950 to-purple-950/40',
+    borderTheme: 'border-orange-500/30 opacity-50',
+    titleGradient: 'from-orange-400 to-red-500',
+    badge: 'EXPÉRIMENTAL',
+    badgeStyle: 'bg-slate-900 text-slate-500 border-slate-800',
+    players: '2 à 6 Joueurs',
     isClosed: true,
   },
 ];
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const [muted, setMuted] = useState(soundFx.isMuted());
+
+  const handleToggleSound = () => {
+    const isNowMuted = soundFx.toggleMute();
+    setMuted(isNowMuted);
+    if (!isNowMuted) {
+      soundFx.click();
+    }
+  };
+
+  const handleGameSelect = (route: string, isClosed?: boolean) => {
+    if (isClosed) return;
+    soundFx.playCard();
+    navigate(route);
+  };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6">
-      {/* Header */}
-      <div className="text-center mb-12">
-        <div className="text-6xl mb-4">🎮</div>
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-3 bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">
-          Choisissez votre jeu
-        </h1>
-        <p className="text-slate-500 text-lg max-w-md mx-auto">
-          Rejoignez un salon existant ou créez le vôtre et invitez vos amis
-        </p>
-      </div>
+    <div className="min-h-screen bg-lounge-felt text-slate-100 flex flex-col justify-between p-6 relative overflow-x-hidden">
+      {/* Ambient background lights */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-red-500/5 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Game cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-6xl">
+      {/* Top Navbar */}
+      <nav className="w-full max-w-7xl mx-auto flex justify-between items-center pb-6 border-b border-slate-800/80 relative z-10">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl animate-pulse">🎲</span>
+          <div>
+            <div className="text-xs font-mono uppercase tracking-widest text-amber-400 font-bold">
+              Club Multijoueur
+            </div>
+            <div className="text-sm font-extrabold text-slate-200">
+              The Tabletop Lounge
+            </div>
+          </div>
+        </div>
+
+        {/* Sound FX toggle */}
+        <button
+          onClick={handleToggleSound}
+          className="flex items-center gap-2 bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 px-3.5 py-1.5 rounded-full text-xs text-slate-300 cursor-pointer transition shadow-md"
+          title="Activer / Désactiver les effets sonores"
+        >
+          <span>{muted ? '🔇' : '🔊'}</span>
+          <span className="font-mono text-[11px]">{muted ? 'Sons coupés' : 'Sons activés'}</span>
+        </button>
+      </nav>
+
+      {/* Hero Header */}
+      <header className="text-center my-10 max-w-2xl mx-auto relative z-10">
+        <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-red-500/10 border border-amber-500/20 px-4 py-1 rounded-full text-xs font-bold text-amber-300 mb-4 shadow-inner">
+          ✨ 7 JEUX COMPLETS • MULTIJOUEUR EN DIRECT
+        </div>
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight mb-3 text-white">
+          La Salle des Jeux
+        </h1>
+        <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
+          Rejoignez une table entre amis ou créez votre salon. Chaque jeu possède ses propres mécaniques, son univers et son ambiance sonore.
+        </p>
+      </header>
+
+      {/* Game Cards Grid */}
+      <main className="w-full max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 relative z-10">
         {GAMES.map((game) => (
-          <button
+          <div
             key={game.route}
-            onClick={() => !game.isClosed && navigate(game.route)}
-            disabled={game.isClosed}
+            onMouseEnter={() => !game.isClosed && soundFx.click()}
+            onClick={() => handleGameSelect(game.route, game.isClosed)}
             className={`
-              group relative bg-slate-900 border border-slate-800 rounded-2xl p-8
-              text-left transition-all duration-200 shadow-xl
+              holo-card group relative p-6 rounded-3xl border-2 transition-all duration-200 flex flex-col justify-between shadow-xl
+              ${game.cardTheme} ${game.borderTheme}
               ${game.isClosed 
-                ? 'opacity-40 cursor-not-allowed border-slate-900' 
-                : 'cursor-pointer hover:border-slate-600 hover:bg-slate-800/80 hover:shadow-2xl hover:-translate-y-1'
+                ? 'cursor-not-allowed' 
+                : 'cursor-pointer hover:-translate-y-2 hover:shadow-2xl active:translate-y-0'
               }
             `}
           >
-            {/* Badge */}
-            <span className={`absolute top-4 right-4 text-xs font-semibold px-2.5 py-1 rounded-full border ${
-              game.isClosed 
-                ? 'bg-slate-950/40 text-slate-500 border-slate-800' 
-                : game.badgeColor
-            }`}>
-              {game.isClosed ? 'Fermé' : game.badge}
-            </span>
+            <div>
+              {/* Card Top: Emoji & Badge */}
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-4xl transition-transform duration-200 group-hover:scale-110 block">
+                  {game.emoji}
+                </span>
+                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${game.badgeStyle}`}>
+                  {game.isClosed ? 'MAINTENANCE' : game.badge}
+                </span>
+              </div>
 
-            {/* Emoji */}
-            <div className={`text-5xl mb-5 transition-transform duration-200 ${!game.isClosed && 'group-hover:scale-110'}`}>
-              {game.emoji}
+              {/* Title & Subtitle */}
+              <h3 className={`font-black mb-1 bg-gradient-to-r ${game.titleGradient} bg-clip-text text-transparent text-2xl ${game.fontClass}`}>
+                {game.title}
+              </h3>
+              <div className="text-[11px] font-medium text-amber-400/90 mb-3 tracking-wide">
+                {game.subtitle}
+              </div>
+
+              {/* Description */}
+              <p className="text-xs text-slate-300/90 leading-relaxed mb-6 font-normal">
+                {game.description}
+              </p>
             </div>
-
-            {/* Title */}
-            <h2 className={`text-2xl font-extrabold mb-2 bg-gradient-to-r ${game.gradient} bg-clip-text text-transparent`}>
-              {game.title}
-            </h2>
-
-            {/* Description */}
-            <p className="text-slate-400 text-sm leading-relaxed mb-5">
-              {game.description}
-            </p>
 
             {/* Footer */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-500 flex items-center gap-1.5">
+            <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs">
+              <span className="text-slate-400 font-medium flex items-center gap-1.5 text-[11px]">
                 <span>👥</span> {game.players}
               </span>
-              <span className={`text-sm font-bold bg-gradient-to-r ${game.gradient} bg-clip-text text-transparent ${!game.isClosed && 'group-hover:underline'}`}>
-                {game.isClosed ? 'Fermé 🔒' : 'Jouer →'}
+              <span className={`font-bold transition-all flex items-center gap-1 ${
+                game.isClosed 
+                  ? 'text-slate-600' 
+                  : 'text-amber-400 group-hover:text-amber-300 group-hover:translate-x-1'
+              }`}>
+                {game.isClosed ? 'Bientôt 🔒' : 'Rejoindre →'}
               </span>
             </div>
-          </button>
+          </div>
         ))}
-      </div>
+      </main>
 
-      {/* Footer */}
-      <p className="mt-12 text-slate-700 text-xs">
-        Partie multijoueur en ligne · Temps réel
-      </p>
+      {/* Footer info */}
+      <footer className="w-full max-w-7xl mx-auto text-center pt-12 pb-4 text-xs text-slate-600 relative z-10 flex flex-wrap justify-between items-center gap-2 border-t border-slate-850 mt-12">
+        <span>Parties multijoueurs synchronisées par WebSockets</span>
+        <span className="text-slate-500">Antigravity Boardgame Platform • 2026</span>
+      </footer>
     </div>
   );
 }

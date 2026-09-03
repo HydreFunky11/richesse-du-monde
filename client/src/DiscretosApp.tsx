@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
+import { soundFx } from './utils/audio';
 
 const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || 'http://localhost:3001';
 
@@ -43,6 +44,7 @@ export default function DiscretosApp() {
   const [roomCode, setRoomCode] = useState('');
   const [joined, setJoined] = useState(false);
   const [error, setError] = useState('');
+  const [muted, setMuted] = useState(soundFx.isMuted());
 
   // Chat input state
   const [clueInput, setClueInput] = useState('');
@@ -58,6 +60,10 @@ export default function DiscretosApp() {
       setGameState(state);
       setJoined(true);
       setError('');
+
+      if (state.status === 'FINISHED') {
+        soundFx.victory();
+      }
     });
 
     s.on('error', (msg: string) => {
@@ -84,26 +90,37 @@ export default function DiscretosApp() {
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || !roomCode.trim() || !socket) return;
+    soundFx.click();
     socket.emit('joinGame', { username, roomCode, gameType: 'discretos' });
   };
 
   const handleStartGame = () => {
-    if (socket) socket.emit('discretos:startGame');
+    if (socket) {
+      soundFx.playCard();
+      socket.emit('discretos:startGame');
+    }
   };
 
   const handleSendClue = (e: React.FormEvent) => {
     e.preventDefault();
     if (!clueInput.trim() || !socket) return;
+    soundFx.playCard();
     socket.emit('discretos:submitClue', { clueText: clueInput });
     setClueInput('');
   };
 
   const handleVote = (targetId: string) => {
-    if (socket) socket.emit('discretos:accusePlayer', { targetId });
+    if (socket) {
+      soundFx.click();
+      socket.emit('discretos:accusePlayer', { targetId });
+    }
   };
 
   const handleResetGame = () => {
-    if (socket) socket.emit('discretos:resetGame');
+    if (socket) {
+      soundFx.click();
+      socket.emit('discretos:resetGame');
+    }
   };
 
   const me = gameState?.players.find((p) => p.id === socket?.id);
@@ -177,40 +194,57 @@ export default function DiscretosApp() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between font-typewriter select-none">
       {/* Header */}
-      <header className="bg-slate-900 border-b border-slate-850 p-4 flex justify-between items-center shadow-lg">
+      <header className="bg-slate-900 border-b border-cyan-900/40 p-4 flex justify-between items-center shadow-lg">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/')}
-            className="text-xs bg-slate-800 hover:bg-slate-750 px-3 py-1.5 rounded text-slate-300 border border-slate-700 flex items-center gap-1 cursor-pointer"
+            onClick={() => {
+              soundFx.click();
+              navigate('/');
+            }}
+            className="text-xs bg-slate-850 hover:bg-slate-800 px-3 py-1.5 rounded-xl text-slate-300 border border-slate-700 flex items-center gap-1 cursor-pointer font-bold"
           >
             ← Accueil
           </button>
-          <span className="font-bold text-lg bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+          <span className="font-typewriter font-black text-xl tracking-wider bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
             Discretos 🥸
           </span>
-          <span className="text-slate-500 text-xs font-mono font-bold bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800">
-            Salon : {roomCode.toUpperCase()}
+          <span className="text-cyan-400 text-xs font-mono font-bold bg-slate-950 px-2.5 py-1 rounded-lg border border-cyan-500/30">
+            Dossier : {roomCode.toUpperCase()}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
+          {/* Sound toggle button */}
+          <button
+            onClick={() => {
+              const isNowMuted = soundFx.toggleMute();
+              setMuted(isNowMuted);
+              if (!isNowMuted) soundFx.click();
+            }}
+            className="bg-slate-850 hover:bg-slate-800 border border-cyan-500/30 px-3 py-1.5 rounded-xl text-xs text-cyan-200 cursor-pointer transition flex items-center gap-1.5"
+            title="Activer / Désactiver les effets sonores"
+          >
+            <span>{muted ? '🔇' : '🔊'}</span>
+            <span className="font-mono text-[10px] hidden sm:inline">{muted ? 'Muet' : 'Audio ON'}</span>
+          </button>
+
           {gameState.status === 'LOBBY' && isHost && (
             <button
               onClick={handleStartGame}
               disabled={gameState.players.length < 3}
-              className="bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs px-4 py-2 rounded shadow transition cursor-pointer"
+              className="btn-3d-purple disabled:opacity-40 disabled:cursor-not-allowed font-bold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
             >
-              Démarrer la partie 🚀
+              Lancer l'Enquête 🚀
             </button>
           )}
           {gameState.status === 'FINISHED' && isHost && (
             <button
               onClick={handleResetGame}
-              className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs px-4 py-2 rounded shadow transition cursor-pointer"
+              className="btn-3d-amber font-bold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
             >
-              Réinitialiser la partie 🔄
+              Nouveau Dossier 🔄
             </button>
           )}
         </div>

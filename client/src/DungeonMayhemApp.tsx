@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
+import { soundFx } from './utils/audio';
 
 const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || 'http://localhost:3001';
 
@@ -123,6 +124,9 @@ export default function DungeonMayhemApp() {
 
   // Targeting state
   const [targetingCard, setTargetingCard] = useState<MayhemCard | null>(null);
+  const [isShaking, setIsShaking] = useState(false);
+  const [muted, setMuted] = useState(soundFx.isMuted());
+  const prevLastCardRef = useRef<string | null>(null);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -134,6 +138,31 @@ export default function DungeonMayhemApp() {
       setGameState(state);
       setJoined(true);
       setError('');
+
+      // Play audio & trigger screen shake on new cards played
+      if (state.lastPlayedCard) {
+        const cardKey = `${state.lastPlayedCard.playerName}_${state.lastPlayedCard.card.id}_${state.log.length}`;
+        if (prevLastCardRef.current !== cardKey) {
+          prevLastCardRef.current = cardKey;
+          const card = state.lastPlayedCard.card;
+          if (card.attack > 0 || card.specialEffect === 'FIREBALL' || card.specialEffect === 'DESTROY_SHIELD') {
+            soundFx.attack();
+            setIsShaking(true);
+            setTimeout(() => setIsShaking(false), 450);
+          } else if (card.type === 'defense') {
+            soundFx.shield();
+          } else if (card.heal > 0) {
+            soundFx.heal();
+          } else {
+            soundFx.playCard();
+          }
+        }
+      }
+
+      if (state.status === 'FINISHED') {
+        soundFx.victory();
+      }
+
       // Clear targeting if no longer our turn
       const isMyTurn = state.status === 'PLAYING' && state.players[state.currentPlayerIndex]?.id === s.id;
       if (!isMyTurn || state.playsLeft <= 0) {
@@ -235,65 +264,69 @@ export default function DungeonMayhemApp() {
 
   if (!joined || !gameState) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
-        <div className="bg-slate-900 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-800">
+      <div className="min-h-screen bg-dungeon-stone text-slate-100 flex items-center justify-center p-4 relative">
+        <div className="bg-stone-950/90 border-2 border-amber-600/40 p-8 rounded-3xl shadow-2xl w-full max-w-md backdrop-blur-sm relative z-10">
           <div className="flex justify-between items-center mb-6">
             <button
-              onClick={() => navigate('/')}
-              className="text-xs text-slate-400 hover:text-white transition flex items-center gap-1 cursor-pointer"
+              onClick={() => {
+                soundFx.click();
+                navigate('/');
+              }}
+              className="text-xs text-amber-400/80 hover:text-amber-300 transition flex items-center gap-1 cursor-pointer font-medieval font-bold"
             >
               ← Accueil
             </button>
-            <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] uppercase font-bold px-2 py-0.5 rounded">
+            <span className="bg-amber-950 text-amber-300 border border-amber-500/40 text-[10px] uppercase font-bold px-2.5 py-1 rounded-full font-medieval tracking-wider">
               DUNGEON MAYHEM ⚔️
             </span>
           </div>
 
           <div className="text-center mb-6">
-            <div className="text-5xl mb-2">⚔️</div>
-            <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-400 via-orange-500 to-red-500 bg-clip-text text-transparent">
+            <div className="text-5xl mb-2 animate-bounce">⚔️</div>
+            <h1 className="text-3xl font-medieval font-black tracking-wider bg-gradient-to-r from-amber-300 via-orange-400 to-red-500 bg-clip-text text-transparent">
               Dungeon Mayhem
             </h1>
-            <p className="text-slate-400 text-xs mt-1">
-              Bagarre déjantée dans le donjon • 2 à 4 joueurs
+            <p className="text-slate-400 text-xs mt-1 font-serif italic">
+              Bagarre déjantée dans les profondeurs du donjon • 2 à 4 joueurs
             </p>
           </div>
 
           <form onSubmit={handleJoin} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Votre Pseudo</label>
+              <label className="block text-xs font-bold text-amber-300/90 uppercase tracking-wider mb-1 font-medieval">Votre Pseudo de Combattant</label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Ex: Conan"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
+                placeholder="Ex: Conan le Barbare"
+                className="w-full bg-stone-900 border border-stone-700 rounded-xl px-4 py-2.5 text-white placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
                 required
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Code du Salon</label>
+              <label className="block text-xs font-bold text-amber-300/90 uppercase tracking-wider mb-1 font-medieval">Code de l'Arène</label>
               <input
                 type="text"
                 value={roomCode}
                 onChange={(e) => setRoomCode(e.target.value)}
                 placeholder="Ex: DONJON"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm uppercase"
+                className="w-full bg-stone-900 border border-stone-700 rounded-xl px-4 py-2.5 text-white placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm uppercase font-mono"
                 required
               />
             </div>
 
             {error && (
-              <div className="bg-red-950/40 border border-red-500/40 text-red-300 text-xs p-3 rounded-lg">
+              <div className="bg-red-950/60 border border-red-500/40 text-red-300 text-xs p-3 rounded-xl font-mono">
                 ⚠️ {error}
               </div>
             )}
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-amber-600 to-red-600 hover:from-amber-500 hover:to-red-500 text-white font-bold py-3 rounded-lg shadow-lg hover:shadow-amber-950/40 transition cursor-pointer text-sm"
+              onClick={() => soundFx.click()}
+              className="btn-3d-amber w-full py-3.5 rounded-xl font-medieval font-black tracking-wider text-sm cursor-pointer shadow-lg mt-2"
             >
-              Rejoindre / Créer la bagarre 🚀
+              Rejoindre l'Arène ⚔️
             </button>
           </form>
         </div>
@@ -304,42 +337,65 @@ export default function DungeonMayhemApp() {
   // ─── Main App View ─────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between select-none">
+    <div className={`min-h-screen bg-dungeon-stone text-slate-100 flex flex-col justify-between select-none transition-transform ${isShaking ? 'animate-shake-heavy' : ''}`}>
       {/* Header */}
-      <header className="bg-slate-900/90 backdrop-blur border-b border-slate-800 px-4 py-3 flex justify-between items-center shadow-lg z-20">
+      <header className="bg-stone-950/90 backdrop-blur border-b border-amber-900/40 px-4 py-3 flex justify-between items-center shadow-2xl z-20">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/')}
-            className="text-xs bg-slate-800 hover:bg-slate-750 px-3 py-1.5 rounded text-slate-300 border border-slate-700 flex items-center gap-1 cursor-pointer transition"
+            onClick={() => {
+              soundFx.click();
+              navigate('/');
+            }}
+            className="text-xs bg-stone-900 hover:bg-stone-850 px-3 py-1.5 rounded-xl text-amber-300 border border-amber-500/30 flex items-center gap-1 cursor-pointer transition font-medieval font-bold"
           >
             ← Accueil
           </button>
           <div className="flex items-center gap-2">
-            <span className="text-xl">⚔️</span>
-            <span className="font-extrabold text-base bg-gradient-to-r from-amber-400 via-orange-400 to-red-500 bg-clip-text text-transparent">
+            <span className="text-2xl">⚔️</span>
+            <span className="font-medieval font-black text-lg tracking-wider bg-gradient-to-r from-amber-300 via-orange-400 to-red-500 bg-clip-text text-transparent">
               Dungeon Mayhem
             </span>
           </div>
-          <span className="text-slate-400 text-xs font-mono font-bold bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800">
+          <span className="text-amber-400 text-xs font-mono font-bold bg-stone-900 px-2.5 py-1 rounded-lg border border-amber-500/30">
             Salon : {roomCode.toUpperCase()}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
+          {/* Sound toggle button */}
+          <button
+            onClick={() => {
+              const isNowMuted = soundFx.toggleMute();
+              setMuted(isNowMuted);
+              if (!isNowMuted) soundFx.click();
+            }}
+            className="bg-stone-900 hover:bg-stone-800 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs text-amber-200 cursor-pointer transition flex items-center gap-1.5"
+            title="Activer / Désactiver les effets sonores"
+          >
+            <span>{muted ? '🔇' : '🔊'}</span>
+            <span className="font-mono text-[10px] hidden sm:inline">{muted ? 'Muet' : 'Audio ON'}</span>
+          </button>
+
           {gameState.status === 'LOBBY' && isHost && (
             <button
-              onClick={handleStartGame}
+              onClick={() => {
+                soundFx.click();
+                handleStartGame();
+              }}
               disabled={gameState.players.length < 2}
-              className="bg-gradient-to-r from-amber-600 to-red-600 hover:from-amber-500 hover:to-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs px-4 py-2 rounded-lg shadow transition cursor-pointer flex items-center gap-1.5"
+              className="btn-3d-amber disabled:opacity-40 disabled:cursor-not-allowed font-medieval font-extrabold text-xs px-4 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5"
             >
-              <span>Lancer la bagarre</span> ⚔️ ({gameState.players.length}/4)
+              <span>Lancer la Bagarre</span> ⚔️ ({gameState.players.length}/4)
             </button>
           )}
 
           {gameState.status === 'PLAYING' && isMyTurn && (
             <button
-              onClick={handleEndTurn}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs px-3 py-1.5 rounded-lg shadow transition cursor-pointer"
+              onClick={() => {
+                soundFx.click();
+                handleEndTurn();
+              }}
+              className="btn-3d-red font-medieval font-extrabold text-xs px-3.5 py-2 rounded-xl transition cursor-pointer"
             >
               Fin du tour ⏳
             </button>
@@ -347,8 +403,11 @@ export default function DungeonMayhemApp() {
 
           {gameState.status === 'FINISHED' && isHost && (
             <button
-              onClick={handleResetGame}
-              className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-4 py-2 rounded-lg shadow transition cursor-pointer"
+              onClick={() => {
+                soundFx.click();
+                handleResetGame();
+              }}
+              className="btn-3d-amber font-medieval font-extrabold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
             >
               Rejouer 🔄
             </button>
@@ -728,64 +787,65 @@ export default function DungeonMayhemApp() {
                       return (
                         <div
                           key={card.id}
+                          onMouseEnter={() => isPlayable && soundFx.click()}
                           onClick={() => isPlayable && handleCardClick(card)}
-                          className={`min-w-[170px] max-w-[190px] rounded-xl p-3 border-2 transition-all flex flex-col justify-between shadow-lg ${
+                          className={`holo-card min-w-[175px] max-w-[195px] rounded-2xl p-3.5 border-2 transition-all duration-150 flex flex-col justify-between shadow-xl ${
                             card.type === 'defense'
-                              ? 'bg-gradient-to-b from-amber-950/70 to-slate-900 border-amber-600/60'
-                              : 'bg-gradient-to-b from-slate-850 to-slate-900 border-slate-700'
+                              ? 'bg-gradient-to-b from-amber-950/80 via-stone-900 to-stone-950 border-amber-500/70 shadow-amber-950/40'
+                              : 'bg-gradient-to-b from-stone-850 via-stone-900 to-stone-950 border-stone-600/70 shadow-black/60'
                           } ${
                             isSelectedTargeting
-                              ? 'ring-4 ring-red-500 border-red-500 scale-105 -translate-y-2'
+                              ? 'ring-4 ring-red-500 border-red-500 scale-105 -translate-y-3'
                               : isPlayable
-                              ? 'hover:-translate-y-2 hover:shadow-2xl hover:border-amber-500 cursor-pointer'
-                              : 'opacity-60 cursor-not-allowed'
+                              ? 'hover:-translate-y-2 hover:shadow-2xl hover:border-amber-400 cursor-pointer active:translate-y-0'
+                              : 'opacity-50 cursor-not-allowed'
                           }`}
                         >
                           <div>
                             {/* Card Top Icons */}
-                            <div className="flex flex-wrap gap-1 items-center justify-end mb-1 text-xs">
+                            <div className="flex flex-wrap gap-1 items-center justify-end mb-1.5 text-xs">
                               {card.attack > 0 && (
-                                <span className="bg-red-950/80 text-red-300 border border-red-500/40 px-1.5 py-0.5 rounded font-bold font-mono">
+                                <span className="bg-red-950 text-red-200 border border-red-500/60 px-1.5 py-0.5 rounded-lg font-bold font-mono shadow-sm">
                                   ⚔️ {card.attack}
                                 </span>
                               )}
                               {card.shieldHp && (
-                                <span className="bg-amber-950/80 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded font-bold font-mono">
+                                <span className="bg-amber-950 text-amber-200 border border-amber-500/60 px-1.5 py-0.5 rounded-lg font-bold font-mono shadow-sm">
                                   🛡️ {card.shieldHp}
                                 </span>
                               )}
                               {card.heal > 0 && (
-                                <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.5 rounded font-bold font-mono">
+                                <span className="bg-emerald-950 text-emerald-200 border border-emerald-500/60 px-1.5 py-0.5 rounded-lg font-bold font-mono shadow-sm">
                                   ❤️ {card.heal}
                                 </span>
                               )}
                               {card.draw > 0 && (
-                                <span className="bg-blue-950/80 text-blue-300 border border-blue-500/40 px-1.5 py-0.5 rounded font-bold font-mono">
+                                <span className="bg-blue-950 text-blue-200 border border-blue-500/60 px-1.5 py-0.5 rounded-lg font-bold font-mono shadow-sm">
                                   🃏 {card.draw}
                                 </span>
                               )}
                               {card.playAgain > 0 && (
-                                <span className="bg-purple-950/80 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-bold font-mono">
+                                <span className="bg-purple-950 text-purple-200 border border-purple-500/60 px-1.5 py-0.5 rounded-lg font-bold font-mono shadow-sm">
                                   ⚡ +{card.playAgain}
                                 </span>
                               )}
                             </div>
 
-                            {/* Card Title */}
-                            <h5 className="font-extrabold text-sm text-white leading-tight mb-1">
+                            {/* Card Title with Medieval Font */}
+                            <h5 className="font-medieval font-black text-xs text-white leading-tight mb-1.5 tracking-wide">
                               {card.name}
                             </h5>
 
                             {/* Card Description */}
-                            <p className="text-[11px] text-slate-300 leading-snug">
+                            <p className="text-[11px] text-stone-300 leading-snug font-normal">
                               {card.description}
                             </p>
                           </div>
 
-                          <div className="mt-3 pt-2 border-t border-slate-800/80 flex justify-between items-center text-[9px] font-mono text-slate-400">
-                            <span>{card.type === 'defense' ? 'DÉFENSE' : 'ACTION'}</span>
+                          <div className="mt-3 pt-2 border-t border-stone-800/80 flex justify-between items-center text-[9px] font-mono text-stone-400">
+                            <span className="uppercase font-bold tracking-wider">{card.type === 'defense' ? '🛡️ DÉFENSE' : '⚔️ ACTION'}</span>
                             {isPlayable && (
-                              <span className="text-amber-400 font-bold">
+                              <span className="text-amber-400 font-black tracking-wider">
                                 {isSelectedTargeting ? '🎯 CIBLER' : 'JOUER →'}
                               </span>
                             )}

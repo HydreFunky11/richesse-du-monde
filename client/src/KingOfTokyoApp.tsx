@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
+import { soundFx } from './utils/audio';
 
 const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || 'http://localhost:3001';
 
@@ -50,6 +51,7 @@ export default function KingOfTokyoApp() {
   const [roomCode, setRoomCode] = useState('');
   const [joined, setJoined] = useState(false);
   const [error, setError] = useState('');
+  const [muted, setMuted] = useState(soundFx.isMuted());
 
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -61,6 +63,10 @@ export default function KingOfTokyoApp() {
       setGameState(state);
       setJoined(true);
       setError('');
+
+      if (state.status === 'FINISHED') {
+        soundFx.victory();
+      }
     });
 
     s.on('error', (msg: string) => {
@@ -81,39 +87,71 @@ export default function KingOfTokyoApp() {
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || !roomCode.trim() || !socket) return;
+    soundFx.click();
     socket.emit('joinGame', { username, roomCode, gameType: 'kingoftokyo' });
   };
 
   const handleStartGame = () => {
-    if (socket) socket.emit('king:startGame');
+    if (socket) {
+      soundFx.attack();
+      socket.emit('king:startGame');
+    }
   };
 
   const handleToggleKeep = (index: number) => {
-    if (socket) socket.emit('king:toggleKeep', { index });
+    if (socket) {
+      soundFx.click();
+      socket.emit('king:toggleKeep', { index });
+    }
   };
 
   const handleRollDice = () => {
-    if (socket) socket.emit('king:rollDice');
+    if (socket) {
+      soundFx.dice();
+      socket.emit('king:rollDice');
+    }
   };
 
   const handleResolveDice = () => {
-    if (socket) socket.emit('king:resolveDice');
+    if (socket && gameState) {
+      const hasAttack = gameState.dice.includes('ATTACK');
+      if (hasAttack) {
+        soundFx.attack();
+      } else if (gameState.dice.includes('HEAL')) {
+        soundFx.heal();
+      } else {
+        soundFx.playCard();
+      }
+      socket.emit('king:resolveDice');
+    }
   };
 
   const handleRespondYield = (yieldTokyo: boolean) => {
-    if (socket) socket.emit('king:respondYield', { yieldTokyo });
+    if (socket) {
+      soundFx.shield();
+      socket.emit('king:respondYield', { yieldTokyo });
+    }
   };
 
   const handleBuyCard = (cardId: string) => {
-    if (socket) socket.emit('king:buyCard', { cardId });
+    if (socket) {
+      soundFx.playCard();
+      socket.emit('king:buyCard', { cardId });
+    }
   };
 
   const handleEndTurn = () => {
-    if (socket) socket.emit('king:endTurn');
+    if (socket) {
+      soundFx.click();
+      socket.emit('king:endTurn');
+    }
   };
 
   const handleResetGame = () => {
-    if (socket) socket.emit('king:resetGame');
+    if (socket) {
+      soundFx.click();
+      socket.emit('king:resetGame');
+    }
   };
 
   const getDieIcon = (val: string) => {
@@ -205,30 +243,47 @@ export default function KingOfTokyoApp() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-955 text-slate-100 flex flex-col justify-between">
+    <div className="min-h-screen bg-kaiju-city text-slate-100 flex flex-col justify-between select-none">
       {/* Navbar */}
-      <header className="bg-slate-900 border-b border-slate-850 p-4 flex justify-between items-center shadow-lg">
+      <header className="bg-slate-950/90 backdrop-blur border-b border-red-900/40 p-4 flex justify-between items-center shadow-xl z-20">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/')}
-            className="text-xs bg-slate-800 hover:bg-slate-750 px-3 py-1.5 rounded text-slate-300 border border-slate-700 flex items-center gap-1 cursor-pointer"
+            onClick={() => {
+              soundFx.click();
+              navigate('/');
+            }}
+            className="text-xs bg-slate-900 hover:bg-slate-800 px-3 py-1.5 rounded-xl text-slate-300 border border-slate-700 flex items-center gap-1 cursor-pointer font-bold"
           >
             ← Accueil
           </button>
-          <span className="font-black text-lg bg-gradient-to-r from-red-500 to-amber-500 bg-clip-text text-transparent">
+          <span className="font-comic text-3xl tracking-wider bg-gradient-to-r from-red-500 via-amber-400 to-red-500 bg-clip-text text-transparent">
             King of Tokyo 🦖
           </span>
-          <span className="text-slate-500 text-xs font-mono font-bold bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800">
+          <span className="text-red-400 text-xs font-mono font-bold bg-slate-950 px-2.5 py-1 rounded-lg border border-red-500/30">
             Arène : {roomCode.toUpperCase()}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
+          {/* Sound toggle button */}
+          <button
+            onClick={() => {
+              const isNowMuted = soundFx.toggleMute();
+              setMuted(isNowMuted);
+              if (!isNowMuted) soundFx.click();
+            }}
+            className="bg-slate-900 hover:bg-slate-800 border border-red-500/30 px-3 py-1.5 rounded-xl text-xs text-red-200 cursor-pointer transition flex items-center gap-1.5"
+            title="Activer / Désactiver les effets sonores"
+          >
+            <span>{muted ? '🔇' : '🔊'}</span>
+            <span className="font-mono text-[10px] hidden sm:inline">{muted ? 'Muet' : 'Audio ON'}</span>
+          </button>
+
           {gameState.status === 'LOBBY' && isHost && (
             <button
               onClick={handleStartGame}
               disabled={gameState.players.length < 2}
-              className="bg-red-655 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs px-4 py-2 rounded shadow transition cursor-pointer"
+              className="btn-3d-red font-comic text-sm tracking-wider disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition cursor-pointer"
             >
               Lancer la bagarre ! ⚔️
             </button>
@@ -236,7 +291,7 @@ export default function KingOfTokyoApp() {
           {gameState.status === 'FINISHED' && isHost && (
             <button
               onClick={handleResetGame}
-              className="bg-red-655 hover:bg-red-700 text-white font-bold text-xs px-4 py-2 rounded shadow transition cursor-pointer"
+              className="btn-3d-amber font-comic text-sm tracking-wider text-white px-4 py-2 rounded-xl transition cursor-pointer"
             >
               Nouvelle partie 🔄
             </button>
@@ -441,16 +496,16 @@ export default function KingOfTokyoApp() {
                         key={idx}
                         onClick={() => clickable && handleToggleKeep(idx)}
                         disabled={!clickable}
-                        className={`h-16 rounded-xl border-2 flex flex-col items-center justify-center font-extrabold text-lg shadow transition transform relative ${getDieColor(
+                        className={`btn-3d h-16 rounded-2xl border-2 flex flex-col items-center justify-center font-extrabold text-lg shadow-lg transition transform relative ${getDieColor(
                           val
                         )} ${
-                          isKept ? 'ring-2 ring-amber-500 border-amber-500' : ''
+                          isKept ? 'ring-4 ring-amber-400 border-amber-400 scale-105' : ''
                         } ${
                           clickable ? 'hover:scale-105 cursor-pointer' : 'cursor-default'
                         }`}
                       >
                         {isKept && (
-                          <span className="absolute -top-1.5 -right-1 text-[8px] bg-amber-500 text-slate-950 px-1 rounded font-black font-sans">
+                          <span className="absolute -top-2 -right-1 text-[8px] bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded-full font-black font-sans shadow">
                             GARDÉ
                           </span>
                         )}
@@ -462,11 +517,11 @@ export default function KingOfTokyoApp() {
 
                 {/* Dice actions buttons */}
                 {isMyTurn && (
-                  <div className="flex gap-4 items-center justify-center w-full max-w-sm">
+                  <div className="flex gap-4 items-center justify-center w-full max-w-md">
                     {gameState.rollCount < 3 && (
                       <button
                         onClick={handleRollDice}
-                        className="flex-1 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow transition cursor-pointer"
+                        className="btn-3d-red font-comic tracking-wider text-sm flex-1 py-3 px-4 rounded-xl cursor-pointer"
                       >
                         {gameState.rollCount === 0 ? "Lancer les dés 🎲" : `Relancer non-gardés (${gameState.rollCount}/3) 🔄`}
                       </button>
@@ -475,16 +530,16 @@ export default function KingOfTokyoApp() {
                     {gameState.rollCount > 0 && (
                       <button
                         onClick={handleResolveDice}
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow transition cursor-pointer"
+                        className="btn-3d-emerald font-comic tracking-wider text-sm flex-1 py-3 px-4 rounded-xl cursor-pointer"
                       >
-                        Valider & Résoudre ✔️
+                        Valider & Résoudre 💥
                       </button>
                     )}
 
                     {gameState.rollCount >= 3 && (
                       <button
                         onClick={handleEndTurn}
-                        className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 px-4 rounded-xl text-xs border border-slate-700 transition cursor-pointer"
+                        className="btn-3d-amber font-comic tracking-wider text-sm flex-1 py-3 px-4 rounded-xl cursor-pointer"
                       >
                         Finir le tour ➔
                       </button>
