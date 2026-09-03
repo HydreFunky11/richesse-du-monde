@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import { soundFx } from './utils/audio';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 
 export type ClashTeam = 'blue' | 'red';
 export type ClashCardId = 
@@ -232,14 +232,23 @@ export default function ClashApp() {
 
   // Connect socket
   useEffect(() => {
-    const s = io(SERVER_URL);
+    const s = io(SERVER_URL, {
+      transports: ['websocket', 'polling']
+    });
     setSocket(s);
 
+    s.on('connect', () => {
+      setErrorMsg(null);
+    });
+
     s.on('connect_error', () => {
-      setErrorMsg('Impossible de se connecter au serveur de jeu.');
+      setErrorMsg('Impossible de se connecter au serveur de jeu. Veuillez patienter pendant le réveil du serveur...');
     });
 
     s.on('clashStateUpdate', (newState: ClashGameState) => {
+      setJoined(true);
+      setErrorMsg(null);
+
       // Check HP differences to spawn floating damage numbers & particles
       newState.towers.forEach(t => {
         const prev = prevHpsRef.current[t.id];
@@ -308,12 +317,16 @@ export default function ClashApp() {
     setErrorMsg(null);
     soundFx.click();
 
+    if (!socket.connected) {
+      setErrorMsg('Connexion au serveur en cours... Veuillez patienter un instant.');
+      socket.connect();
+    }
+
     socket.emit('joinGame', {
       username: usernameInput.trim(),
       roomCode: roomCodeInput.trim(),
       gameType: 'clash'
     });
-    setJoined(true);
   };
 
   const handleStartGame = () => {
