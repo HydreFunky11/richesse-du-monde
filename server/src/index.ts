@@ -50,7 +50,7 @@ io.on('connection', (socket) => {
     (socket as any).gameType = type;
 
     if (type === 'uno') {
-      if (!unoGames[formattedRoomCode]) {
+      if (!unoGames[formattedRoomCode] || unoGames[formattedRoomCode].getState().status === 'FINISHED' || unoGames[formattedRoomCode].getPlayers().length === 0) {
         unoGames[formattedRoomCode] = new UnoEngine(formattedRoomCode);
       }
       const game = unoGames[formattedRoomCode];
@@ -70,7 +70,7 @@ io.on('connection', (socket) => {
       socket.emit('error', 'Le jeu Chaos Board est temporairement fermé.');
       return;
     } else if (type === 'loveletter') {
-      if (!loveLetterGames[formattedRoomCode]) {
+      if (!loveLetterGames[formattedRoomCode] || loveLetterGames[formattedRoomCode].getState().status === 'FINISHED' || loveLetterGames[formattedRoomCode].getPlayers().length === 0) {
         loveLetterGames[formattedRoomCode] = new LoveLetterEngine(formattedRoomCode);
       }
       const game = loveLetterGames[formattedRoomCode];
@@ -87,7 +87,7 @@ io.on('connection', (socket) => {
         socket.emit('error', 'Impossible de rejoindre le salon Love Letter (partie commencée ou salon plein).');
       }
     } else if (type === 'discretos') {
-      if (!discretosGames[formattedRoomCode]) {
+      if (!discretosGames[formattedRoomCode] || discretosGames[formattedRoomCode].getState().status === 'FINISHED' || discretosGames[formattedRoomCode].getPlayers().length === 0) {
         discretosGames[formattedRoomCode] = new DiscretosEngine(formattedRoomCode);
       }
       const game = discretosGames[formattedRoomCode];
@@ -104,7 +104,7 @@ io.on('connection', (socket) => {
         socket.emit('error', 'Impossible de rejoindre le salon Discretos (partie commencée ou salon plein).');
       }
     } else if (type === 'skyjo') {
-      if (!skyjoGames[formattedRoomCode]) {
+      if (!skyjoGames[formattedRoomCode] || skyjoGames[formattedRoomCode].getState().status === 'FINISHED' || skyjoGames[formattedRoomCode].getPlayers().length === 0) {
         skyjoGames[formattedRoomCode] = new SkyjoEngine(formattedRoomCode);
       }
       const game = skyjoGames[formattedRoomCode];
@@ -121,7 +121,7 @@ io.on('connection', (socket) => {
         socket.emit('error', 'Impossible de rejoindre le salon Skyjo (partie commencée ou salon plein).');
       }
     } else if (type === 'kingoftokyo') {
-      if (!kingOfTokyoGames[formattedRoomCode]) {
+      if (!kingOfTokyoGames[formattedRoomCode] || kingOfTokyoGames[formattedRoomCode].getState().status === 'FINISHED' || kingOfTokyoGames[formattedRoomCode].getPlayers().length === 0) {
         kingOfTokyoGames[formattedRoomCode] = new KingOfTokyoEngine(formattedRoomCode);
       }
       const game = kingOfTokyoGames[formattedRoomCode];
@@ -138,7 +138,7 @@ io.on('connection', (socket) => {
         socket.emit('error', 'Impossible de rejoindre le salon King of Tokyo (partie commencée ou salon plein).');
       }
     } else if (type === 'mayhem') {
-      if (!mayhemGames[formattedRoomCode]) {
+      if (!mayhemGames[formattedRoomCode] || mayhemGames[formattedRoomCode].getState().status === 'FINISHED' || mayhemGames[formattedRoomCode].getPlayers().length === 0 || mayhemGames[formattedRoomCode].getPlayers().every(p => p.isEliminated)) {
         mayhemGames[formattedRoomCode] = new DungeonMayhemEngine(formattedRoomCode);
       }
       const game = mayhemGames[formattedRoomCode];
@@ -155,7 +155,7 @@ io.on('connection', (socket) => {
         socket.emit('error', 'Impossible de rejoindre le salon Dungeon Mayhem (partie commencée ou salon plein).');
       }
     } else {
-      if (!games[formattedRoomCode]) {
+      if (!games[formattedRoomCode] || games[formattedRoomCode].getStatus() === 'FINISHED' || games[formattedRoomCode].getPlayers().length === 0 || games[formattedRoomCode].getPlayers().every(p => p.isBankrupt)) {
         games[formattedRoomCode] = new GameEngine(formattedRoomCode);
       }
       const game = games[formattedRoomCode];
@@ -790,7 +790,7 @@ io.on('connection', (socket) => {
       game.removePlayer(socket.id);
       io.to(roomCode).emit('mayhemStateUpdate', game.getState());
       console.log(`[MAYHEM] Déconnexion de ${username} du salon ${roomCode}`);
-      if (game.getPlayers().length === 0) {
+      if (game.getPlayers().length === 0 || game.getPlayers().every(p => p.isEliminated)) {
         delete mayhemGames[roomCode];
       }
     } else if (gameType === 'chaos' && roomCode && chaosGames[roomCode]) {
@@ -828,6 +828,9 @@ io.on('connection', (socket) => {
 
       io.to(roomCode).emit('gameStateUpdate', game.getState());
       console.log(`[GAME] Déconnexion de ${username} du salon ${roomCode}`);
+      if (game.getPlayers().length === 0 || game.getPlayers().every(p => p.isBankrupt)) {
+        delete games[roomCode];
+      }
     }
   });
 

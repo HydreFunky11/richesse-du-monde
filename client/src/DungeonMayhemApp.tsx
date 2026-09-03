@@ -174,6 +174,11 @@ export default function DungeonMayhemApp() {
       setError(msg);
     });
 
+    s.on('connect_error', (err) => {
+      console.error('[Dungeon Mayhem] Erreur connexion socket:', err);
+      setError(`Connexion au serveur impossible : ${err.message}`);
+    });
+
     return () => {
       s.disconnect();
     };
@@ -187,7 +192,12 @@ export default function DungeonMayhemApp() {
 
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !roomCode.trim() || !socket) return;
+    if (!username.trim() || !roomCode.trim()) return;
+    if (!socket || !socket.connected) {
+      setError("Connexion au serveur en cours... Réessayez dans un instant.");
+      return;
+    }
+    soundFx.click();
     socket.emit('joinGame', { username, roomCode, gameType: 'mayhem' });
   };
 

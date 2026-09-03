@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import type { GameState, ResourceType } from './types/game';
 import { RESOURCE_DEFINITIONS, COUNTRY_CONTINENT_MAP } from './data/board';
+import { soundFx } from './utils/audio';
 import './App.css';
 
 const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || 'http://localhost:3001';
@@ -23,7 +24,7 @@ export default function App() {
   const [selectedCellIndex, setSelectedCellIndex] = useState<number | null>(null);
   const [monopolySortMode, setMonopolySortMode] = useState<'DEFAULT' | 'PERCENTAGE' | 'ROYALTIES' | 'ALPHABETICAL'>('DEFAULT');
   const [showActionModal, setShowActionModal] = useState(false);
-  const [boardZoom, setBoardZoom] = useState(1.0);
+  const [boardZoom, setBoardZoom] = useState<number>(1);
   const [auctionSearchQuery, setAuctionSearchQuery] = useState('');
   const [auctionContinentFilter, setAuctionContinentFilter] = useState<'ALL' | 'Europe' | 'Asie' | 'Afrique' | 'Amérique'>('ALL');
   const [highlightedResourceType, setHighlightedResourceType] = useState<ResourceType | null>(null);
@@ -53,6 +54,11 @@ export default function App() {
 
     newSocket.on('error', (msg: string) => {
       setErrorMsg(msg);
+    });
+
+    newSocket.on('connect_error', (err) => {
+      console.error('[Richesse] Erreur connexion socket:', err);
+      setErrorMsg(`Connexion au serveur impossible : ${err.message}`);
     });
 
     newSocket.on('lobbyClosed', () => {
@@ -173,8 +179,13 @@ export default function App() {
 
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !roomCode.trim() || !socket) return;
-    socket.emit('joinGame', { username, roomCode });
+    if (!username.trim() || !roomCode.trim()) return;
+    if (!socket || !socket.connected) {
+      setErrorMsg("Connexion au serveur en cours... Réessayez dans un instant.");
+      return;
+    }
+    soundFx.click();
+    socket.emit('joinGame', { username, roomCode, gameType: 'richesse' });
   };
 
   const handleStartGame = () => {
@@ -205,9 +216,9 @@ export default function App() {
   };
 
   const handleStartAuction = () => {
-    if (socket && selectedTitlesForAuction.length > 0) {
+    if (socket) {
       socket.emit('startAuction', { titleIds: selectedTitlesForAuction });
-      setSelectedTitlesForAuction([]);
+      setSelectedTitlesForAuction([]); // Reset sélection après lancement
     }
   };
 
@@ -254,55 +265,68 @@ export default function App() {
 
   if (!joined || !gameState) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
-        {/* Back button */}
-        <button
-          onClick={() => navigate('/')}
-          className="absolute top-4 left-4 flex items-center gap-1.5 text-slate-400 hover:text-slate-100 text-sm font-medium transition-colors"
-        >
-          ← Accueil
-        </button>
-        <div className="bg-slate-900 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-800">
-          <h1 className="text-3xl font-extrabold text-center mb-2 tracking-tight bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
-            Richesses du Monde
-          </h1>
-          <p className="text-center text-slate-400 text-sm mb-6">Rejouez au jeu de société économique culte</p>
+      <div className="min-h-screen bg-lounge-felt text-slate-100 flex items-center justify-center p-4 relative">
+        <div className="bg-slate-950/90 border-2 border-emerald-500/40 p-8 rounded-3xl shadow-2xl w-full max-w-md backdrop-blur-sm relative z-10">
+          <div className="flex justify-between items-center mb-6">
+            <button
+              onClick={() => {
+                soundFx.click();
+                navigate('/');
+              }}
+              className="text-xs text-amber-400/90 hover:text-amber-300 transition flex items-center gap-1 cursor-pointer font-luxury font-bold"
+            >
+              ← Accueil
+            </button>
+            <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/40 text-[10px] uppercase font-bold px-2.5 py-1 rounded-full font-luxury tracking-wider">
+              RICHESSES DU MONDE 🌍
+            </span>
+          </div>
+
+          <div className="text-center mb-6">
+            <div className="text-5xl mb-2 animate-bounce">🌍</div>
+            <h1 className="text-3xl font-luxury italic font-black tracking-wider bg-gradient-to-r from-amber-200 via-emerald-300 to-yellow-500 bg-clip-text text-transparent">
+              Richesses du Monde
+            </h1>
+            <p className="text-slate-400 text-xs mt-1 font-serif italic">
+              Le grand jeu économique mondial • 2 à 6 Magnats
+            </p>
+          </div>
 
           <form onSubmit={handleJoin} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Votre Pseudo</label>
+              <label className="block text-xs font-bold text-amber-300/90 uppercase tracking-wider mb-1 font-luxury">Votre Pseudo de Magnat</label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Ex: Alexandre"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                placeholder="Ex: Alexandre de Rothschild"
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Code de la Partie</label>
+              <label className="block text-xs font-bold text-amber-300/90 uppercase tracking-wider mb-1 font-luxury">Code de la Séance</label>
               <input
                 type="text"
                 value={roomCode}
                 onChange={(e) => setRoomCode(e.target.value)}
-                placeholder="Ex: LOBBY123"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 uppercase"
+                placeholder="Ex: BOURSE"
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm uppercase font-mono"
                 required
               />
             </div>
 
             {errorMsg && (
-              <div className="bg-red-900/50 border border-red-500 text-red-200 text-sm rounded-lg p-3 text-center">
-                {errorMsg}
+              <div className="bg-red-950/60 border border-red-500/40 text-red-300 text-xs p-3 rounded-xl font-mono text-center">
+                ⚠️ {errorMsg}
               </div>
             )}
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-slate-950 font-bold py-3 rounded-lg shadow-lg hover:shadow-xl transition duration-200"
+              className="btn-3d-amber w-full py-3.5 rounded-xl font-luxury font-bold tracking-wider text-sm cursor-pointer shadow-lg mt-2 text-slate-950"
             >
-              Rejoindre ou Créer le Salon
+              Rejoindre ou Créer la Séance 🏛️
             </button>
           </form>
         </div>
