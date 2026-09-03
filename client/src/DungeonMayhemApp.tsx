@@ -546,52 +546,52 @@ export default function DungeonMayhemApp() {
                     onClick={() => {
                       if (isTargetablePlayer) handleTargetClick(opp.id);
                     }}
-                    className={`relative p-3 rounded-2xl border-2 transition-all flex flex-col justify-between bg-slate-900/90 shadow-lg ${
+                    className={`relative p-4 rounded-2xl border-2 transition-all flex flex-col justify-between bg-gradient-to-b from-[#221810] to-[#120d08] shadow-2xl ${
                       opp.isEliminated
-                        ? 'border-slate-850 opacity-40 grayscale'
+                        ? 'border-stone-900 opacity-40 grayscale'
                         : isOppTurn
-                        ? `${char.borderColor} ring-2 ring-amber-500/40 shadow-amber-950/30`
+                        ? `${char.borderColor} ring-4 ring-amber-500/50 shadow-amber-950/50 scale-[1.01]`
                         : isTargetablePlayer
-                        ? 'border-red-500 ring-4 ring-red-500/50 cursor-pointer hover:scale-[1.02] animate-pulse bg-red-950/20'
-                        : 'border-slate-800'
+                        ? 'border-red-500 ring-4 ring-red-500/70 cursor-pointer hover:scale-[1.03] animate-pulse bg-red-950/40'
+                        : 'border-amber-900/50 hover:border-amber-700/60'
                     }`}
                   >
                     {/* Opponent Header */}
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-2xl">{char.avatar}</span>
+                        <span className="text-3xl filter drop-shadow">{char.avatar}</span>
                         <div>
-                          <div className="font-extrabold text-sm text-white flex items-center gap-1.5">
+                          <div className="font-medieval font-black text-sm text-amber-100 flex items-center gap-1.5 tracking-wide">
                             {opp.username}
                             {isOppTurn && (
-                              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
                             )}
                           </div>
-                          <div className="text-[10px] text-slate-400">{char.name}</div>
+                          <div className="text-[10px] text-amber-400/80 font-serif italic">{char.name}</div>
                         </div>
                       </div>
 
                       {/* Health Indicator */}
-                      <div className="flex items-center gap-1.5 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800">
-                        <span className="text-red-400 text-xs">❤️</span>
-                        <span className={`font-mono font-extrabold text-sm ${opp.hp <= 3 ? 'text-red-400 animate-pulse' : 'text-white'}`}>
+                      <div className="flex items-center gap-1.5 bg-[#0a0705] px-2.5 py-1 rounded-xl border border-amber-900/60 shadow-inner">
+                        <span className="text-red-500 text-sm animate-pulse">❤️</span>
+                        <span className={`font-mono font-black text-sm ${opp.hp <= 3 ? 'text-red-400 animate-bounce' : 'text-amber-200'}`}>
                           {opp.hp}/10
                         </span>
                       </div>
                     </div>
 
                     {/* Health Bar */}
-                    <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mb-3">
+                    <div className="w-full bg-black/80 h-2 rounded-full overflow-hidden mb-3 border border-amber-950">
                       <div
-                        className="h-full bg-gradient-to-r from-red-600 to-green-500 transition-all duration-300"
+                        className="h-full bg-gradient-to-r from-red-600 via-amber-500 to-green-500 transition-all duration-300 shadow"
                         style={{ width: `${(opp.hp / 10) * 100}%` }}
                       />
                     </div>
 
                     {/* Active Shields Row */}
-                    <div className="min-h-[44px] flex flex-wrap gap-1.5 items-center mb-2 bg-slate-950/60 p-1.5 rounded-xl border border-slate-850">
+                    <div className="min-h-[46px] flex flex-wrap gap-1.5 items-center mb-2 bg-[#0c0906] p-2 rounded-xl border border-amber-950 shadow-inner">
                       {opp.shields.length === 0 ? (
-                        <span className="text-[10px] text-slate-500 italic px-2">Aucun bouclier actif</span>
+                        <span className="text-[10px] text-stone-500 italic px-2 font-serif">Aucun bouclier actif</span>
                       ) : (
                         opp.shields.map((sh) => {
                           const isTargetableShield =
@@ -606,15 +606,15 @@ export default function DungeonMayhemApp() {
                                 e.stopPropagation();
                                 if (isTargetableShield) handleTargetClick(opp.id, sh.id);
                               }}
-                              className={`text-[10px] px-2 py-1 rounded-lg border flex items-center gap-1 font-mono transition ${
+                              className={`text-[10px] px-2 py-1 rounded-lg border-2 flex items-center gap-1.5 font-mono transition ${
                                 isTargetableShield
-                                  ? 'bg-red-900 text-white border-red-500 cursor-pointer animate-bounce'
-                                  : 'bg-slate-850 text-amber-300 border-amber-500/40'
+                                  ? 'bg-red-900 text-white border-red-500 cursor-pointer animate-bounce shadow-lg shadow-red-900/50'
+                                  : 'bg-gradient-to-r from-amber-950 to-stone-900 text-amber-300 border-amber-600/60 shadow'
                               }`}
                             >
                               <span>🛡️</span>
-                              <span className="font-bold">{sh.name}</span>
-                              <span className="bg-slate-900 px-1 rounded text-[9px] text-white">
+                              <span className="font-medieval font-bold">{sh.name}</span>
+                              <span className="bg-black/60 px-1.5 py-0.5 rounded text-[9px] text-amber-200 border border-amber-800/40">
                                 {sh.currentShieldHp}/{sh.shieldHp} PV
                               </span>
                             </div>
@@ -624,19 +624,19 @@ export default function DungeonMayhemApp() {
                     </div>
 
                     {/* Footer: Cards count */}
-                    <div className="flex justify-between items-center text-[10px] text-slate-500 font-mono">
+                    <div className="flex justify-between items-center text-[10px] text-amber-300/60 font-mono">
                       <span>🎴 {opp.hand.length} en main</span>
-                      <span>🃏 {opp.deckCount} dans le deck</span>
+                      <span>🃏 {opp.deckCount} pioche</span>
                       {opp.isEliminated && (
-                        <span className="text-red-400 font-bold uppercase">💀 Éliminé</span>
+                        <span className="text-red-400 font-bold uppercase font-medieval">💀 Terrassé</span>
                       )}
                     </div>
 
                     {/* Targeting Overlay Prompt */}
                     {isTargetablePlayer && (
-                      <div className="absolute inset-0 bg-red-600/10 rounded-2xl flex items-center justify-center pointer-events-none">
-                        <span className="bg-red-600 text-white text-xs font-extrabold px-3 py-1 rounded-full shadow-lg">
-                          🎯 CIBLER CE JOUEUR
+                      <div className="absolute inset-0 bg-red-900/20 rounded-2xl flex items-center justify-center pointer-events-none border-2 border-red-500">
+                        <span className="bg-red-600 text-white text-xs font-black px-3 py-1 rounded-full shadow-xl font-medieval tracking-wider">
+                          ⚔️ CIBLER CE HÉROS
                         </span>
                       </div>
                     )}
@@ -648,69 +648,69 @@ export default function DungeonMayhemApp() {
           {/* Center Area: Turn indicator & Combat Logs */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Turn status & Action points */}
-            <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg flex flex-col justify-between">
+            <div className="lg:col-span-1 bg-gradient-to-b from-[#221910] to-[#120d08] border-2 border-amber-800/60 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                    Phase de combat
+                  <span className="text-[10px] uppercase font-bold tracking-widest text-amber-400/80 font-medieval">
+                    ⚔️ Arène de Combat
                   </span>
                   {activePlayer && (
-                    <span className="text-xs font-bold text-amber-400">
+                    <span className="text-xs font-medieval font-black text-amber-300">
                       Tour de {activePlayer.username}
                     </span>
                   )}
                 </div>
 
                 {isMyTurn ? (
-                  <div className="bg-amber-950/30 border border-amber-500/40 rounded-xl p-3 text-center mb-2">
-                    <div className="text-xl font-extrabold text-amber-300 flex items-center justify-center gap-2">
-                      <span>⚡</span>
+                  <div className="bg-gradient-to-r from-amber-950/80 via-stone-900 to-amber-950/80 border-2 border-amber-500/60 rounded-xl p-3 text-center mb-2 shadow-lg">
+                    <div className="text-xl font-medieval font-black text-amber-300 flex items-center justify-center gap-2">
+                      <span className="text-amber-400 animate-pulse">⚡</span>
                       <span>{gameState.playsLeft} action(s) restante(s)</span>
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-1">
+                    <p className="text-[11px] text-amber-200/80 mt-1 font-serif italic">
                       {targetingCard
-                        ? `🎯 Cliquez sur un adversaire ou un bouclier pour lancer "${targetingCard.name}".`
-                        : 'Cliquez sur une carte de votre main pour la jouer.'}
+                        ? `🎯 Choisissez une cible pour votre sort "${targetingCard.name}".`
+                        : 'Jouez une carte de votre main de combattant.'}
                     </p>
                     {targetingCard && (
                       <button
                         onClick={() => setTargetingCard(null)}
-                        className="mt-2 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1 rounded border border-slate-700 cursor-pointer"
+                        className="mt-2 text-[10px] bg-red-950 hover:bg-red-900 text-red-200 px-3 py-1 rounded-lg border border-red-700 cursor-pointer font-bold"
                       >
                         Annuler le ciblage ✕
                       </button>
                     )}
                   </div>
                 ) : (
-                  <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4 text-center text-xs text-slate-400 italic mb-2">
-                    ⏳ Attente de {activePlayer?.username}...
+                  <div className="bg-[#0b0805] border border-amber-950 rounded-xl p-4 text-center text-xs text-amber-400/60 font-serif italic mb-2">
+                    ⏳ Attente du tour de {activePlayer?.username}...
                   </div>
                 )}
               </div>
 
               {/* Last Played Card Highlight */}
               {gameState.lastPlayedCard && (
-                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center gap-3">
+                <div className="bg-[#0e0a07] p-2.5 rounded-xl border border-amber-900/40 flex items-center gap-3 shadow-inner">
                   <span className="text-2xl">🃏</span>
                   <div className="text-xs">
-                    <div className="text-slate-400 text-[10px]">Dernière carte jouée par {gameState.lastPlayedCard.playerName} :</div>
-                    <div className="font-extrabold text-white">{gameState.lastPlayedCard.card.name}</div>
-                    <div className="text-[10px] text-amber-400/90">{gameState.lastPlayedCard.card.description}</div>
+                    <div className="text-amber-400/70 text-[10px] font-serif">Dernière attaque de {gameState.lastPlayedCard.playerName} :</div>
+                    <div className="font-medieval font-black text-amber-200 tracking-wide">{gameState.lastPlayedCard.card.name}</div>
+                    <div className="text-[10px] text-amber-400/90 font-serif">{gameState.lastPlayedCard.card.description}</div>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Combat Log */}
-            <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg flex flex-col max-h-44">
-              <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
-                <span>📜 Journal de la Bagarre</span>
-                <span className="text-slate-500 font-mono text-[9px]">{gameState.log.length} actions</span>
+            {/* Combat Log Parchment */}
+            <div className="lg:col-span-2 bg-gradient-to-b from-[#241a10] via-[#1c140c] to-[#140e08] border-2 border-amber-800/60 rounded-2xl p-4 shadow-2xl flex flex-col max-h-44">
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-amber-400 mb-2 flex items-center justify-between font-medieval">
+                <span>📜 Grimoire des Combats</span>
+                <span className="text-amber-500/70 font-mono text-[9px]">{gameState.log.length} chroniques</span>
               </h4>
-              <div className="overflow-y-auto space-y-1 font-mono text-[11px] text-slate-300 pr-1 flex-1">
+              <div className="overflow-y-auto space-y-1 font-serif text-[11px] text-amber-100/90 pr-1 flex-1 leading-relaxed">
                 {gameState.log.map((entry, idx) => (
-                  <div key={idx} className="border-b border-slate-850/60 pb-0.5 last:border-none">
-                    {entry}
+                  <div key={idx} className="border-b border-amber-900/30 pb-0.5 last:border-none">
+                    ⚔️ {entry}
                   </div>
                 ))}
                 <div ref={logsEndRef} />
@@ -720,7 +720,7 @@ export default function DungeonMayhemApp() {
 
           {/* Bottom Area: Current Player Hand & Player Bar */}
           {me && (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-2xl flex flex-col gap-3">
+            <div className="bg-gradient-to-t from-[#100c08] via-[#1a130d] to-[#241a12] border-2 border-amber-700/70 rounded-3xl p-4 shadow-2xl flex flex-col gap-3">
               {/* My Stats Banner */}
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
                 <div className="flex items-center gap-3">

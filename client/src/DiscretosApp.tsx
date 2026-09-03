@@ -253,33 +253,37 @@ export default function DiscretosApp() {
       {gameState.status === 'LOBBY' ? (
         /* Lobby State */
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md w-full shadow-2xl">
+          <div className="bg-[#1c150e] border-2 border-amber-800/70 p-8 rounded-3xl max-w-md w-full shadow-2xl relative">
+            <div className="absolute -top-3 right-6 border-2 border-red-600 text-red-500 font-black text-[10px] px-3 py-0.5 uppercase tracking-widest rotate-[-8deg] shadow-lg bg-red-950/40">
+              SECRET-DÉFENSE
+            </div>
             <div className="text-5xl mb-4 animate-bounce">🥸</div>
-            <h2 className="text-xl font-bold mb-4">Salon de jeu</h2>
+            <h2 className="text-xl font-black mb-1 text-amber-200 uppercase tracking-wider">Dossier d'Enquête</h2>
+            <p className="text-xs text-amber-400/60 mb-6 italic font-serif">Enregistrement des agents secrets pour la mission</p>
+            
             <div className="space-y-2 mb-6">
               {gameState.players.map((p, idx) => (
-                <div key={p.id} className="bg-slate-850 p-2.5 rounded border border-slate-800 flex items-center gap-2 text-sm justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full block" style={{ backgroundColor: p.color }} />
-                    <span className="font-semibold">{p.username}</span>
+                <div key={p.id} className="bg-[#261c14] p-3 rounded-xl border border-amber-700/40 flex items-center gap-2 text-xs justify-between shadow">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-3 h-3 rounded-full border border-amber-500/50" style={{ backgroundColor: p.color }} />
+                    <span className="font-bold text-amber-100">{p.username}</span>
                   </div>
-                  {idx === 0 && <span className="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-bold uppercase">Hôte</span>}
+                  {idx === 0 && <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded font-bold uppercase tracking-wider">Chef de Mission</span>}
                 </div>
               ))}
             </div>
-            <p className="text-slate-500 text-xs leading-relaxed mb-6">
-              Il faut un minimum de 3 joueurs pour démarrer la partie.
+            <p className="text-amber-300/60 text-xs leading-relaxed mb-6 font-serif italic">
+              Au moins 3 agents sont requis pour ouvrir l'interrogatoire.
             </p>
 
             {/* Section Règles */}
-            <div className="pt-6 border-t border-slate-800 text-left w-full">
-              <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-3">📜 Règles de Discretos :</h3>
-              <ul className="text-xs text-slate-400 space-y-2 list-disc list-inside leading-relaxed">
-                <li>Un <strong>thème secret</strong> est tiré (ex: <em>🧙 Sorciers & Vieux Sages</em>). Tous les citoyens reçoivent le <strong>même personnage</strong> (ex: Gandalf).</li>
-                <li><strong>1 joueur</strong> est l'<strong>Imposteur 🥸</strong> : il reçoit un <strong>personnage différent du même thème</strong> (ex: Dumbledore) sans le savoir !</li>
-                <li><strong>Chat Tour par Tour</strong> : chacun envoie un message pour donner un <em>indice sur son personnage</em> sans le nommer.</li>
-                <li>Après <strong>3 tours</strong>, la phase de vote s'ouvre pour démasquer l'imposteur.</li>
-                <li>Les citoyens doivent repérer l'imposteur grâce aux différences subtiles dans ses indices !</li>
+            <div className="pt-6 border-t border-amber-900/50 text-left w-full">
+              <h3 className="text-xs font-black text-amber-400 uppercase tracking-widest mb-3">📋 Protocole de la Mission :</h3>
+              <ul className="text-xs text-amber-200/80 space-y-2 list-disc list-inside leading-relaxed font-serif">
+                <li>Un <strong>thème secret</strong> est tiré (ex: <em>🧙 Sorciers</em>). Tous les citoyens reçoivent le <strong>même personnage</strong> (ex: Gandalf).</li>
+                <li><strong>1 agent</strong> est l'<strong>Imposteur 🥸</strong> : il reçoit un <strong>personnage similaire du même thème</strong> (ex: Dumbledore) sans savoir qu'il l'est !</li>
+                <li><strong>Tour par Tour</strong> : chaque agent tape un télégramme avec un <em>indice subtil</em> sans jamais nommer son personnage.</li>
+                <li>Après <strong>3 tours</strong>, ouverture du vote d'accusation pour neutraliser l'imposteur.</li>
               </ul>
             </div>
           </div>
@@ -291,16 +295,19 @@ export default function DiscretosApp() {
           {/* Left panel: Player List & Identity Card */}
           <div className="lg:col-span-1 flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-130px)] pr-1">
             {/* Player list block */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg flex flex-col gap-3">
+            <div className="bg-[#1c150e] border-2 border-amber-800/60 rounded-2xl p-4 shadow-2xl flex flex-col gap-3">
               <div className="flex justify-between items-center">
-                <h3 className="font-bold text-xs text-slate-400 uppercase tracking-wider">Membres</h3>
+                <h3 className="font-bold text-xs text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <span>🕵️</span>
+                  <span>Agents Suspects</span>
+                </h3>
                 {gameState.status === 'PLAYING' && (
-                  <span className="bg-slate-950 text-cyan-400 font-bold px-2 py-0.5 rounded border border-slate-800 text-[10px]">
+                  <span className="bg-[#0e0a07] text-amber-300 font-bold px-2 py-0.5 rounded border border-amber-800/60 text-[10px] font-mono">
                     Tour {gameState.currentRound}/3
                   </span>
                 )}
                 {gameState.status === 'VOTING' && (
-                  <span className="bg-red-950 text-red-400 font-bold px-2 py-0.5 rounded border border-red-900/40 text-[10px] animate-pulse">
+                  <span className="bg-red-950 text-red-400 font-bold px-2 py-0.5 rounded border border-red-700 text-[10px] animate-pulse">
                     VOTE 🗳️
                   </span>
                 )}
@@ -315,28 +322,28 @@ export default function DiscretosApp() {
                   return (
                     <div
                       key={p.id}
-                      className={`p-2.5 rounded-lg border bg-slate-850 flex flex-col gap-1.5 transition text-xs ${
-                        gameState.status === 'FINISHED' && p.isSpy ? 'border-red-500/50' : 'border-slate-750'
+                      className={`p-3 rounded-xl border-2 bg-[#251b13] flex flex-col gap-1.5 transition text-xs shadow ${
+                        gameState.status === 'FINISHED' && p.isSpy ? 'border-red-500' : 'border-amber-900/40'
                       }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
-                          <span className="font-semibold">
+                          <span className="w-2.5 h-2.5 rounded-full border border-amber-400/50" style={{ backgroundColor: p.color }} />
+                          <span className="font-bold text-amber-100">
                             {p.username} {isMe && '(Vous)'}
                           </span>
                           {gameState.status === 'FINISHED' && p.isSpy && (
-                            <span className="text-[8px] bg-red-950 text-red-400 px-1.5 py-0.5 rounded font-bold border border-red-800">🥸 IMPOSTEUR</span>
+                            <span className="text-[8px] bg-red-950 text-red-300 px-1.5 py-0.5 rounded font-black border border-red-600">🥸 IMPOSTEUR</span>
                           )}
                         </div>
                         <div className="flex items-center gap-1">
                           {gameState.status === 'VOTING' && (
-                            <span className={`text-[8px] px-1 rounded font-bold ${hasVoted ? 'bg-green-950 text-green-400' : 'bg-slate-800 text-slate-550'}`}>
-                              {hasVoted ? 'A VOTÉ' : 'ATTENTE'}
+                            <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold ${hasVoted ? 'bg-green-950 text-green-300 border border-green-700' : 'bg-[#15100b] text-amber-500/60 border border-amber-900'}`}>
+                              {hasVoted ? 'A VOTÉ' : 'EN ATTENTE'}
                             </span>
                           )}
                           {gameState.status === 'VOTING' && votesAgainst > 0 && (
-                            <span className="text-[8px] bg-red-950/60 text-red-400 px-1 rounded font-bold border border-red-900/30">
+                            <span className="text-[8px] bg-red-950 text-red-300 px-1.5 py-0.5 rounded font-bold border border-red-700">
                               🗳️ {votesAgainst}
                             </span>
                           )}
@@ -345,8 +352,8 @@ export default function DiscretosApp() {
 
                       {/* In FINISHED, reveal each player's character */}
                       {gameState.status === 'FINISHED' && (
-                        <div className={`text-[9px] font-mono px-2 py-0.5 rounded border ${p.isSpy ? 'bg-red-950/30 border-red-900/40 text-red-300' : 'bg-slate-900/60 border-slate-800 text-cyan-300'}`}>
-                          🎭 {p.role}
+                        <div className={`text-[10px] font-mono px-2 py-1 rounded border ${p.isSpy ? 'bg-red-950/40 border-red-700 text-red-200' : 'bg-[#120d08] border-amber-900 text-amber-300'}`}>
+                          🎭 Identité : {p.role}
                         </div>
                       )}
 
@@ -354,16 +361,16 @@ export default function DiscretosApp() {
                       {gameState.status === 'VOTING' && !isMe && !me?.hasVotedToAccuse && (
                         <button
                           onClick={() => handleVote(p.id)}
-                          className="w-full text-center font-bold text-[9px] py-1 bg-red-900 hover:bg-red-800 text-white rounded transition border border-red-700 cursor-pointer"
+                          className="btn-3d-red w-full text-center font-bold text-[10px] py-1.5 rounded-lg cursor-pointer mt-1"
                         >
-                          Voter contre {p.username} 🗳️
+                          Accuser {p.username} 🗳️
                         </button>
                       )}
 
                       {/* Show who voted for whom at FINISHED state */}
                       {gameState.status === 'FINISHED' && p.hasVotedToAccuse && (
-                        <div className="text-[9px] text-slate-400 font-mono">
-                          👉 A voté contre : <span className="text-white font-bold">{gameState.players.find(pl => pl.id === p.hasVotedToAccuse)?.username}</span>
+                        <div className="text-[9px] text-amber-400/70 font-mono">
+                          👉 A accusé : <span className="text-white font-bold">{gameState.players.find(pl => pl.id === p.hasVotedToAccuse)?.username}</span>
                         </div>
                       )}
                     </div>
@@ -372,48 +379,51 @@ export default function DiscretosApp() {
               </div>
             </div>
 
-            {/* Identity Card Details */}
+            {/* Identity Card Details (Badge d'Agent Secret) */}
             {me && (
-              <div className="border-2 border-cyan-500/50 rounded-xl flex flex-col gap-3 p-4 text-center shadow-lg relative bg-slate-900">
-                <div className="text-2xl">🎭</div>
+              <div className="border-2 border-amber-600/70 rounded-2xl flex flex-col gap-3 p-4 text-center shadow-2xl relative bg-gradient-to-b from-[#2c2016] to-[#1a130d]">
+                <div className="absolute top-2 right-2 border border-red-600 text-red-500 font-black text-[8px] px-2 py-0.5 uppercase tracking-widest rotate-[-8deg] shadow bg-red-950/20">
+                  CLASSIFIÉ
+                </div>
+                <div className="text-3xl filter drop-shadow">📎</div>
 
                 {/* Theme — visible to everyone */}
                 {gameState.themeName && (
-                  <div>
-                    <h3 className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Thème du Round :</h3>
-                    <h2 className="text-xs font-extrabold text-amber-400 mt-0.5">{gameState.themeName}</h2>
+                  <div className="bg-[#120d08] p-2 rounded-xl border border-amber-800/40">
+                    <h3 className="text-[9px] text-amber-400/80 font-bold uppercase tracking-widest">Thème d'Enquête :</h3>
+                    <h2 className="text-xs font-black text-amber-300 mt-0.5">{gameState.themeName}</h2>
                   </div>
                 )}
 
                 {/* Character */}
-                <div>
-                  <h3 className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Votre Personnage :</h3>
-                  <h2 className="text-xl font-extrabold text-white mt-0.5 leading-snug">{me.role}</h2>
+                <div className="bg-gradient-to-r from-amber-950 via-[#1f150e] to-amber-950 p-3 rounded-xl border-2 border-amber-500/50 shadow-inner">
+                  <h3 className="text-[9px] text-amber-400/80 font-bold uppercase tracking-widest">Votre Identité Secrète :</h3>
+                  <h2 className="text-xl font-black text-white mt-1 tracking-wide leading-snug drop-shadow">{me.role}</h2>
                 </div>
 
-                <p className="text-[9px] text-slate-500 leading-relaxed italic">
-                  Donnez des indices sans nommer votre personnage. Êtes-vous l'imposteur ? Vous ne le saurez qu'à la fin !
+                <p className="text-[10px] text-amber-200/70 leading-relaxed italic font-serif">
+                  Distillez des indices sans révéler votre nom. Si vos camarades ont un personnage différent du même thème, vous êtes l'imposteur !
                 </p>
 
-                <div className="text-[8px] text-slate-500 uppercase tracking-widest font-mono">
-                  DISCRETOS CARD
+                <div className="text-[8px] text-amber-500/50 uppercase tracking-widest font-mono border-t border-amber-900/40 pt-2">
+                  DOSSIER D'AGENT ACTIF • N° 81-F058
                 </div>
               </div>
             )}
           </div>
 
-          {/* Center Column: Big Chat Room */}
-          <div className="lg:col-span-2 flex flex-col justify-between bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden min-h-[480px]">
+          {/* Center Column: Big Chat Room (Télétype d'interrogatoire) */}
+          <div className="lg:col-span-2 flex flex-col justify-between bg-[#150f09] border-2 border-amber-800/60 rounded-3xl shadow-2xl overflow-hidden min-h-[480px]">
             
             {/* Chat Header */}
-            <div className="bg-slate-850 border-b border-slate-800 p-4 flex justify-between items-center">
+            <div className="bg-[#241a11] border-b-2 border-amber-800/60 p-4 flex justify-between items-center shadow">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-pulse" />
-                <span className="font-bold text-sm text-slate-200">Discussion des indices</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+                <span className="font-bold text-sm text-amber-200 uppercase tracking-wider">Télétype des Indices</span>
               </div>
               {activeCluePlayer && (
-                <div className="text-xs text-slate-400">
-                  C'est au tour de : <span className="text-cyan-400 font-bold">{activeCluePlayer.username}</span>
+                <div className="text-xs text-amber-300/80 font-mono">
+                  Tour de parole : <span className="text-amber-400 font-bold">{activeCluePlayer.username}</span>
                 </div>
               )}
             </div>
@@ -422,8 +432,8 @@ export default function DiscretosApp() {
             <div className="flex-1 p-4 overflow-y-auto space-y-3 flex flex-col justify-end min-h-0">
               <div className="space-y-3 overflow-y-auto max-h-[360px] pr-1">
                 {gameState.clues.length === 0 ? (
-                  <div className="text-xs text-slate-500 italic text-center my-8">
-                    La partie commence. Aucun indice n'a été partagé pour le moment.
+                  <div className="text-xs text-amber-400/60 italic text-center my-8 font-serif">
+                    📜 L'interrogatoire commence. En attente du premier indice tapé au télex...
                   </div>
                 ) : (
                   gameState.clues.map((c, idx) => {
@@ -433,19 +443,19 @@ export default function DiscretosApp() {
                     return (
                       <div
                         key={idx}
-                        className={`flex flex-col max-w-[80%] ${
+                        className={`flex flex-col max-w-[85%] ${
                           isSelf ? 'ml-auto items-end' : 'mr-auto items-start'
                         }`}
                       >
-                        <div className="flex items-center gap-1 text-[9px] text-slate-500 mb-0.5 font-mono">
-                          <span className="font-bold" style={{ color: player?.color || '#94A3B8' }}>{c.username}</span>
-                          <span>• Tour {c.round}</span>
+                        <div className="flex items-center gap-1 text-[9px] text-amber-400/70 mb-0.5 font-mono">
+                          <span className="font-bold" style={{ color: player?.color || '#FBBF24' }}>{c.username}</span>
+                          <span>• Dépêche Tour {c.round}</span>
                         </div>
                         <div
-                          className={`rounded-2xl px-4 py-2.5 text-xs ${
+                          className={`rounded-2xl px-4 py-3 text-xs shadow-md border leading-relaxed ${
                             isSelf
-                              ? 'bg-cyan-600 text-white rounded-tr-none'
-                              : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-750'
+                              ? 'bg-gradient-to-r from-amber-900 to-[#3d2a19] text-amber-100 border-amber-600/60 rounded-tr-none'
+                              : 'bg-[#261b12] text-amber-100 rounded-tl-none border-amber-800/60'
                           }`}
                         >
                           {c.clueText}
@@ -459,7 +469,7 @@ export default function DiscretosApp() {
             </div>
 
             {/* Chat Input panel */}
-            <div className="bg-slate-850 border-t border-slate-800 p-4">
+            <div className="bg-[#20160e] border-t-2 border-amber-800/60 p-4">
               {gameState.status === 'PLAYING' && (
                 isMyTurnToClue ? (
                   <form onSubmit={handleSendClue} className="flex gap-2">
@@ -467,17 +477,17 @@ export default function DiscretosApp() {
                       type="text"
                       value={clueInput}
                       onChange={(e) => setClueInput(e.target.value)}
-                      placeholder="Écrivez un indice sur votre personnage sans le nommer..."
-                      className="flex-1 bg-slate-950 border border-slate-750 rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                      placeholder="Tapez votre indice confidentiel au télex sans nommer votre personnage..."
+                      className="flex-1 bg-[#0c0805] border-2 border-amber-800/70 rounded-xl px-4 py-3 text-xs text-amber-100 placeholder-amber-500/40 focus:outline-none focus:ring-2 focus:ring-amber-500 font-typewriter"
                       maxLength={120}
                       required
                       autoFocus
                     />
                     <button
                       type="submit"
-                      className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition cursor-pointer flex items-center gap-1 shadow-md hover:shadow-cyan-950/20"
+                      className="btn-3d-amber text-slate-950 font-black px-6 py-3 rounded-xl text-xs cursor-pointer shadow-lg tracking-wider"
                     >
-                      Envoyer 🚀
+                      Transmettre 📡
                     </button>
                   </form>
                 ) : (

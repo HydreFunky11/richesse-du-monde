@@ -341,7 +341,7 @@ export default function App() {
 
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col p-4 relative">
+    <div className="min-h-screen bg-lounge-felt text-slate-100 flex flex-col p-4 relative">
       {/* Styles injectés pour les animations de gains / pertes */}
       <style>{`
         @keyframes floatUp {
@@ -424,33 +424,42 @@ export default function App() {
         ))}
       </div>
 
-      {/* Header */}
-      <header className="flex justify-between items-center bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-md mb-4">
-        <div className="flex items-center gap-4">
+      {/* Header Art Déco Haute Finance */}
+      <header className="flex flex-wrap justify-between items-center bg-gradient-to-r from-emerald-950 via-slate-950 to-emerald-950 p-4 rounded-2xl border-2 border-amber-500/40 shadow-[0_4px_30px_rgba(16,185,129,0.15)] mb-4 gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <button
-            onClick={() => navigate('/')}
-            className="flex items-center gap-1 text-slate-400 hover:text-slate-100 text-xs font-medium transition-colors"
+            onClick={() => {
+              soundFx.click();
+              navigate('/');
+            }}
+            className="flex items-center gap-1 text-amber-400/90 hover:text-amber-300 text-xs font-luxury font-bold transition-colors cursor-pointer"
           >
             ← Accueil
           </button>
           <div>
-            <h1 className="text-xl font-bold tracking-wider text-amber-500 font-sans">RICHESSES DU MONDE</h1>
-            <p className="text-xs text-slate-400">Code du salon : <span className="font-mono text-white font-bold">{gameState.gameId}</span></p>
+            <h1 className="text-xl md:text-2xl font-black tracking-wider bg-gradient-to-r from-amber-200 via-emerald-300 to-yellow-500 bg-clip-text text-transparent font-luxury italic">
+              RICHESSES DU MONDE 🌍
+            </h1>
+            <p className="text-[11px] text-amber-200/60 font-serif">Séance de Bourse : <span className="font-mono text-amber-400 font-bold tracking-wider">{gameState.gameId}</span></p>
           </div>
           <button
             onClick={() => {
               if (socket && window.confirm("Voulez-vous vraiment réinitialiser la partie ? Tout sera remis à zéro.")) {
+                soundFx.click();
                 socket.emit('resetGame');
               }
             }}
-            className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-bold py-1.5 px-3 rounded-lg text-[10px] border border-slate-700 transition cursor-pointer"
+            className="bg-slate-900/80 hover:bg-slate-800 text-amber-300 font-luxury font-bold py-1.5 px-3 rounded-xl text-[11px] border border-amber-500/30 transition cursor-pointer"
           >
-            🔄 Réinitialiser la Partie
+            🔄 Réinitialiser
           </button>
 
           <button
-            onClick={() => setSoundsEnabled(prev => !prev)}
-            className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-bold py-1.5 px-3 rounded-lg text-[10px] border border-slate-700 transition flex items-center gap-1 cursor-pointer font-sans"
+            onClick={() => {
+              soundFx.click();
+              setSoundsEnabled(prev => !prev);
+            }}
+            className="bg-slate-900/80 hover:bg-slate-800 text-amber-300 font-luxury font-bold py-1.5 px-3 rounded-xl text-[11px] border border-amber-500/30 transition flex items-center gap-1 cursor-pointer"
           >
             {soundsEnabled ? '🔊 Sons : ON' : '🔇 Sons : OFF'}
           </button>
@@ -458,22 +467,23 @@ export default function App() {
           {isHost && (
             <button
               onClick={handleCloseLobby}
-              className="bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-red-200 font-bold py-1.5 px-3 rounded-lg text-[10px] border border-red-900/50 transition"
+              className="bg-red-950/60 hover:bg-red-900/80 text-red-300 font-luxury font-bold py-1.5 px-3 rounded-xl text-[11px] border border-red-800/50 transition cursor-pointer"
             >
-              🚪 Fermer le Salon
+              🚪 Clôturer la séance
             </button>
           )}
-
         </div>
 
         <div className="flex items-center gap-3">
           {me && (
-            <div className="flex items-center gap-3 bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 shadow-sm">
-              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: me.color }} />
-              <span className="font-semibold text-sm">{me.username} (Vous)</span>
-              <span className="text-amber-400 font-bold ml-2">{me.cash.toLocaleString()} F</span>
+            <div className="flex items-center gap-3 bg-gradient-to-r from-amber-950 via-slate-900 to-amber-950 px-4 py-2.5 rounded-xl border border-amber-500/60 shadow-lg">
+              <span className="w-3.5 h-3.5 rounded-full border border-amber-400 shadow-sm" style={{ backgroundColor: me.color }} />
+              <span className="font-luxury font-bold text-sm text-slate-100">{me.username} (Vous)</span>
+              <span className="text-amber-300 font-mono font-black text-sm ml-2 bg-slate-950/60 px-2.5 py-1 rounded-lg border border-amber-500/30">
+                💰 {me.cash.toLocaleString()} F
+              </span>
               {me.hasJokerCard && (
-                <span className="bg-indigo-900 border border-indigo-500 text-indigo-200 text-[10px] px-1.5 py-0.5 rounded font-bold">
+                <span className="bg-amber-500/20 border border-amber-400 text-amber-200 text-[10px] px-2 py-0.5 rounded-full font-luxury font-black">
                   🃏 JOKER
                 </span>
               )}
@@ -484,43 +494,49 @@ export default function App() {
 
       {/* Lobby State */}
       {gameState.status === 'LOBBY' ? (
-        <div className="flex-1 flex flex-col items-center justify-center max-w-xl mx-auto w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center shadow-lg">
-          <h2 className="text-2xl font-bold mb-6 text-slate-200">Salon d'attente</h2>
+        <div className="flex-1 flex flex-col items-center justify-center max-w-xl mx-auto w-full bg-gradient-to-b from-emerald-950/90 via-slate-950 to-emerald-950/90 border-2 border-amber-500/50 rounded-3xl p-8 text-center shadow-2xl backdrop-blur-sm">
+          <div className="text-5xl mb-3 animate-bounce">🏛️</div>
+          <h2 className="text-2xl font-luxury font-black mb-2 text-amber-300 tracking-wide italic">Club Privé des Magnats</h2>
+          <p className="text-xs text-slate-400 font-serif mb-6 italic">En attente de l'ouverture des négociations boursières mondiales</p>
+          
           <div className="w-full space-y-3 mb-8">
-            <h3 className="text-sm font-semibold text-slate-400 text-left">Joueurs connectés ({gameState.players.length}) :</h3>
+            <h3 className="text-xs font-bold text-amber-400 uppercase tracking-widest text-left font-luxury">Actionnaires à la table ({gameState.players.length}/6) :</h3>
             {gameState.players.map((p) => (
-              <div key={p.id} className="flex items-center justify-between bg-slate-800 p-3.5 rounded-lg border border-slate-700">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
-                  <span className="font-medium text-white">{p.username}</span>
+              <div key={p.id} className="flex items-center justify-between bg-slate-900/80 p-3.5 rounded-xl border border-amber-500/30 shadow-md">
+                <div className="flex items-center gap-3">
+                  <span className="w-3.5 h-3.5 rounded-full border border-amber-400/50" style={{ backgroundColor: p.color }} />
+                  <span className="font-luxury font-bold text-sm text-white">{p.username}</span>
                 </div>
-                <span className="text-slate-400 text-xs">{p.id === socket?.id ? 'Hôte (Vous)' : 'Prêt'}</span>
+                <span className="text-amber-400/80 text-xs font-mono font-bold">{p.id === socket?.id ? '👑 Président (Vous)' : '✓ Prêt'}</span>
               </div>
             ))}
           </div>
 
           {gameState.players.length < 2 ? (
-            <div className="text-amber-400/80 text-sm mb-4">
-              En attente d'autres joueurs pour démarrer (minimum 2 joueurs requis)...
+            <div className="text-amber-400/80 text-xs mb-4 font-luxury italic bg-amber-950/40 p-3 rounded-xl border border-amber-500/30">
+              ⏳ En attente d'au moins 2 magnats pour lancer la séance...
             </div>
           ) : (
             <button
-              onClick={handleStartGame}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition duration-200 cursor-pointer"
+              onClick={() => {
+                soundFx.click();
+                handleStartGame();
+              }}
+              className="btn-3d-amber w-full py-3.5 rounded-xl font-luxury font-bold text-sm tracking-wider cursor-pointer text-slate-950 shadow-xl"
             >
-              Lancer la Partie 🚀
+              Ouvrir la Séance Boursière 🚀
             </button>
           )}
 
           {/* Section Règles */}
-          <div className="mt-8 pt-6 border-t border-slate-800 text-left w-full">
-            <h3 className="text-xs font-bold text-amber-500 uppercase tracking-wider mb-3">📜 Règles de Richesses du Monde :</h3>
-            <ul className="text-xs text-slate-400 space-y-2 list-disc list-inside leading-relaxed">
-              <li>Déplacez-vous sur le plateau mondial de 70 cases en lançant les dés.</li>
-              <li>Achetez des concessions de ressources (Pétrole, Or, Café, Houille, Laine...) pour développer votre empire.</li>
-              <li>Si un joueur atterrit sur l'une de vos ressources, il vous paie des redevances basées sur le pourcentage que vous possédez.</li>
-              <li>Complétez des monopoles sur un continent ou dans le monde pour multiplier vos gains.</li>
-              <li>Vendez vos titres aux enchères ou utilisez vos Jokers pour éviter la faillite !</li>
+          <div className="mt-8 pt-6 border-t border-amber-500/20 text-left w-full">
+            <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-3 font-luxury">📜 Règles de Haute Finance :</h3>
+            <ul className="text-xs text-slate-300 space-y-2 list-disc list-inside leading-relaxed font-serif">
+              <li>Déplacez-vous sur le plateau mondial de 70 cases en lançant les dés d'ivoire.</li>
+              <li>Achetez des concessions de ressources (Pétrole, Or, Café, Houille, Laine...) pour bâtir votre empire.</li>
+              <li>Si un concurrent s'arrête sur vos concessions, il vous verse des redevances proportionnelles à vos parts.</li>
+              <li>Complétez des monopoles sur un continent ou dans le monde pour décupler votre fortune.</li>
+              <li>Mettez vos titres aux enchères ou utilisez vos Jokers pour parer la banqueroute !</li>
             </ul>
           </div>
         </div>
@@ -531,7 +547,7 @@ export default function App() {
 
           
           {/* Plateau 2D à Gauche (Prend 3 colonnes sur LG) */}
-          <div className="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center justify-center overflow-auto relative min-h-[600px]">
+          <div className="lg:col-span-3 bg-gradient-to-br from-emerald-950 via-[#071a10] to-emerald-950 border-4 border-amber-600/70 rounded-3xl p-4 shadow-[0_0_50px_rgba(245,158,11,0.2)] flex items-center justify-center overflow-auto relative min-h-[600px]">
             
             {/* Zoom Controls Overlay */}
             <div className="absolute top-4 right-4 z-30 bg-slate-950/85 backdrop-blur-sm border border-slate-800 p-1.5 rounded-lg flex items-center gap-2 shadow-lg select-none">
@@ -900,10 +916,13 @@ export default function App() {
                             <div className="w-full space-y-2">
                               {gameState.lastDiceRoll === null && (
                                 <button
-                                  onClick={handleRollDice}
-                                  className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-2.5 rounded-lg shadow transition transform hover:-translate-y-0.5 text-xs"
+                                  onClick={() => {
+                                    soundFx.dice();
+                                    handleRollDice();
+                                  }}
+                                  className="btn-3d-amber w-full py-3 rounded-xl font-luxury font-bold text-xs tracking-wider text-slate-950 shadow-lg cursor-pointer"
                                 >
-                                  Lancer les dés (Blanc + Rouge) 🎲
+                                  Lancer les dés d'ivoire 🎲
                                 </button>
                               )}
 
@@ -929,22 +948,24 @@ export default function App() {
                                 return (
                                   <div className="space-y-2 text-center">
                                     {hasAnyAction ? (
-                                      <div className="text-[11px] text-amber-400 font-semibold py-1 animate-pulse">
+                                      <div className="text-[11px] text-amber-300 font-luxury font-semibold py-1 animate-pulse">
                                         Sélectionnez vos actions dans le pop-up à l'écran.
                                       </div>
                                     ) : (
-                                      <div className="text-[11px] text-slate-400 py-1">
-                                        Aucune action disponible sur cette case.
+                                      <div className="text-[11px] text-slate-400 font-serif italic py-1">
+                                        Aucune concession disponible sur cette case.
                                       </div>
                                     )}
                                     <button
-                                      onClick={handlePassTurn}
+                                      onClick={() => {
+                                        soundFx.click();
+                                        handlePassTurn();
+                                      }}
                                       disabled={cell.type === 'ENCHERES' && (me?.lapsCompleted ?? 0) >= 1 && Object.values(gameState.titles).some(t => t.ownerId === me?.id)}
-                                      className="w-full bg-slate-800 hover:bg-slate-750 disabled:bg-slate-900 disabled:text-slate-550 disabled:border-slate-850 text-white font-bold py-2 rounded-lg border border-slate-700 text-xs transition"
+                                      className="btn-3d w-full py-2.5 rounded-xl font-luxury font-bold text-xs tracking-wider cursor-pointer"
                                     >
-                                      Terminer mon tour ➡️
+                                      Terminer mon tour ➔
                                     </button>
-
                                   </div>
                                 );
                               })()}
@@ -984,30 +1005,37 @@ export default function App() {
           <div className="lg:col-span-1 space-y-4 max-h-[780px] overflow-y-auto pr-1">
             
             {/* Section Joueurs */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow">
-              <h3 className="font-bold text-sm text-slate-400 mb-3 uppercase tracking-wider">État des Joueurs</h3>
+            <div className="bg-slate-950/90 border-2 border-amber-500/40 rounded-2xl p-4 shadow-xl backdrop-blur-sm">
+              <h3 className="font-luxury font-bold text-xs text-amber-300 mb-3 uppercase tracking-widest flex items-center gap-1.5">
+                <span>🏛️</span>
+                <span>Registre des Actionnaires</span>
+              </h3>
               <div className="space-y-2">
                 {gameState.players.map((p) => (
                   <div
                     key={p.id}
-                    className={`p-2.5 rounded-lg border flex flex-col justify-between ${
-                      p.isBankrupt ? 'bg-red-950/20 border-red-900/50 opacity-60' : 'bg-slate-800/80 border-slate-700/80'
+                    className={`p-3 rounded-xl border flex flex-col justify-between transition ${
+                      p.isBankrupt 
+                        ? 'bg-red-950/30 border-red-900/50 opacity-60' 
+                        : 'bg-slate-900/80 border-amber-500/20 shadow-sm'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
-                        <span className={`font-semibold text-xs ${p.isBankrupt ? 'line-through text-slate-500' : 'text-slate-100'}`}>
-                          {p.username}
+                        <span className="w-3 h-3 rounded-full border border-amber-400/50" style={{ backgroundColor: p.color }} />
+                        <span className={`font-luxury font-bold text-xs ${p.isBankrupt ? 'line-through text-slate-500' : 'text-slate-100'}`}>
+                          {p.username} {p.id === socket?.id && <span className="text-amber-400 font-serif text-[10px]">(Vous)</span>}
                         </span>
                       </div>
-                      {p.isBankrupt && <span className="text-[9px] bg-red-900 text-red-200 px-1 rounded font-bold">FAILLITE</span>}
+                      {p.isBankrupt && <span className="text-[9px] bg-red-900 text-red-200 px-1.5 py-0.5 rounded font-bold">BANQUEROUTE</span>}
                     </div>
                     
                     {!p.isBankrupt && (
-                      <div className="flex justify-between items-center mt-1.5 pt-1.5 border-t border-slate-700/30 text-[11px]">
-                        <span className="text-slate-400">Fortune :</span>
-                        <span className="text-amber-400 font-bold">{p.cash.toLocaleString()} F</span>
+                      <div className="flex justify-between items-center mt-2 pt-2 border-t border-amber-500/20 text-xs">
+                        <span className="text-slate-400 font-serif text-[11px]">Fortune :</span>
+                        <span className="text-amber-300 font-mono font-bold bg-slate-950 px-2 py-0.5 rounded border border-amber-500/30">
+                          {p.cash.toLocaleString()} F
+                        </span>
                       </div>
                     )}
                   </div>
@@ -1016,12 +1044,15 @@ export default function App() {
             </div>
 
             {/* Section Titres Possédés */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow max-h-[680px] overflow-y-auto flex flex-col min-h-0">
-              <div className="flex flex-col gap-1.5 border-b border-slate-800 pb-2.5 mb-2.5 flex-none">
+            <div className="bg-slate-950/90 border-2 border-amber-500/40 rounded-2xl p-4 shadow-xl max-h-[680px] overflow-y-auto flex flex-col min-h-0 backdrop-blur-sm">
+              <div className="flex flex-col gap-2 border-b border-amber-500/20 pb-2.5 mb-2.5 flex-none">
                 <div className="flex justify-between items-center">
-                  <h3 className="font-bold text-xs text-slate-400 uppercase tracking-wider">Vos Monopoles</h3>
-                  <span className="text-[9px] bg-slate-850 text-slate-400 px-1.5 py-0.5 rounded font-mono">
-                    Tri : {monopolySortMode === 'DEFAULT' ? 'Sabot' : monopolySortMode === 'PERCENTAGE' ? 'Parts %' : monopolySortMode === 'ROYALTIES' ? 'Gains' : 'A-Z'}
+                  <h3 className="font-luxury font-bold text-xs text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>📜</span>
+                    <span>Vos Concessions</span>
+                  </h3>
+                  <span className="text-[9px] bg-slate-900 text-amber-400 px-2 py-0.5 rounded font-mono border border-amber-500/30">
+                    {monopolySortMode === 'DEFAULT' ? 'Sabot' : monopolySortMode === 'PERCENTAGE' ? 'Parts %' : monopolySortMode === 'ROYALTIES' ? 'Gains' : 'A-Z'}
                   </span>
                 </div>
                 

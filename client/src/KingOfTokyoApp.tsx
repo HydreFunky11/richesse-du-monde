@@ -339,9 +339,12 @@ export default function KingOfTokyoApp() {
         /* Game Playing State */
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 p-6 overflow-hidden select-none">
           
-          {/* Left panel: Player List */}
+          {/* Left panel: Player List (Comic Trading Cards) */}
           <div className="lg:col-span-1 space-y-4 overflow-y-auto max-h-[calc(100vh-130px)] pr-1">
-            <h3 className="font-bold text-xs text-slate-450 uppercase tracking-wider">Monstres en lice</h3>
+            <h3 className="font-comic font-black text-sm text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span>🦖</span>
+              <span>Monstres en lice</span>
+            </h3>
             
             {gameState.players.map((p) => {
               const isCurrent = gameState.players[gameState.currentPlayerIndex]?.id === p.id && gameState.status === 'PLAYING';
@@ -350,42 +353,42 @@ export default function KingOfTokyoApp() {
               return (
                 <div
                   key={p.id}
-                  className={`p-3.5 rounded-xl border transition flex flex-col gap-2 relative ${
+                  className={`p-4 rounded-2xl border-3 border-black transition flex flex-col gap-2 relative shadow-[4px_4px_0px_#000] ${
                     p.isDead 
-                      ? 'bg-slate-950/40 border-slate-900 opacity-40' 
+                      ? 'bg-slate-950/60 opacity-40 grayscale' 
                       : isCurrent 
-                      ? 'bg-red-950/20 border-red-500 shadow-lg' 
-                      : 'bg-slate-900 border-slate-800'
+                      ? 'bg-gradient-to-r from-red-950/80 to-amber-950/80 ring-4 ring-red-500' 
+                      : 'bg-slate-900'
                   }`}
                 >
                   {isInTokyo && (
-                    <span className="absolute top-2.5 right-2.5 text-xs bg-amber-500/10 text-amber-400 border border-amber-500/25 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider animate-pulse flex items-center gap-1">
+                    <span className="absolute top-2.5 right-2.5 text-xs bg-yellow-400 text-black border-2 border-black px-2 py-0.5 rounded-lg font-comic font-black uppercase tracking-wider shadow-[2px_2px_0px_#000] animate-bounce flex items-center gap-1">
                       👑 TOKYO
                     </span>
                   )}
 
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
-                    <span className="font-black text-xs">{p.username}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3.5 h-3.5 rounded-full border border-black shadow-sm" style={{ backgroundColor: p.color }} />
+                    <span className="font-comic font-black text-sm text-white">{p.username}</span>
                   </div>
 
-                  <div className="text-[10px] text-slate-400 font-mono font-bold bg-slate-950/60 px-2 py-0.5 rounded border border-slate-800/80 w-fit">
+                  <div className="text-xs text-amber-300 font-comic font-black bg-black px-2.5 py-1 rounded-lg border border-amber-500/40 w-fit tracking-wide">
                     {p.monsterName}
                   </div>
 
                   {/* Stats Row */}
-                  <div className="grid grid-cols-3 gap-2 mt-1 text-center font-mono">
-                    <div className="bg-red-950/40 border border-red-900/30 py-1 rounded text-red-400">
-                      <div className="text-[9px] uppercase text-slate-500">Vie</div>
-                      <div className="text-xs font-black">❤️ {p.hp}/10</div>
+                  <div className="grid grid-cols-3 gap-2 mt-1 text-center font-comic">
+                    <div className="bg-red-950/80 border-2 border-red-500 py-1.5 rounded-xl text-red-300 shadow-[2px_2px_0px_#000]">
+                      <div className="text-[10px] uppercase text-red-400 font-black">Vie</div>
+                      <div className="text-sm font-black">❤️ {p.hp}/10</div>
                     </div>
-                    <div className="bg-amber-950/40 border border-amber-900/30 py-1 rounded text-amber-400">
-                      <div className="text-[9px] uppercase text-slate-500">Points</div>
-                      <div className="text-xs font-black">⭐ {p.vp}/20</div>
+                    <div className="bg-amber-950/80 border-2 border-amber-500 py-1.5 rounded-xl text-amber-300 shadow-[2px_2px_0px_#000]">
+                      <div className="text-[10px] uppercase text-amber-400 font-black">Points</div>
+                      <div className="text-sm font-black">⭐ {p.vp}/20</div>
                     </div>
-                    <div className="bg-cyan-950/40 border border-cyan-900/30 py-1 rounded text-cyan-400">
-                      <div className="text-[9px] uppercase text-slate-500">Énergie</div>
-                      <div className="text-xs font-black">⚡ {p.energy}</div>
+                    <div className="bg-cyan-950/80 border-2 border-cyan-500 py-1.5 rounded-xl text-cyan-300 shadow-[2px_2px_0px_#000]">
+                      <div className="text-[10px] uppercase text-cyan-400 font-black">Énergie</div>
+                      <div className="text-sm font-black">⚡ {p.energy}</div>
                     </div>
                   </div>
 
@@ -393,8 +396,8 @@ export default function KingOfTokyoApp() {
                   {p.cards.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {p.cards.map(c => (
-                        <span key={c.id} className="text-[8px] bg-slate-800 text-slate-300 border border-slate-700 px-1 rounded font-medium" title={c.description}>
-                          {c.name}
+                        <span key={c.id} className="text-[9px] bg-slate-800 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-lg font-comic font-black shadow" title={c.description}>
+                          🃏 {c.name}
                         </span>
                       ))}
                     </div>
@@ -408,61 +411,63 @@ export default function KingOfTokyoApp() {
           <div className="lg:col-span-2 flex flex-col justify-between gap-6">
             
             {/* Tokyo City visual arena */}
-            <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-850 rounded-2xl p-6 shadow-inner relative flex flex-col items-center justify-center min-h-[220px]">
-              <div className="absolute top-3 left-3 text-[10px] text-slate-400 font-bold uppercase tracking-widest bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800">
-                🏢 Quartier de Tokyo City
+            <div className="bg-gradient-to-b from-red-950 via-slate-950 to-red-950 border-4 border-black rounded-3xl p-6 shadow-[6px_6px_0px_#000] relative flex flex-col items-center justify-center min-h-[230px] overflow-hidden">
+              <div className="absolute top-3 left-3 bg-yellow-400 text-black font-comic font-black text-xs px-3 py-0.5 rounded-lg border-2 border-black tracking-widest shadow-[2px_2px_0px_#000]">
+                ⚠️ ZONE DE COMBAT : TOKYO CITY ⚠️
               </div>
 
               {tokyoMonster ? (
-                <div className="text-center flex flex-col items-center gap-3 animate-fade-in">
-                  <div className="w-16 h-16 rounded-full bg-amber-500/10 border-2 border-amber-500 flex items-center justify-center text-4xl shadow-xl shadow-amber-950/30 animate-pulse">
+                <div className="text-center flex flex-col items-center gap-3 animate-fade-in mt-4">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-amber-500 to-red-600 border-4 border-black flex items-center justify-center text-5xl shadow-[4px_4px_0px_#000] animate-bounce">
                     🦖
                   </div>
                   <div>
-                    <h3 className="text-xs text-amber-400 font-black tracking-wider uppercase">Monstre occupant Tokyo</h3>
-                    <h2 className="text-xl font-extrabold text-white mt-0.5">{tokyoMonster.username}</h2>
-                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">{tokyoMonster.monsterName} • ❤️ {tokyoMonster.hp} PV</p>
+                    <h3 className="text-xs text-yellow-300 font-comic font-black tracking-widest uppercase">💥 OCCUPANT DE TOKYO 💥</h3>
+                    <h2 className="text-2xl font-comic font-black text-white mt-0.5 tracking-wider drop-shadow-[2px_2px_0px_#000]">{tokyoMonster.username}</h2>
+                    <p className="text-xs text-amber-300 font-mono font-bold mt-0.5 bg-black/60 px-3 py-1 rounded-full border border-amber-500/40">
+                      {tokyoMonster.monsterName} • ❤️ {tokyoMonster.hp} PV
+                    </p>
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-6 flex flex-col items-center gap-2">
-                  <div className="text-4xl text-slate-650 animate-bounce">🏙️</div>
-                  <h3 className="text-xs font-bold text-slate-450 uppercase tracking-widest">Tokyo est libre !</h3>
-                  <p className="text-[10px] text-slate-500 italic max-w-xs leading-relaxed">
-                    Le premier monstre qui réalisera une attaque 💥 entrera dans la ville pour y semer le chaos.
+                <div className="text-center py-6 flex flex-col items-center gap-2 mt-4">
+                  <div className="text-5xl animate-bounce">🏙️</div>
+                  <h3 className="text-base font-comic font-black text-amber-300 tracking-widest uppercase drop-shadow-[2px_2px_0px_#000]">Tokyo est libre !</h3>
+                  <p className="text-xs text-slate-300 font-comic max-w-sm leading-relaxed">
+                    Le premier monstre qui réalisera une attaque 💥 prendra possession de la ville pour y semer la panique !
                   </p>
                 </div>
               )}
 
               {/* Yield Action Overlay */}
               {gameState.status === 'RESOLVING_ATTACK' && gameState.pendingYieldRequest && (
-                <div className="absolute inset-0 bg-slate-950/90 rounded-2xl flex flex-col items-center justify-center p-6 z-30">
-                  <div className="text-3xl mb-1">🏃💨</div>
-                  <h3 className="text-sm font-black text-red-400 uppercase tracking-wider">Attaque subie !</h3>
+                <div className="absolute inset-0 bg-black/90 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center p-6 z-30 border-4 border-red-500">
+                  <div className="text-4xl mb-1 animate-bounce">🏃💨</div>
+                  <h3 className="text-lg font-comic font-black text-red-400 uppercase tracking-wider">💥 ATTAQUE MASSIVE SUBIE ! 💥</h3>
                   
                   {gameState.pendingYieldRequest.tokyoMonsterId === socket?.id ? (
                     <div className="mt-3 text-center max-w-sm">
-                      <p className="text-xs text-slate-300 leading-relaxed mb-4">
-                        Vous avez subi **{gameState.pendingYieldRequest.damage} dégâts** ! Voulez-vous fuir Tokyo et céder votre place ?
+                      <p className="text-xs text-white font-comic leading-relaxed mb-4">
+                        Vous avez encaissé <span className="text-red-400 font-black text-sm">{gameState.pendingYieldRequest.damage} dégâts</span> ! Voulez-vous fuir Tokyo ou tenir la position ?
                       </p>
                       <div className="flex gap-4 justify-center">
                         <button
                           onClick={() => handleRespondYield(true)}
-                          className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
+                          className="btn-3d-red font-comic font-black text-xs px-5 py-2.5 rounded-xl cursor-pointer"
                         >
                           Fuir Tokyo 🏃
                         </button>
                         <button
                           onClick={() => handleRespondYield(false)}
-                          className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs px-4 py-2 rounded-xl border border-slate-700 transition cursor-pointer"
+                          className="btn-3d-emerald font-comic font-black text-xs px-5 py-2.5 rounded-xl cursor-pointer"
                         >
-                          Rester 💪
+                          Rester & Combattre 💪
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <p className="text-xs text-slate-400 italic text-center mt-2">
-                      Attente de la décision de l'occupant de fuir ou rester dans Tokyo...
+                    <p className="text-xs text-amber-300 font-comic italic text-center mt-2">
+                      Attente de la décision de l'occupant de fuir ou de rester dans Tokyo...
                     </p>
                   )}
                 </div>
