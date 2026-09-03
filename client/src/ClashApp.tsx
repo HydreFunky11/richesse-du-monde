@@ -215,7 +215,10 @@ export default function ClashApp() {
 
   const [gameState, setGameState] = useState<ClashGameState | null>(null);
   const [selectedCard, setSelectedCard] = useState<ClashCardId | null>(null);
+  const [draggingCard, setDraggingCard] = useState<ClashCardId | null>(null);
+  const [dragPointer, setDragPointer] = useState<{ x: number; y: number } | null>(null);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
+  const [showLog, setShowLog] = useState<boolean>(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const floatingTextsRef = useRef<FloatingText[]>([]);
@@ -348,8 +351,34 @@ export default function ClashApp() {
 
   const me = gameState?.players.find(p => p.id === socket?.id);
   const isHost = gameState?.players[0]?.id === socket?.id;
+  const isFlipped = me?.team === 'red';
 
-  // Validate placement zone logic
+  // Coordinate mapper from pointer clientX/clientY to Arena coordinates (0-100 X, 0-160 Y)
+  const getArenaCoordsFromPointer = (clientX: number, clientY: number): { x: number; y: number } | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    if (
+      clientX < rect.left ||
+      clientX > rect.right ||
+      clientY < rect.top ||
+      clientY > rect.bottom
+    ) {
+      return null;
+    }
+    const visualX = ((clientX - rect.left) / rect.width) * 100;
+    const visualY = ((clientY - rect.top) / rect.height) * 160;
+
+    const arenaX = isFlipped ? 100 - visualX : visualX;
+    const arenaY = isFlipped ? 160 - visualY : visualY;
+
+    return {
+      x: Math.max(0, Math.min(100, arenaX)),
+      y: Math.max(0, Math.min(160, arenaY))
+    };
+  };
+
+  // Validate placement zone logic in Arena coordinates
   const isPlacementValid = (x: number, y: number, cardId: ClashCardId | null): boolean => {
     if (!cardId || !me) return false;
     const cardDef = CLASH_CARDS[cardId];
@@ -374,21 +403,18 @@ export default function ClashApp() {
     }
   };
 
+  // Click-to-deploy support
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current || !selectedCard || !me || !socket) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const scaleX = 100 / rect.width;
-    const scaleY = 160 / rect.height;
+    if (!selectedCard || !me || !socket) return;
+    const coords = getArenaCoordsFromPointer(e.clientX, e.clientY);
+    if (!coords) return;
 
-    const clickX = (e.clientX - rect.left) * scaleX;
-    const clickY = (e.clientY - rect.top) * scaleY;
-
-    if (isPlacementValid(clickX, clickY, selectedCard)) {
+    if (isPlacementValid(coords.x, coords.y, selectedCard)) {
       soundFx.playCard();
       socket.emit('clash:playCard', {
         cardId: selectedCard,
-        x: clickX,
-        y: clickY
+        x: coords.x,
+        y: coords.y
       });
       setSelectedCard(null);
     } else {
@@ -397,15 +423,61 @@ export default function ClashApp() {
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const scaleX = 100 / rect.width;
-    const scaleY = 160 / rect.height;
-    setHoverPos({
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY
-    });
+    if (draggingCard) return;
+    const coords = getArenaCoordsFromPointer(e.clientX, e.clientY);
+    setHoverPos(coords);
   };
+
+  // Drag-and-Drop Handlers
+  const handleCardPointerDown = (cardId: ClashCardId, e: React.PointerEvent) => {
+    if (!me || me.elixir < CLASH_CARDS[cardId].cost) return;
+    soundFx.click();
+    setSelectedCard(cardId);
+    setDraggingCard(cardId);
+    setDragPointer({ x: e.clientX, y: e.clientY });
+
+    const coords = getArenaCoordsFromPointer(e.clientX, e.clientY);
+    setHoverPos(coords);
+  };
+
+  // Global Pointer Events for Dragging & Releasing
+  useEffect(() => {
+    if (!draggingCard) return;
+
+    const handleWindowPointerMove = (e: PointerEvent) => {
+      setDragPointer({ x: e.clientX, y: e.clientY });
+      const coords = getArenaCoordsFromPointer(e.clientX, e.clientY);
+      setHoverPos(coords);
+    };
+
+    const handleWindowPointerUp = (e: PointerEvent) => {
+      const coords = getArenaCoordsFromPointer(e.clientX, e.clientY);
+      if (coords && isPlacementValid(coords.x, coords.y, draggingCard)) {
+        soundFx.playCard();
+        socket?.emit('clash:playCard', {
+          cardId: draggingCard,
+          x: coords.x,
+          y: coords.y
+        });
+        setSelectedCard(null);
+      } else if (coords) {
+        soundFx.shield();
+      }
+      setDraggingCard(null);
+      setDragPointer(null);
+      setHoverPos(null);
+    };
+
+    window.addEventListener('pointermove', handleWindowPointerMove);
+    window.addEventListener('pointerup', handleWindowPointerUp);
+    window.addEventListener('pointercancel', handleWindowPointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handleWindowPointerMove);
+      window.removeEventListener('pointerup', handleWindowPointerUp);
+      window.removeEventListener('pointercancel', handleWindowPointerUp);
+    };
+  }, [draggingCard, me, socket, gameState, isFlipped]);
 
   // Canvas render loop
   useEffect(() => {
@@ -429,12 +501,15 @@ export default function ClashApp() {
 
       const W = canvas.width;
       const H = canvas.height;
-      const toX = (x: number) => (x / 100) * W;
-      const toY = (y: number) => (y / 160) * H;
+
+      // Symmetrical 180° Mirror coordinate transformation
+      const toX = (x: number) => ((isFlipped ? 100 - x : x) / 100) * W;
+      const toY = (y: number) => ((isFlipped ? 160 - y : y) / 160) * H;
+      const toW = (w: number) => (w / 100) * W;
+      const toH = (h: number) => (h / 160) * H;
       const toSize = (s: number) => (s / 100) * W;
 
       // ─── 1. ARENA BACKGROUND (Grass & Grid) ───────────────────────────
-      // Vibrant royal lawn
       ctx.fillStyle = '#1e3a1e';
       ctx.fillRect(0, 0, W, H);
 
@@ -446,8 +521,8 @@ export default function ClashApp() {
       }
 
       // ─── 2. THE RIVER & BRIDGES ──────────────────────────────────────
-      const riverY = toY(75);
-      const riverH = toY(10);
+      const riverY = (75 / 160) * H;
+      const riverH = toH(10);
 
       // River bed
       const riverGrad = ctx.createLinearGradient(0, riverY, 0, riverY + riverH);
@@ -459,17 +534,18 @@ export default function ClashApp() {
 
       // River ripples
       ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-      const rippleOffset = (time / 30) % toX(20);
+      const rippleOffset = (time / 30) % toW(20);
       for (let rx = -20; rx < 120; rx += 20) {
-        ctx.fillRect(toX(rx) + rippleOffset, riverY + riverH * 0.4, toX(8), 2);
+        ctx.fillRect(toW(rx) + rippleOffset, riverY + riverH * 0.4, toW(8), 2);
       }
 
       // Bridges (Left Bridge X=21, Right Bridge X=79)
-      const drawBridge = (cx: number) => {
-        const bx = toX(cx - 6);
-        const bw = toX(12);
-        const by = riverY - toY(2);
-        const bh = riverH + toY(4);
+      const drawBridge = (cxArena: number) => {
+        const cx = toX(cxArena);
+        const bw = toW(12);
+        const bx = cx - bw / 2;
+        const by = riverY - toH(2);
+        const bh = riverH + toH(4);
 
         // Wood planks
         ctx.fillStyle = '#78350f';
@@ -478,7 +554,7 @@ export default function ClashApp() {
         // Plank lines
         ctx.strokeStyle = '#451a03';
         ctx.lineWidth = 1.5;
-        for (let py = by; py <= by + bh; py += toY(2.5)) {
+        for (let py = by; py <= by + bh; py += toH(2.5)) {
           ctx.beginPath();
           ctx.moveTo(bx, py);
           ctx.lineTo(bx + bw, py);
@@ -494,29 +570,34 @@ export default function ClashApp() {
       drawBridge(21);
       drawBridge(79);
 
-      // ─── 3. DEPLOY ZONE HIGHLIGHT (If Card Selected) ─────────────────
-      if (selectedCard && me && gameState?.status === 'PLAYING') {
-        const cardDef = CLASH_CARDS[selectedCard];
+      // ─── 3. DEPLOY ZONE HIGHLIGHT (If Card Selected or Dragged) ───────
+      const activeCard = draggingCard || selectedCard;
+      if (activeCard && me && gameState?.status === 'PLAYING') {
+        const cardDef = CLASH_CARDS[activeCard];
         ctx.save();
         if (cardDef.type === 'spell') {
           // Entire arena is deployable
           ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
           ctx.fillRect(0, 0, W, H);
         } else {
-          // Blue deployable zone
-          const redLeftDown = !gameState?.towers.some(t => t.id === 'red_princess_left' && t.hp > 0);
-          const redRightDown = !gameState?.towers.some(t => t.id === 'red_princess_right' && t.hp > 0);
+          // Player's half is ALWAYS at the bottom of their screen (Y=80 to 155)
+          ctx.fillStyle = me.team === 'blue' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+          ctx.fillRect(toW(5), (80 / 160) * H, toW(90), (75 / 160) * H);
 
-          ctx.fillStyle = 'rgba(59, 130, 246, 0.18)';
-          ctx.fillRect(toX(5), toY(80), toX(90), toY(75));
+          // Pockets unlock if enemy princess towers fall (Top-left & Top-right from player's view)
+          const enemyLeftDown = me.team === 'blue'
+            ? !gameState?.towers.some(t => t.id === 'red_princess_left' && t.hp > 0)
+            : !gameState?.towers.some(t => t.id === 'blue_princess_right' && t.hp > 0);
 
-          if (redLeftDown) {
-            ctx.fillStyle = 'rgba(59, 130, 246, 0.18)';
-            ctx.fillRect(toX(5), toY(50), toX(45), toY(30));
+          const enemyRightDown = me.team === 'blue'
+            ? !gameState?.towers.some(t => t.id === 'red_princess_right' && t.hp > 0)
+            : !gameState?.towers.some(t => t.id === 'blue_princess_left' && t.hp > 0);
+
+          if (enemyLeftDown) {
+            ctx.fillRect(toW(5), (50 / 160) * H, toW(45), (30 / 160) * H);
           }
-          if (redRightDown) {
-            ctx.fillStyle = 'rgba(59, 130, 246, 0.18)';
-            ctx.fillRect(toX(50), toY(50), toX(45), toY(30));
+          if (enemyRightDown) {
+            ctx.fillRect(toW(50), (50 / 160) * H, toW(45), (30 / 160) * H);
           }
         }
         ctx.restore();
@@ -527,7 +608,7 @@ export default function ClashApp() {
         gameState.towers.forEach(t => {
           const isAlive = t.hp > 0;
           const isKing = t.type === 'king';
-          const isBlue = t.team === 'blue';
+          const isAlly = t.team === me?.team;
           const cx = toX(t.x);
           const cy = toY(t.y);
           const r = toSize(isKing ? 7.5 : 5.5);
@@ -539,7 +620,10 @@ export default function ClashApp() {
             ctx.arc(cx, cy, r * 0.8, 0, Math.PI * 2);
             ctx.fill();
             ctx.fillStyle = '#78716c';
-            ctx.fillText('🪨', cx - 8, cy + 5);
+            ctx.font = '14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🪨', cx, cy);
             return;
           }
 
@@ -551,8 +635,8 @@ export default function ClashApp() {
 
           // Tower Stone Body
           const grad = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, 2, cx, cy, r);
-          grad.addColorStop(0, isBlue ? '#38bdf8' : '#f87171');
-          grad.addColorStop(0.5, isBlue ? '#0284c7' : '#dc2626');
+          grad.addColorStop(0, isAlly ? '#38bdf8' : '#f87171');
+          grad.addColorStop(0.5, isAlly ? '#0284c7' : '#dc2626');
           grad.addColorStop(1, '#0f172a');
 
           ctx.fillStyle = grad;
@@ -560,7 +644,7 @@ export default function ClashApp() {
           ctx.arc(cx, cy, r, 0, Math.PI * 2);
           ctx.fill();
 
-          ctx.strokeStyle = isBlue ? '#60a5fa' : '#fca5a5';
+          ctx.strokeStyle = isAlly ? '#60a5fa' : '#fca5a5';
           ctx.lineWidth = 2.5;
           ctx.stroke();
 
@@ -580,7 +664,7 @@ export default function ClashApp() {
           ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
 
           const hpRatio = Math.max(0, t.hp / t.maxHp);
-          ctx.fillStyle = hpRatio > 0.4 ? '#22c55e' : (hpRatio > 0.2 ? '#eab308' : '#ef4444');
+          ctx.fillStyle = hpRatio > 0.4 ? (isAlly ? '#22c55e' : '#ef4444') : (hpRatio > 0.2 ? '#eab308' : '#ef4444');
           ctx.fillRect(barX, barY, barW * hpRatio, barH);
 
           // Text HP
@@ -595,7 +679,7 @@ export default function ClashApp() {
         gameState.units.forEach(u => {
           const cx = toX(u.x);
           const cy = toY(u.y);
-          const isBlue = u.team === 'blue';
+          const isAlly = u.team === me?.team;
           const card = CLASH_CARDS[u.cardId];
           const unitRadius = toSize(u.cardId === 'giant' ? 4.5 : (u.cardId === 'skeletons' ? 2 : 3));
 
@@ -606,12 +690,12 @@ export default function ClashApp() {
           ctx.fill();
 
           // Unit Circle Body
-          ctx.fillStyle = isBlue ? '#1d4ed8' : '#b91c1c';
+          ctx.fillStyle = isAlly ? '#1d4ed8' : '#b91c1c';
           ctx.beginPath();
           ctx.arc(cx, cy, unitRadius, 0, Math.PI * 2);
           ctx.fill();
 
-          ctx.strokeStyle = isBlue ? '#93c5fd' : '#fca5a5';
+          ctx.strokeStyle = isAlly ? '#93c5fd' : '#fca5a5';
           ctx.lineWidth = 1.5;
           ctx.stroke();
 
@@ -631,7 +715,7 @@ export default function ClashApp() {
           ctx.fillRect(barX - 0.5, barY - 0.5, barW + 1, barH + 1);
 
           const hpPct = Math.max(0, u.hp / u.maxHp);
-          ctx.fillStyle = isBlue ? '#38bdf8' : '#f87171';
+          ctx.fillStyle = isAlly ? '#38bdf8' : '#f87171';
           ctx.fillRect(barX, barY, barW * hpPct, barH);
         });
       }
@@ -643,7 +727,6 @@ export default function ClashApp() {
           const py = toY(p.currentY);
 
           if (p.type === 'fireball') {
-            // Fiery comet
             ctx.fillStyle = '#f97316';
             ctx.beginPath();
             ctx.arc(px, py, 7, 0, Math.PI * 2);
@@ -653,13 +736,11 @@ export default function ClashApp() {
             ctx.arc(px, py, 4, 0, Math.PI * 2);
             ctx.fill();
           } else if (p.type === 'cannon') {
-            // Heavy black ball
             ctx.fillStyle = '#0f172a';
             ctx.beginPath();
             ctx.arc(px, py, 5, 0, Math.PI * 2);
             ctx.fill();
           } else if (p.type === 'lightning') {
-            // Blue electric spark
             ctx.strokeStyle = '#38bdf8';
             ctx.lineWidth = 2.5;
             ctx.beginPath();
@@ -667,7 +748,6 @@ export default function ClashApp() {
             ctx.lineTo(px, py);
             ctx.stroke();
           } else {
-            // Arrow
             ctx.fillStyle = '#facc15';
             ctx.beginPath();
             ctx.arc(px, py, 2.5, 0, Math.PI * 2);
@@ -711,10 +791,10 @@ export default function ClashApp() {
         }
       }
 
-      // ─── 8. HOVER RETICLE CURSOR ────────────────────────────────────
-      if (hoverPos && selectedCard && me && gameState?.status === 'PLAYING') {
-        const isValid = isPlacementValid(hoverPos.x, hoverPos.y, selectedCard);
-        const cardDef = CLASH_CARDS[selectedCard];
+      // ─── 8. HOVER / DRAG RETICLE CURSOR ─────────────────────────────
+      if (hoverPos && activeCard && me && gameState?.status === 'PLAYING') {
+        const isValid = isPlacementValid(hoverPos.x, hoverPos.y, activeCard);
+        const cardDef = CLASH_CARDS[activeCard];
         const hx = toX(hoverPos.x);
         const hy = toY(hoverPos.y);
 
@@ -728,10 +808,10 @@ export default function ClashApp() {
         ctx.arc(hx, hy, radius, 0, Math.PI * 2);
         ctx.stroke();
 
-        ctx.fillStyle = isValid ? 'rgba(74, 222, 128, 0.2)' : 'rgba(239, 68, 68, 0.25)';
+        ctx.fillStyle = isValid ? 'rgba(74, 222, 128, 0.25)' : 'rgba(239, 68, 68, 0.3)';
         ctx.fill();
 
-        ctx.font = '16px sans-serif';
+        ctx.font = '18px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(isValid ? cardDef.emoji : '🚫', hx, hy);
@@ -743,7 +823,7 @@ export default function ClashApp() {
 
     animationId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animationId);
-  }, [gameState, selectedCard, hoverPos, me]);
+  }, [gameState, selectedCard, draggingCard, hoverPos, me, isFlipped]);
 
   // Format timer
   const formatTimer = (sec: number) => {
@@ -752,6 +832,9 @@ export default function ClashApp() {
     const rem = s % 60;
     return `${m}:${rem < 10 ? '0' : ''}${rem}`;
   };
+
+  const myScore = me ? (me.team === 'blue' ? gameState?.blueScore ?? 0 : gameState?.redScore ?? 0) : gameState?.blueScore ?? 0;
+  const enemyScore = me ? (me.team === 'blue' ? gameState?.redScore ?? 0 : gameState?.blueScore ?? 0) : gameState?.redScore ?? 0;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between font-sans select-none overflow-x-hidden">
@@ -788,10 +871,10 @@ export default function ClashApp() {
         {/* Middle: Timer & Crown Score */}
         {gameState && gameState.status === 'PLAYING' && (
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-slate-950 px-3 py-1 rounded-xl border border-slate-800">
-              <span className="text-blue-400 font-black text-sm">👑 {gameState.blueScore}</span>
+            <div className="flex items-center gap-2 bg-slate-950 px-3 py-1 rounded-xl border border-slate-800 font-mono">
+              <span className="text-blue-400 font-black text-sm">👑 {myScore}</span>
               <span className="text-slate-500 text-xs">-</span>
-              <span className="text-red-400 font-black text-sm">{gameState.redScore} 👑</span>
+              <span className="text-red-400 font-black text-sm">{enemyScore} 👑</span>
             </div>
 
             <div className={`px-3 py-1 rounded-xl border font-mono font-black text-sm flex items-center gap-1.5 ${
@@ -824,6 +907,19 @@ export default function ClashApp() {
       {errorMsg && (
         <div className="bg-red-950/80 border-b border-red-800 text-red-200 text-xs py-2 px-4 text-center font-bold animate-pulse">
           ⚠️ {errorMsg}
+        </div>
+      )}
+
+      {/* ─── FLOATING CARD AVATAR DURING DRAG ─────────────────────────────────── */}
+      {draggingCard && dragPointer && (
+        <div
+          className="fixed pointer-events-none z-50 transform -translate-x-1/2 -translate-y-1/2"
+          style={{ left: dragPointer.x, top: dragPointer.y }}
+        >
+          <div className="bg-slate-900/90 border-2 border-amber-400 p-2 rounded-2xl shadow-2xl flex flex-col items-center scale-110">
+            <span className="text-3xl">{CLASH_CARDS[draggingCard].emoji}</span>
+            <span className="text-[9px] font-black text-amber-300 uppercase mt-0.5">{CLASH_CARDS[draggingCard].name}</span>
+          </div>
         </div>
       )}
 
@@ -885,7 +981,7 @@ export default function ClashApp() {
             <div className="grid grid-cols-2 gap-3 mb-6">
               {/* Blue Slot */}
               <div className="bg-blue-950/40 border-2 border-blue-500/50 p-4 rounded-2xl flex flex-col items-center justify-center">
-                <span className="text-xs font-bold text-blue-300 uppercase mb-1">Camp Bleu 🔷</span>
+                <span className="text-xs font-bold text-blue-300 uppercase mb-1">Joueur 1 (Bleu 🔷)</span>
                 {gameState.players[0] ? (
                   <div className="font-extrabold text-sm text-white">
                     {gameState.players[0].username}
@@ -897,7 +993,7 @@ export default function ClashApp() {
 
               {/* Red Slot */}
               <div className="bg-red-950/40 border-2 border-red-500/50 p-4 rounded-2xl flex flex-col items-center justify-center">
-                <span className="text-xs font-bold text-red-300 uppercase mb-1">Camp Rouge 🔴</span>
+                <span className="text-xs font-bold text-red-300 uppercase mb-1">Joueur 2 (Rouge 🔴)</span>
                 {gameState.players[1] ? (
                   <div className="font-extrabold text-sm text-white">
                     {gameState.players[1].username} {gameState.players[1].isBot && '🤖'}
@@ -950,128 +1046,140 @@ export default function ClashApp() {
           </div>
         </div>
       ) : (
-        /* ─── IN-GAME ARENA VIEW ──────────────────────────────────────────────── */
-        <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-3 gap-4 max-w-6xl mx-auto w-full">
+        /* ─── IN-GAME ARENA VIEW (CLASH ROYALE CONSOLE LAYOUT) ─────────────────── */
+        <div className="flex-1 flex flex-col items-center justify-start p-2 sm:p-4 max-w-xl mx-auto w-full">
           {/* Main Battlefield Canvas */}
-          <div className="flex flex-col items-center relative">
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-slate-800 bg-black">
-              <canvas
-                ref={canvasRef}
-                width={460}
-                height={700}
-                onClick={handleCanvasClick}
-                onMouseMove={handleCanvasMouseMove}
-                onMouseLeave={() => setHoverPos(null)}
-                className="cursor-crosshair block"
-              />
+          <div className="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-slate-800 bg-black touch-none">
+            <canvas
+              ref={canvasRef}
+              width={460}
+              height={640}
+              onClick={handleCanvasClick}
+              onMouseMove={handleCanvasMouseMove}
+              onMouseLeave={() => setHoverPos(null)}
+              className="cursor-crosshair block w-full max-w-[460px] select-none"
+            />
 
-              {/* Sudden Death Banner Overlay */}
-              {gameState?.isSuddenDeath && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-600/90 text-white font-black text-xs px-4 py-1.5 rounded-full border-2 border-white shadow-xl animate-bounce">
-                  ⚡ MORT SUBITE ! PROCHAINE TOUR = VICTOIRE !
-                </div>
-              )}
-            </div>
-
-            {/* Hint prompt when card is selected */}
-            {selectedCard && (
-              <div className="mt-2 text-xs font-bold text-amber-400 animate-pulse bg-slate-900 px-4 py-1.5 rounded-full border border-amber-500/40">
-                🎯 Cliquez sur l'arène pour déployer "{CLASH_CARDS[selectedCard].name}" !
+            {/* Sudden Death Banner Overlay */}
+            {gameState.isSuddenDeath && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-600/90 text-white font-black text-xs px-4 py-1.5 rounded-full border-2 border-white shadow-xl animate-bounce">
+                ⚡ MORT SUBITE ! PROCHAINE TOUR = VICTOIRE !
               </div>
             )}
           </div>
 
-          {/* Right/Bottom Panel: Deck, Elixir Bar & Logs */}
-          <div className="w-full lg:w-80 flex flex-col justify-between gap-4 self-stretch">
-            {/* Elixir Gauge & Hand Console */}
-            {me && (
-              <div className="bg-slate-900 border-2 border-slate-800 rounded-3xl p-4 shadow-xl flex flex-col gap-4">
-                {/* Elixir Bar */}
-                <div>
-                  <div className="flex justify-between items-center text-xs font-extrabold mb-1">
-                    <span className="text-purple-400 flex items-center gap-1">
-                      <span>⚡</span>
-                      <span>ÉLIXIR</span>
+          {/* Hint prompt when card is selected or being dragged */}
+          {selectedCard && (
+            <div className="mt-1 text-[11px] font-bold text-amber-400 animate-pulse bg-slate-900/90 px-4 py-1 rounded-full border border-amber-500/40 shadow">
+              🎯 Glissez ou cliquez sur l'arène pour déployer "{CLASH_CARDS[selectedCard].name}" !
+            </div>
+          )}
+
+          {/* ─── DIRECTLY UNDER ARENA: BUBBLING ELIXIR BAR ───────────────────── */}
+          {me && (
+            <div className="w-full max-w-[460px] mt-2 bg-slate-900/95 backdrop-blur-md border-2 border-purple-500/40 rounded-2xl p-2.5 shadow-lg flex flex-col gap-1.5">
+              <div className="flex justify-between items-center text-xs font-black">
+                <span className="text-purple-400 flex items-center gap-1.5 font-bold">
+                  <span className="text-base animate-pulse">⚡</span>
+                  <span>ÉLIXIR</span>
+                  {gameState.isDoubleElixir && (
+                    <span className="text-[9px] bg-amber-500 text-slate-950 px-1.5 py-0.2 rounded font-black tracking-wider animate-bounce">
+                      2X VITESSE
                     </span>
-                    <span className="font-mono text-purple-300 font-black">
-                      {Math.floor(me.elixir)} / 10
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-950 h-4 rounded-full overflow-hidden border border-purple-500/40 p-0.5 shadow-inner">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-purple-600 via-fuchsia-500 to-pink-500 transition-all duration-150 shadow"
-                      style={{ width: `${(me.elixir / 10) * 100}%` }}
-                    />
-                  </div>
-                </div>
+                  )}
+                </span>
+                <span className="font-mono text-purple-300 text-sm font-black tracking-wider">
+                  {Math.floor(me.elixir)} <span className="text-purple-500 text-xs font-normal">/ 10</span>
+                </span>
+              </div>
 
-                {/* Hand Cards */}
-                <div>
-                  <div className="text-[10px] uppercase font-bold text-slate-400 mb-2 flex justify-between items-center">
-                    <span>Votre Main</span>
-                    <span className="text-slate-500 font-mono">
-                      Suivante: {CLASH_CARDS[me.nextCard]?.emoji} {CLASH_CARDS[me.nextCard]?.name}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-2">
-                    {me.hand.map((cardId, idx) => {
-                      const card = CLASH_CARDS[cardId];
-                      const canAfford = me.elixir >= card.cost;
-                      const isSelected = selectedCard === cardId;
-
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            if (canAfford) {
-                              soundFx.click();
-                              setSelectedCard(isSelected ? null : cardId);
-                            }
-                          }}
-                          disabled={!canAfford}
-                          className={`btn-3d flex flex-col items-center justify-between p-2 rounded-2xl border-2 transition relative cursor-pointer ${
-                            isSelected
-                              ? 'ring-4 ring-amber-400 border-amber-400 bg-amber-950/60 scale-105'
-                              : canAfford
-                              ? 'border-purple-500/60 bg-slate-850 hover:scale-105 shadow-lg'
-                              : 'border-slate-800 bg-slate-950 opacity-50 cursor-not-allowed'
-                          }`}
-                        >
-                          {/* Elixir Cost Badge */}
-                          <div className="absolute -top-2 -left-2 bg-purple-600 text-white font-mono font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center border border-white shadow">
-                            {card.cost}
-                          </div>
-
-                          <div className="text-2xl mt-1">{card.emoji}</div>
-                          <div className="text-[9px] font-extrabold text-white text-center leading-tight truncate w-full mt-1">
-                            {card.name}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+              {/* Elixir Gauge Bar with 10 segment tick divisions */}
+              <div className="relative w-full bg-slate-950 h-3.5 rounded-full overflow-hidden border border-purple-600/50 p-0.5 shadow-inner">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-purple-600 via-fuchsia-500 to-pink-500 transition-all duration-150 shadow"
+                  style={{ width: `${(me.elixir / 10) * 100}%` }}
+                />
+                <div className="absolute inset-0 flex justify-between pointer-events-none px-1">
+                  {[...Array(10)].map((_, i) => (
+                    <div key={i} className="w-[1px] h-full bg-purple-950/40" />
+                  ))}
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Combat Chronicle Log */}
-            <div className="bg-slate-900 border-2 border-slate-800 rounded-3xl p-4 shadow-xl flex-1 flex flex-col max-h-48">
-              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-                <span>📜 Chronique de Bataille</span>
-                <span className="font-mono text-[9px] text-slate-500">{gameState?.log?.length ?? 0} entrées</span>
-              </h4>
+          {/* ─── DIRECTLY UNDER ELIXIR: 4 CARDS DOCK (DRAG & DROP + CLICK) ───── */}
+          {me && (
+            <div className="w-full max-w-[460px] mt-2 bg-slate-900 border-2 border-slate-800 rounded-2xl p-2 shadow-xl flex items-center gap-2">
+              {/* Next Card Slot */}
+              <div className="flex flex-col items-center justify-center p-1.5 bg-slate-950 border border-slate-800 rounded-xl w-14 shrink-0 shadow-inner">
+                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tight">Suivante</span>
+                <span className="text-xl my-0.5">{CLASH_CARDS[me.nextCard]?.emoji}</span>
+                <span className="text-[8px] font-mono font-bold text-purple-400">⚡{CLASH_CARDS[me.nextCard]?.cost}</span>
+              </div>
+
+              {/* 4 Cards in Hand */}
+              <div className="grid grid-cols-4 gap-2 flex-1">
+                {me.hand.map((cardId, idx) => {
+                  const card = CLASH_CARDS[cardId];
+                  const canAfford = me.elixir >= card.cost;
+                  const isSelected = selectedCard === cardId || draggingCard === cardId;
+
+                  return (
+                    <div
+                      key={idx}
+                      onPointerDown={(e) => handleCardPointerDown(cardId, e)}
+                      onClick={() => {
+                        if (canAfford) {
+                          soundFx.click();
+                          setSelectedCard(isSelected ? null : cardId);
+                        }
+                      }}
+                      className={`btn-3d select-none touch-none flex flex-col items-center justify-between p-1.5 sm:p-2 rounded-xl border-2 transition relative cursor-grab active:cursor-grabbing ${
+                        isSelected
+                          ? 'ring-4 ring-amber-400 border-amber-400 bg-amber-950/80 scale-105 shadow-amber-500/50 shadow-lg'
+                          : canAfford
+                          ? 'border-purple-500/60 bg-slate-850 hover:scale-105 shadow-md hover:border-purple-400'
+                          : 'border-slate-800 bg-slate-950 opacity-40 cursor-not-allowed'
+                      }`}
+                    >
+                      {/* Elixir Cost Badge */}
+                      <div className="absolute -top-1.5 -left-1.5 bg-gradient-to-br from-purple-500 to-pink-600 text-white font-mono font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center border border-white shadow">
+                        {card.cost}
+                      </div>
+
+                      <div className="text-2xl mt-0.5">{card.emoji}</div>
+                      <div className="text-[8px] sm:text-[9px] font-black text-white text-center leading-tight truncate w-full mt-0.5">
+                        {card.name}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ─── COLLAPSIBLE COMBAT LOG ───────────────────────────────────────── */}
+          <div className="w-full max-w-[460px] mt-2">
+            <button
+              onClick={() => setShowLog(!showLog)}
+              className="w-full bg-slate-900 hover:bg-slate-850 border border-slate-800 px-3 py-1.5 rounded-xl text-[10px] font-bold text-slate-400 flex justify-between items-center cursor-pointer transition shadow"
+            >
+              <span>📜 Journal de combat ({gameState.log.length})</span>
+              <span>{showLog ? '▲ Masquer' : '▼ Afficher'}</span>
+            </button>
+            {showLog && (
               <div
                 ref={logContainerRef}
-                className="overflow-y-auto space-y-1 font-mono text-[10px] text-slate-300 pr-1 flex-1"
+                className="mt-1 bg-slate-900 border border-slate-800 rounded-xl p-2.5 max-h-32 overflow-y-auto space-y-1 font-mono text-[10px] text-slate-300 shadow-inner"
               >
-                {gameState?.log?.map((entry, idx) => (
-                  <div key={idx} className="border-b border-slate-850/60 pb-0.5 last:border-none">
+                {gameState.log.map((entry, idx) => (
+                  <div key={idx} className="border-b border-slate-800/60 pb-0.5 last:border-none">
                     {entry}
                   </div>
                 ))}
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
