@@ -168,6 +168,7 @@ io.on('connection', (socket) => {
                 socket.join(formattedRoomCode);
                 socket.roomCode = formattedRoomCode;
                 socket.username = username;
+                socket.emit('clashStateUpdate', game.getState());
                 io.to(formattedRoomCode).emit('clashStateUpdate', game.getState());
                 console.log(`[CLASH LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
             }

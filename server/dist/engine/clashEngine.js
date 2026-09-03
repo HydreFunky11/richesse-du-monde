@@ -140,13 +140,18 @@ class ClashEngine {
         return this.state.players;
     }
     addPlayer(id, username, color) {
+        // Check if player is reconnecting with the same username
+        const existing = this.state.players.find(p => p.username.toLowerCase() === username.toLowerCase() || p.id === id);
+        if (existing) {
+            existing.id = id;
+            return true;
+        }
         if (this.state.status !== 'LOBBY') {
             // Allow joining as spectator
-            if (!this.state.spectators.some(s => s.id === id) && !this.state.players.some(p => p.id === id)) {
+            if (!this.state.spectators.some(s => s.id === id)) {
                 this.state.spectators.push({ id, username });
-                return true;
             }
-            return false;
+            return true;
         }
         if (this.state.players.length >= 2) {
             if (!this.state.spectators.some(s => s.id === id)) {

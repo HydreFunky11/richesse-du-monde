@@ -232,17 +232,15 @@ export default function ClashApp() {
 
   // Connect socket
   useEffect(() => {
-    const s = io(SERVER_URL, {
-      transports: ['websocket', 'polling']
-    });
+    const s = io(SERVER_URL);
     setSocket(s);
 
     s.on('connect', () => {
       setErrorMsg(null);
     });
 
-    s.on('connect_error', () => {
-      setErrorMsg('Impossible de se connecter au serveur de jeu. Veuillez patienter pendant le réveil du serveur...');
+    s.on('connect_error', (err) => {
+      console.warn('[Clash] Erreur connexion socket:', err);
     });
 
     s.on('clashStateUpdate', (newState: ClashGameState) => {
@@ -318,8 +316,9 @@ export default function ClashApp() {
     soundFx.click();
 
     if (!socket.connected) {
-      setErrorMsg('Connexion au serveur en cours... Veuillez patienter un instant.');
+      setErrorMsg('Connexion au serveur en cours... Réessayez dans quelques secondes.');
       socket.connect();
+      return;
     }
 
     socket.emit('joinGame', {
@@ -829,7 +828,7 @@ export default function ClashApp() {
       )}
 
       {/* ─── NOT JOINED MODAL ────────────────────────────────────────────────── */}
-      {!joined ? (
+      {!joined || !gameState ? (
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="bg-slate-900 border-2 border-amber-500/50 p-8 rounded-3xl max-w-md w-full shadow-2xl relative">
             <div className="text-center mb-6">
@@ -874,7 +873,7 @@ export default function ClashApp() {
             </form>
           </div>
         </div>
-      ) : gameState?.status === 'LOBBY' ? (
+      ) : gameState.status === 'LOBBY' ? (
         /* ─── LOBBY VIEW ──────────────────────────────────────────────────────── */
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
           <div className="bg-slate-900 border-2 border-amber-500/50 p-8 rounded-3xl max-w-lg w-full shadow-2xl relative">
