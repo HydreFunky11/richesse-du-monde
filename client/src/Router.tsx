@@ -9,6 +9,7 @@ import SkyjoApp from './SkyjoApp';
 import KingOfTokyoApp from './KingOfTokyoApp';
 import DungeonMayhemApp from './DungeonMayhemApp';
 import ClashApp from './ClashApp';
+import AlchemyApp from './AlchemyApp';
 
 export default function Router() {
   return (
@@ -24,6 +25,8 @@ export default function Router() {
       <Route path="/dungeonmayhem" element={<DungeonMayhemApp />} />
       <Route path="/mayhem" element={<DungeonMayhemApp />} />
       <Route path="/clash" element={<ClashApp />} />
+      <Route path="/alchimiste" element={<AlchemyApp />} />
+      <Route path="/alchemy" element={<AlchemyApp />} />
     </Routes>
   );
 }

@@ -20,6 +20,20 @@ interface GameTheme {
 
 const GAMES: GameTheme[] = [
   {
+    emoji: '⚗️',
+    title: 'L\'Alchimiste Suprême',
+    subtitle: 'Idle & Transmutation Infinie',
+    description: 'Jeu incrémental solo à la Cookie Clicker ! Pilonnez le chaudron magique, débloquez les 12 ères alchimiques, automatisez 12 ateliers et accomplissez le Grand Œuvre.',
+    route: '/alchimiste',
+    fontClass: 'font-display font-black tracking-wide',
+    cardTheme: 'bg-gradient-to-b from-purple-950/80 via-slate-950 to-amber-950/40',
+    borderTheme: 'border-amber-500/50 hover:border-amber-300 hover:shadow-purple-900/60',
+    titleGradient: 'from-amber-300 via-purple-300 to-pink-400',
+    badge: 'NOUVEAU • SOLO IDLE ♾️',
+    badgeStyle: 'bg-gradient-to-r from-purple-900 to-amber-800 text-amber-200 border-amber-500/50 animate-pulse',
+    players: '1 Joueur (Solo & Hors-Ligne)',
+  },
+  {
     emoji: '👑',
     title: 'Clash of Realms',
     subtitle: 'Arène de Cartes en Temps Réel',
