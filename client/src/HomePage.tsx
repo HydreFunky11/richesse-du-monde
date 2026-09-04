@@ -20,6 +20,20 @@ interface GameTheme {
 
 const GAMES: GameTheme[] = [
   {
+    emoji: '🤼',
+    title: 'Sumo Smash',
+    subtitle: '1v1 Spam & Réflexes QTE',
+    description: 'Duel de spam frénétique de touches ! Repoussez votre adversaire hors du Dohyo sacré, réagissez aux changements de touche éclairs et évitez les feintes du Gyōji.',
+    route: '/sumo',
+    fontClass: 'font-display font-black tracking-wide',
+    cardTheme: 'bg-gradient-to-b from-red-950/80 via-slate-950 to-blue-950/40',
+    borderTheme: 'border-red-500/50 hover:border-amber-400 hover:shadow-red-900/60',
+    titleGradient: 'from-amber-300 via-orange-400 to-red-500',
+    badge: 'NOUVEAU • 1V1 SPAM 🤼',
+    badgeStyle: 'bg-gradient-to-r from-red-900 to-amber-800 text-amber-200 border-amber-500/50 animate-pulse',
+    players: '1v1 (Local, Solo IA ou En Ligne)',
+  },
+  {
     emoji: '⚗️',
     title: 'L\'Alchimiste Suprême',
     subtitle: 'Idle & Transmutation Infinie',

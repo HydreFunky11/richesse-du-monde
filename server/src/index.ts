@@ -11,6 +11,7 @@ import { SkyjoEngine } from './engine/skyjoEngine';
 import { KingOfTokyoEngine } from './engine/kingoftokyoEngine';
 import { DungeonMayhemEngine } from './engine/dungeonMayhemEngine';
 import { ClashEngine } from './engine/clashEngine';
+import { SumoEngine } from './engine/sumoEngine';
 
 const app = express();
 app.use(cors());
@@ -35,6 +36,7 @@ const skyjoGames: { [roomCode: string]: SkyjoEngine } = {};
 const kingOfTokyoGames: { [roomCode: string]: KingOfTokyoEngine } = {};
 const mayhemGames: { [roomCode: string]: DungeonMayhemEngine } = {};
 const clashGames: { [roomCode: string]: ClashEngine } = {};
+const sumoGames: { [roomCode: string]: SumoEngine } = {};
 const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
 
 
@@ -48,7 +50,10 @@ io.on('connection', (socket) => {
 
   socket.on('joinGame', ({ username, roomCode, gameType }: { username: string, roomCode: string, gameType?: string }) => {
     const formattedRoomCode = roomCode.toUpperCase().trim();
-    const type = gameType === 'uno' ? 'uno' : (gameType === 'chaos' ? 'chaos' : (gameType === 'loveletter' ? 'loveletter' : (gameType === 'discretos' ? 'discretos' : (gameType === 'skyjo' ? 'skyjo' : (gameType === 'kingoftokyo' ? 'kingoftokyo' : (gameType === 'mayhem' || gameType === 'dungeonmayhem' ? 'mayhem' : (gameType === 'clash' ? 'clash' : 'richesse')))))));
+    const validTypes = ['uno', 'chaos', 'loveletter', 'discretos', 'skyjo', 'kingoftokyo', 'mayhem', 'clash', 'sumo'];
+    let type = 'richesse';
+    if (gameType === 'dungeonmayhem') type = 'mayhem';
+    else if (gameType && validTypes.includes(gameType)) type = gameType;
     (socket as any).gameType = type;
 
     if (type === 'uno') {
@@ -155,6 +160,27 @@ io.on('connection', (socket) => {
         console.log(`[MAYHEM LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
       } else {
         socket.emit('error', 'Impossible de rejoindre le salon Dungeon Mayhem (partie commencée ou salon plein).');
+      }
+        } else if (type === 'sumo') {
+      if (!sumoGames[formattedRoomCode] || sumoGames[formattedRoomCode].getState().status === 'MATCH_FINISHED' || sumoGames[formattedRoomCode].getPlayers().length === 0) {
+        sumoGames[formattedRoomCode] = new SumoEngine(formattedRoomCode);
+        sumoGames[formattedRoomCode].onStateChange((state) => {
+          io.to(formattedRoomCode).emit('sumoStateUpdate', state);
+        });
+      }
+      const game = sumoGames[formattedRoomCode];
+      const color = PLAYER_COLORS[game.getPlayers().length] || '#3B82F6';
+      const success = game.addPlayer(socket.id, username, color);
+
+      if (success) {
+        socket.join(formattedRoomCode);
+        (socket as any).roomCode = formattedRoomCode;
+        (socket as any).username = username;
+        socket.emit('sumoStateUpdate', game.getState());
+        io.to(formattedRoomCode).emit('sumoStateUpdate', game.getState());
+        console.log(`[SUMO LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+      } else {
+        socket.emit('error', 'Impossible de rejoindre le salon Sumo.');
       }
     } else if (type === 'clash') {
       if (!clashGames[formattedRoomCode] || clashGames[formattedRoomCode].getState().status === 'FINISHED' || clashGames[formattedRoomCode].getPlayers().length === 0) {
@@ -794,6 +820,29 @@ io.on('connection', (socket) => {
     const game = clashGames[roomCode];
     game.resetGame();
     io.to(roomCode).emit('clashStateUpdate', game.getState());
+  });
+
+  // ─── Sumo Smash Listeners ──────────────────────────────────────────────────
+
+  socket.on('sumo:push', ({ key }: { key: string }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !sumoGames[roomCode]) return;
+    const game = sumoGames[roomCode];
+    game.handlePush(socket.id, key);
+  });
+
+  socket.on('sumo:startGame', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !sumoGames[roomCode]) return;
+    const game = sumoGames[roomCode];
+    game.startGame();
+  });
+
+  socket.on('sumo:resetMatch', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !sumoGames[roomCode]) return;
+    const game = sumoGames[roomCode];
+    game.resetMatch();
   });
 
   // ─── Disconnect ────────────────────────────────────────────────────────────
