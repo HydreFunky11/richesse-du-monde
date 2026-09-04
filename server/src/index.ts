@@ -15,6 +15,38 @@ import { SumoEngine } from './engine/sumoEngine';
 import { RtsEngine } from './engine/rtsEngine';
 import { MobaEngine } from './engine/mobaEngine';
 import { ChampionId, SpellKey } from './types/moba';
+import fs from 'fs';
+import path from 'path';
+
+// Load .env locally if present
+try {
+  const candidates = [
+    path.resolve(__dirname, '../.env'),
+    path.resolve(__dirname, '../../.env'),
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(process.cwd(), 'server/.env'),
+  ];
+  for (const envPath of candidates) {
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8');
+      content.split('\n').forEach(line => {
+        const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+        if (match) {
+          const key = match[1];
+          let value = (match[2] || '').trim();
+          if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+            value = value.slice(1, -1);
+          }
+          if (!process.env[key]) {
+            process.env[key] = value;
+          }
+        }
+      });
+    }
+  }
+} catch (e) {
+  // ignore
+}
 
 const app = express();
 app.use(cors());
@@ -79,8 +111,23 @@ io.on('connection', (socket) => {
         socket.emit('error', 'Impossible de rejoindre le salon UNO (partie commencée ou salon plein).');
       }
     } else if (type === 'chaos') {
-      socket.emit('error', 'Le jeu Chaos Board est temporairement fermé.');
-      return;
+      if (!chaosGames[formattedRoomCode] || chaosGames[formattedRoomCode].getState().status === 'FINISHED' || chaosGames[formattedRoomCode].getPlayers().length === 0) {
+        chaosGames[formattedRoomCode] = new ChaosEngine(formattedRoomCode);
+      }
+      const game = chaosGames[formattedRoomCode];
+      const color = PLAYER_COLORS[game.getPlayers().length] || '#F59E0B';
+      const success = game.addPlayer(socket.id, username, color);
+
+      if (success) {
+        socket.join(formattedRoomCode);
+        (socket as any).roomCode = formattedRoomCode;
+        (socket as any).username = username;
+        socket.emit('chaosStateUpdate', game.getState());
+        io.to(formattedRoomCode).emit('chaosStateUpdate', game.getState());
+        console.log(`[CHAOS LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+      } else {
+        socket.emit('error', 'Impossible de rejoindre le salon Chaos (partie commencée ou salon plein).');
+      }
     } else if (type === 'loveletter') {
       if (!loveLetterGames[formattedRoomCode] || loveLetterGames[formattedRoomCode].getState().status === 'FINISHED' || loveLetterGames[formattedRoomCode].getPlayers().length === 0) {
         loveLetterGames[formattedRoomCode] = new LoveLetterEngine(formattedRoomCode);
@@ -513,9 +560,19 @@ io.on('connection', (socket) => {
     const roomCode = (socket as any).roomCode;
     if (!roomCode || !chaosGames[roomCode]) return;
     const game = chaosGames[roomCode];
-    if (game.playAction(socket.id, actionType, params)) {
+    if (game.playAction(socket.id, actionType as 'GAMBLE' | 'FIGHT', params)) {
       io.to(roomCode).emit('chaosStateUpdate', game.getState());
     }
+  });
+
+  socket.on('chaos:draftRule', async ({ ruleText }: { ruleText: string }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !chaosGames[roomCode]) return;
+    const game = chaosGames[roomCode];
+    game.getState().isAiGenerating = true;
+    io.to(roomCode).emit('chaosStateUpdate', game.getState());
+    await game.submitNewRule(socket.id, ruleText);
+    io.to(roomCode).emit('chaosStateUpdate', game.getState());
   });
 
   socket.on('chaos:modifyCell', ({ cellIndex, newType }: { cellIndex: number, newType: any }) => {

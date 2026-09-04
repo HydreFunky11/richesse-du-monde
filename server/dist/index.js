@@ -9,6 +9,7 @@ const socket_io_1 = require("socket.io");
 const cors_1 = __importDefault(require("cors"));
 const gameEngine_1 = require("./engine/gameEngine");
 const unoEngine_1 = require("./engine/unoEngine");
+const chaosEngine_1 = require("./engine/chaosEngine");
 const loveLetterEngine_1 = require("./engine/loveLetterEngine");
 const discretosEngine_1 = require("./engine/discretosEngine");
 const skyjoEngine_1 = require("./engine/skyjoEngine");
@@ -18,6 +19,38 @@ const clashEngine_1 = require("./engine/clashEngine");
 const sumoEngine_1 = require("./engine/sumoEngine");
 const rtsEngine_1 = require("./engine/rtsEngine");
 const mobaEngine_1 = require("./engine/mobaEngine");
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
+// Load .env locally if present
+try {
+    const candidates = [
+        path_1.default.resolve(__dirname, '../.env'),
+        path_1.default.resolve(__dirname, '../../.env'),
+        path_1.default.resolve(process.cwd(), '.env'),
+        path_1.default.resolve(process.cwd(), 'server/.env'),
+    ];
+    for (const envPath of candidates) {
+        if (fs_1.default.existsSync(envPath)) {
+            const content = fs_1.default.readFileSync(envPath, 'utf8');
+            content.split('\n').forEach(line => {
+                const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+                if (match) {
+                    const key = match[1];
+                    let value = (match[2] || '').trim();
+                    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+                        value = value.slice(1, -1);
+                    }
+                    if (!process.env[key]) {
+                        process.env[key] = value;
+                    }
+                }
+            });
+        }
+    }
+}
+catch (e) {
+    // ignore
+}
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
@@ -75,8 +108,23 @@ io.on('connection', (socket) => {
             }
         }
         else if (type === 'chaos') {
-            socket.emit('error', 'Le jeu Chaos Board est temporairement fermé.');
-            return;
+            if (!chaosGames[formattedRoomCode] || chaosGames[formattedRoomCode].getState().status === 'FINISHED' || chaosGames[formattedRoomCode].getPlayers().length === 0) {
+                chaosGames[formattedRoomCode] = new chaosEngine_1.ChaosEngine(formattedRoomCode);
+            }
+            const game = chaosGames[formattedRoomCode];
+            const color = PLAYER_COLORS[game.getPlayers().length] || '#F59E0B';
+            const success = game.addPlayer(socket.id, username, color);
+            if (success) {
+                socket.join(formattedRoomCode);
+                socket.roomCode = formattedRoomCode;
+                socket.username = username;
+                socket.emit('chaosStateUpdate', game.getState());
+                io.to(formattedRoomCode).emit('chaosStateUpdate', game.getState());
+                console.log(`[CHAOS LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+            }
+            else {
+                socket.emit('error', 'Impossible de rejoindre le salon Chaos (partie commencée ou salon plein).');
+            }
         }
         else if (type === 'loveletter') {
             if (!loveLetterGames[formattedRoomCode] || loveLetterGames[formattedRoomCode].getState().status === 'FINISHED' || loveLetterGames[formattedRoomCode].getPlayers().length === 0) {
@@ -509,6 +557,16 @@ io.on('connection', (socket) => {
         if (game.playAction(socket.id, actionType, params)) {
             io.to(roomCode).emit('chaosStateUpdate', game.getState());
         }
+    });
+    socket.on('chaos:draftRule', async ({ ruleText }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !chaosGames[roomCode])
+            return;
+        const game = chaosGames[roomCode];
+        game.getState().isAiGenerating = true;
+        io.to(roomCode).emit('chaosStateUpdate', game.getState());
+        await game.submitNewRule(socket.id, ruleText);
+        io.to(roomCode).emit('chaosStateUpdate', game.getState());
     });
     socket.on('chaos:modifyCell', ({ cellIndex, newType }) => {
         const roomCode = socket.roomCode;
