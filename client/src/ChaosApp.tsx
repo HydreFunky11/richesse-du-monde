@@ -246,8 +246,8 @@ export default function ChaosApp() {
                     {p.username} {p.id === socket?.id && <span className="text-amber-400 text-[10px]">(Vous)</span>}
                   </div>
                   <div className="text-[10px] text-slate-500 flex items-center gap-2">
-                    <span>❤️ 100 PV</span>
-                    <span>⚔️ 25 ATK</span>
+                    <span>❤️ {p.hp} PV</span>
+                    <span>⚔️ {p.atk} ATK</span>
                   </div>
                 </div>
               </div>
@@ -256,10 +256,10 @@ export default function ChaosApp() {
 
           <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/80 mb-6 text-xs text-slate-400 space-y-1.5">
             <div className="font-bold text-slate-300">Règles du Chaos Tactique :</div>
-            <div>• Plateau initial de <strong>6 cases (3 x 2)</strong>. Cliquez pour vous déplacer.</div>
+            <div>• Stats de départ : <strong>3 PV</strong> et <strong>1 ATK</strong>. Perdre un combat fait perdre <strong>1 PV</strong>.</div>
+            <div>• Plateau initial de <strong>6 cases (3 x 2)</strong> neutres. Cliquez pour vous déplacer.</div>
             <div>• Rejoindre une case avec un joueur déclenche un <strong>duel PvP immédiat</strong> !</div>
-            <div>• Des <strong>monstres</strong> peuvent occuper les cases. Tuez-les pour des bonus permanents.</div>
-            <div>• Le premier joueur éliminé devient le <strong>Législateur</strong> et réécrit n'importe quel élément avec l'IA !</div>
+            <div>• Le joueur éliminé à 0 PV dicte un décret absolu avec l'IA et tout le monde ressuscite !</div>
           </div>
 
           <button

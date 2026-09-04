@@ -125,9 +125,9 @@ export class ChaosEngine {
       username,
       color,
       cellId: spawnCellId,
-      hp: 100,
-      maxHp: 100,
-      atk: 25,
+      hp: 3,
+      maxHp: 3,
+      atk: 1,
       customStats: {},
       isEliminated: false,
       kills: 0,
@@ -164,9 +164,9 @@ export class ChaosEngine {
     for (let i = 0; i < this.state.players.length; i++) {
       const p = this.state.players[i];
       p.cellId = this.state.cells[i % this.state.cells.length].id;
-      p.hp = 100;
-      p.maxHp = 100;
-      p.atk = 25;
+      p.hp = 3;
+      p.maxHp = 3;
+      p.atk = 1;
       p.isEliminated = false;
     }
 
@@ -229,23 +229,18 @@ export class ChaosEngine {
     // 4. PVE COMBAT (Monsters on cell)
     if (targetCell.enemies && targetCell.enemies.length > 0) {
       const enemy = targetCell.enemies[0];
-      this.state.log.push(`⚔️ [PVE] ${activePlayer.username} affronte [${enemy.name} ${enemy.icon}] !`);
+      this.state.log.push(`⚔️ [PVE] ${activePlayer.username} (${activePlayer.atk} ATK) affronte [${enemy.name} ${enemy.icon}] (${enemy.atk} ATK) !`);
 
-      // Player attacks monster
-      enemy.hp -= activePlayer.atk;
-      this.state.log.push(`🗡️ ${activePlayer.username} inflige ${activePlayer.atk} dégâts à [${enemy.name}] (reste ${Math.max(0, enemy.hp)} PV).`);
-
-      if (enemy.hp <= 0) {
-        // Monster defeated
+      if (activePlayer.atk >= enemy.atk) {
+        // Player wins combat: defeats monster and gains +1 ATK
         targetCell.enemies.shift();
-        activePlayer.atk += 5;
-        activePlayer.hp = Math.min(activePlayer.maxHp, activePlayer.hp + 20);
-        this.state.log.push(`🏆 [${enemy.name}] est VAINCU ! ${activePlayer.username} gagne +5 ATK permanente et +20 PV !`);
+        activePlayer.atk += 1;
+        this.state.log.push(`🏆 ${activePlayer.username} remporte le combat et terrasse [${enemy.name}] ! (+1 ATK, passe à ${activePlayer.atk} ATK).`);
         this.evaluateRules('ON_KILL', { killer: activePlayer, victimName: enemy.name });
       } else {
-        // Monster retaliates
-        activePlayer.hp -= enemy.atk;
-        this.state.log.push(`👹 [${enemy.name}] contre-attaque et inflige ${enemy.atk} dégâts à ${activePlayer.username} !`);
+        // Player loses combat: loses 1 HP
+        activePlayer.hp -= 1;
+        this.state.log.push(`💥 [${enemy.name}] remporte le combat ! ${activePlayer.username} perd 1 PV (${Math.max(0, activePlayer.hp)}/${activePlayer.maxHp} PV restants).`);
         if (activePlayer.hp <= 0) {
           this.handlePlayerDeath(activePlayer, `Terrassé par [${enemy.name}]`);
           return true;
@@ -260,52 +255,41 @@ export class ChaosEngine {
 
     if (opponents.length > 0) {
       const defender = opponents[0];
-      this.state.log.push(`⚔️ [DUEL PVP] ${activePlayer.username} attaque ${defender.username} sur [${targetCell.name}] !`);
-
-      // Attacker strikes defender
-      defender.hp -= activePlayer.atk;
-      this.state.log.push(`💥 ${activePlayer.username} inflige ${activePlayer.atk} dégâts à ${defender.username} (${Math.max(0, defender.hp)} PV restants) !`);
+      this.state.log.push(`⚔️ [DUEL PVP] ${activePlayer.username} (${activePlayer.atk} ATK) affronte ${defender.username} (${defender.atk} ATK) !`);
 
       this.evaluateRules('ON_PVP', { attacker: activePlayer, defender });
 
-      if (defender.hp <= 0) {
-        activePlayer.kills++;
-        this.state.log.push(`💀 [PVP] ${defender.username} a succombé sous les coups de ${activePlayer.username} !`);
-        this.state.lastCombatEvent = {
-          id: `combat_${Date.now()}`,
-          timestamp: new Date().toLocaleTimeString('fr-FR'),
-          attackerName: activePlayer.username,
-          targetName: defender.username,
-          damageDealt: activePlayer.atk,
-          targetDied: true,
-          attackerDied: false,
-          isPvP: true,
-          message: `${activePlayer.username} a massacré ${defender.username} en duel !`
-        };
-        this.handlePlayerDeath(defender, `Exécuté par ${activePlayer.username}`);
-        return true;
-      } else {
-        // Defender retaliates!
-        activePlayer.hp -= defender.atk;
-        this.state.log.push(`🛡️ ${defender.username} riposte immédiatement et inflige ${defender.atk} dégâts à ${activePlayer.username} !`);
+      // Higher ATK wins. Attacker wins ties (initiative of movement)
+      const attackerWins = activePlayer.atk >= defender.atk;
+      const winner = attackerWins ? activePlayer : defender;
+      const loser = attackerWins ? defender : activePlayer;
 
-        if (activePlayer.hp <= 0) {
-          defender.kills++;
-          this.state.log.push(`💀 [PVP] ${activePlayer.username} a été abattu par la riposte de ${defender.username} !`);
-          this.state.lastCombatEvent = {
-            id: `combat_${Date.now()}`,
-            timestamp: new Date().toLocaleTimeString('fr-FR'),
-            attackerName: defender.username,
-            targetName: activePlayer.username,
-            damageDealt: defender.atk,
-            targetDied: true,
-            attackerDied: false,
-            isPvP: true,
-            message: `${defender.username} a riposté et tué ${activePlayer.username} !`
-          };
-          this.handlePlayerDeath(activePlayer, `Mort sur la riposte de ${defender.username}`);
-          return true;
-        }
+      // Losing a combat makes you lose 1 HP
+      loser.hp -= 1;
+
+      this.state.log.push(
+        attackerWins
+          ? `🏆 ${activePlayer.username} remporte le duel ! ${defender.username} perd 1 PV (${Math.max(0, defender.hp)}/${defender.maxHp} PV).`
+          : `🛡️ ${defender.username} remporte le duel en défense ! ${activePlayer.username} perd 1 PV (${Math.max(0, activePlayer.hp)}/${activePlayer.maxHp} PV).`
+      );
+
+      this.state.lastCombatEvent = {
+        id: `combat_${Date.now()}`,
+        timestamp: new Date().toLocaleTimeString('fr-FR'),
+        attackerName: activePlayer.username,
+        targetName: defender.username,
+        damageDealt: 1,
+        targetDied: defender.hp <= 0,
+        attackerDied: activePlayer.hp <= 0,
+        isPvP: true,
+        message: `${winner.username} a vaincu ${loser.username} (-1 PV) !`
+      };
+
+      if (loser.hp <= 0) {
+        winner.kills++;
+        this.state.log.push(`💀 [MORT] ${loser.username} est tombé à 0 PV !`);
+        this.handlePlayerDeath(loser, `Éliminé en duel par ${winner.username}`);
+        return true;
       }
     }
 
@@ -599,9 +583,9 @@ export class ChaosEngine {
     for (let i = 0; i < this.state.players.length; i++) {
       const p = this.state.players[i];
       p.cellId = this.state.cells[i % this.state.cells.length].id;
-      p.hp = 100;
-      p.maxHp = 100;
-      p.atk = 25;
+      p.hp = 3;
+      p.maxHp = 3;
+      p.atk = 1;
       p.customStats = {};
       p.isEliminated = false;
       p.kills = 0;
