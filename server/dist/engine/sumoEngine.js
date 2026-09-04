@@ -8,7 +8,8 @@ class SumoEngine {
     state;
     tickInterval = null;
     pushTimestamps = {};
-    nextEventTime = 4;
+    nextKeySwitchTimer = 5 + Math.random() * 10;
+    nextSpecialEventTimer = 8;
     stateChangeCallback = null;
     constructor(roomCode, targetScore = 3) {
         this.state = {
@@ -111,7 +112,8 @@ class SumoEngine {
         this.state.eventState = 'NORMAL';
         this.state.eventTimer = 0;
         this.state.lastEventNotice = 'HAKKEYOI ! POUSSEZ !';
-        this.nextEventTime = 3 + Math.random() * 4;
+        this.nextKeySwitchTimer = 5 + Math.random() * 10; // Between 5s and 15s
+        this.nextSpecialEventTimer = 7 + Math.random() * 8;
         this.state.players.forEach(p => {
             p.isStunned = false;
             p.stunTimer = 0;
@@ -120,16 +122,17 @@ class SumoEngine {
         this.notify();
     }
     pickNewKeys() {
-        const keys = ['A', 'Z', 'E', 'R', 'F', 'C', 'ESPACE', 'K', 'L', 'O', 'P'];
         const p1 = this.state.players[0];
         const p2 = this.state.players[1];
         if (p1) {
-            const candidates = ['A', 'Z', 'E', 'Q', 'S', 'D', 'ESPACE'];
-            p1.currentKey = candidates[Math.floor(Math.random() * candidates.length)];
+            const candidatesLeft = ['A', 'Z', 'E', 'Q', 'S', 'D', 'W', 'ESPACE'];
+            const filtered = candidatesLeft.filter(k => k !== p1.currentKey);
+            p1.currentKey = filtered[Math.floor(Math.random() * filtered.length)];
         }
         if (p2) {
-            const candidates = ['I', 'O', 'P', 'K', 'L', 'M', 'ESPACE'];
-            p2.currentKey = candidates[Math.floor(Math.random() * candidates.length)];
+            const candidatesRight = ['I', 'O', 'P', 'J', 'K', 'L', 'Flèche Haut', 'ESPACE'];
+            const filtered = candidatesRight.filter(k => k !== p2.currentKey);
+            p2.currentKey = filtered[Math.floor(Math.random() * filtered.length)];
         }
     }
     handlePush(socketId, pressedKey) {
@@ -274,40 +277,40 @@ class SumoEngine {
                 if (Math.abs(diff) > 2) {
                     this.state.position -= Math.sign(diff) * 0.15 * dt * 10;
                 }
-                // Event timers
+                // Active event countdown
                 if (this.state.eventTimer > 0) {
                     this.state.eventTimer -= dt;
                     if (this.state.eventTimer <= 0) {
                         this.state.eventState = 'NORMAL';
                         this.state.eventTimer = 0;
                         this.state.lastEventNotice = null;
-                        this.nextEventTime = 4 + Math.random() * 4;
                     }
                 }
-                else {
-                    // Trigger next special event
-                    this.nextEventTime -= dt;
-                    if (this.nextEventTime <= 0) {
-                        const roll = Math.random();
-                        if (roll < 0.45) {
-                            // SWITCH KEYS
-                            this.pickNewKeys();
-                            this.state.eventState = 'SWITCH_WARNING';
-                            this.state.eventTimer = 1.0;
-                            this.state.lastEventNotice = '⚠️ SWITCH ! NOUVELLE TOUCHE !';
-                        }
-                        else if (roll < 0.75) {
-                            // FEINT (DO NOT PUSH)
+                // 1. DEDICATED KEY SWITCH TIMER (Every 5s to 15s)
+                this.nextKeySwitchTimer -= dt;
+                if (this.nextKeySwitchTimer <= 0) {
+                    this.pickNewKeys();
+                    this.state.eventState = 'SWITCH_WARNING';
+                    this.state.eventTimer = 1.0;
+                    this.state.lastEventNotice = '⚠️ SWITCH ! NOUVELLE TOUCHE !';
+                    this.nextKeySwitchTimer = 5 + Math.random() * 10; // Exactly 5s to 15s
+                }
+                // 2. DEDICATED SPECIAL EVENT TIMER (Feinte ou Turbo)
+                if (this.state.eventTimer <= 0) {
+                    this.nextSpecialEventTimer -= dt;
+                    if (this.nextSpecialEventTimer <= 0) {
+                        const isFeint = Math.random() < 0.6;
+                        if (isFeint) {
                             this.state.eventState = 'FEINT';
                             this.state.eventTimer = 1.3;
                             this.state.lastEventNotice = '🚫 FEINTE ! NE TOUCHEZ À RIEN !';
                         }
                         else {
-                            // TURBO TSUPPARI
                             this.state.eventState = 'TURBO';
-                            this.state.eventTimer = 2.5;
+                            this.state.eventTimer = 2.2;
                             this.state.lastEventNotice = '⚡ RAFALE TSUPPARI X3 ! SPAMMEZ !';
                         }
+                        this.nextSpecialEventTimer = 8 + Math.random() * 8;
                     }
                 }
                 this.notify();

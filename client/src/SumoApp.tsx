@@ -247,19 +247,27 @@ export default function SumoApp() {
   // ─── LOCAL & AI GAME ENGINE LOOP ───────────────────────────────────────────
 
   const pickLocalKeys = useCallback(() => {
-    const leftKeys = ['A', 'Z', 'E', 'Q', 'S', 'D', 'W'];
-    const rightKeys = ['I', 'O', 'P', 'J', 'K', 'L', 'Flèche Haut'];
+    const leftKeys = ['A', 'Z', 'E', 'Q', 'S', 'D', 'W', 'ESPACE'];
+    const rightKeys = ['I', 'O', 'P', 'J', 'K', 'L', 'Flèche Haut', 'ESPACE'];
 
-    const k1 = leftKeys[Math.floor(Math.random() * leftKeys.length)];
-    const k2 = rightKeys[Math.floor(Math.random() * rightKeys.length)];
+    setGameState(prev => {
+      const p1Current = prev.players[0]?.currentKey;
+      const p2Current = prev.players[1]?.currentKey;
 
-    setGameState(prev => ({
-      ...prev,
-      players: [
-        { ...prev.players[0], currentKey: k1 },
-        { ...prev.players[1], currentKey: k2 }
-      ]
-    }));
+      const filteredLeft = leftKeys.filter(k => k !== p1Current);
+      const filteredRight = rightKeys.filter(k => k !== p2Current);
+
+      const k1 = filteredLeft[Math.floor(Math.random() * filteredLeft.length)];
+      const k2 = filteredRight[Math.floor(Math.random() * filteredRight.length)];
+
+      return {
+        ...prev,
+        players: [
+          { ...prev.players[0], currentKey: k1 },
+          { ...prev.players[1], currentKey: k2 }
+        ]
+      };
+    });
     sumoAudio.playGong();
   }, []);
 
@@ -349,7 +357,8 @@ export default function SumoApp() {
   useEffect(() => {
     if (gameMode === 'ONLINE') return;
 
-    let nextEventTimeout = 4 + Math.random() * 4;
+    let nextKeySwitchTimer = 5 + Math.random() * 10; // Exactly 5s to 15s
+    let nextSpecialEventTimer = 7 + Math.random() * 8;
 
     const loop = setInterval(() => {
       const dt = 0.05;
@@ -381,6 +390,8 @@ export default function SumoApp() {
           const newCd = prev.countdown - dt;
           if (newCd <= 0) {
             startLocalRound();
+            nextKeySwitchTimer = 5 + Math.random() * 10;
+            nextSpecialEventTimer = 7 + Math.random() * 8;
           }
           return { ...prev, countdown: newCd, players: updatedPlayers };
         }
@@ -405,7 +416,7 @@ export default function SumoApp() {
             pos -= Math.sign(diff) * 0.15 * dt * 8;
           }
 
-          // Events logic
+          // Active event countdown
           let evState = prev.eventState;
           let evTimer = prev.eventTimer;
           let notice = prev.lastEventNotice;
@@ -416,31 +427,36 @@ export default function SumoApp() {
               evState = 'NORMAL';
               evTimer = 0;
               notice = null;
-              nextEventTimeout = 4 + Math.random() * 4;
             }
-          } else {
-            nextEventTimeout -= dt;
-            if (nextEventTimeout <= 0) {
-              const roll = Math.random();
-              if (roll < 0.45) {
-                // Switch Keys
-                pickLocalKeys();
-                evState = 'SWITCH_WARNING';
-                evTimer = 1.0;
-                notice = '⚠️ SWITCH ! NOUVELLE TOUCHE !';
-              } else if (roll < 0.75) {
-                // Feinte
+          }
+
+          // 1. DEDICATED KEY SWITCH TIMER (Every 5s to 15s)
+          nextKeySwitchTimer -= dt;
+          if (nextKeySwitchTimer <= 0) {
+            pickLocalKeys();
+            evState = 'SWITCH_WARNING';
+            evTimer = 1.0;
+            notice = '⚠️ SWITCH ! NOUVELLE TOUCHE !';
+            nextKeySwitchTimer = 5 + Math.random() * 10; // Reset between 5s and 15s
+          }
+
+          // 2. SPECIAL EVENT TIMER (Feinte ou Turbo)
+          if (evTimer <= 0) {
+            nextSpecialEventTimer -= dt;
+            if (nextSpecialEventTimer <= 0) {
+              const isFeint = Math.random() < 0.6;
+              if (isFeint) {
                 sumoAudio.playSlip();
                 evState = 'FEINT';
                 evTimer = 1.3;
                 notice = '🚫 FEINTE DU GYŌJI ! NE TOUCHEZ À RIEN !';
               } else {
-                // Turbo
                 soundFx.attack();
                 evState = 'TURBO';
-                evTimer = 2.5;
+                evTimer = 2.2;
                 notice = '⚡ RAFALE TSUPPARI X3 ! SPAMMEZ !';
               }
+              nextSpecialEventTimer = 8 + Math.random() * 8;
             }
           }
 
