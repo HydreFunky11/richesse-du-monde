@@ -17,6 +17,7 @@ const dungeonMayhemEngine_1 = require("./engine/dungeonMayhemEngine");
 const clashEngine_1 = require("./engine/clashEngine");
 const sumoEngine_1 = require("./engine/sumoEngine");
 const rtsEngine_1 = require("./engine/rtsEngine");
+const mobaEngine_1 = require("./engine/mobaEngine");
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
@@ -39,6 +40,7 @@ const mayhemGames = {};
 const clashGames = {};
 const sumoGames = {};
 const rtsGames = {};
+const mobaGames = {};
 const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
 app.get('/health', (req, res) => {
     res.send({ status: 'ok', activeGames: Object.keys(games).length });
@@ -47,7 +49,7 @@ io.on('connection', (socket) => {
     console.log(`Un joueur s'est connecté : ${socket.id}`);
     socket.on('joinGame', ({ username, roomCode, gameType }) => {
         const formattedRoomCode = roomCode.toUpperCase().trim();
-        const validTypes = ['uno', 'chaos', 'loveletter', 'discretos', 'skyjo', 'kingoftokyo', 'mayhem', 'clash', 'sumo', 'rts'];
+        const validTypes = ['uno', 'chaos', 'loveletter', 'discretos', 'skyjo', 'kingoftokyo', 'mayhem', 'clash', 'sumo', 'rts', 'moba'];
         let type = 'richesse';
         if (gameType === 'dungeonmayhem')
             type = 'mayhem';
@@ -206,6 +208,22 @@ io.on('connection', (socket) => {
             else {
                 socket.emit('error', 'Impossible de rejoindre le salon Clash (partie commencée ou salon plein).');
             }
+        }
+        else if (type === 'moba') {
+            if (!mobaGames[formattedRoomCode] || mobaGames[formattedRoomCode].getState().players.length === 0) {
+                mobaGames[formattedRoomCode] = new mobaEngine_1.MobaEngine(formattedRoomCode);
+                mobaGames[formattedRoomCode].setOnUpdate((state) => {
+                    io.to(formattedRoomCode).emit('mobaStateUpdate', state);
+                });
+            }
+            const game = mobaGames[formattedRoomCode];
+            game.addPlayer(socket.id, username);
+            socket.join(formattedRoomCode);
+            socket.roomCode = formattedRoomCode;
+            socket.username = username;
+            socket.emit('mobaStateUpdate', game.getState());
+            io.to(formattedRoomCode).emit('mobaStateUpdate', game.getState());
+            console.log(`[MOBA LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
         }
         else if (type === 'rts') {
             if (!rtsGames[formattedRoomCode] || rtsGames[formattedRoomCode].getState().status === 'FINISHED' || rtsGames[formattedRoomCode].getPlayers().length === 0) {
@@ -941,6 +959,99 @@ io.on('connection', (socket) => {
         game.resetGame();
         io.to(roomCode).emit('rtsStateUpdate', game.getState());
     });
+    // ─── MOBA Handlers ───────────────────────────────────────────────────────
+    socket.on('moba:selectChampion', ({ championId }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !mobaGames[roomCode])
+            return;
+        const game = mobaGames[roomCode];
+        game.selectChampion(socket.id, championId);
+        io.to(roomCode).emit('mobaStateUpdate', game.getState());
+    });
+    socket.on('moba:switchTeam', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !mobaGames[roomCode])
+            return;
+        const game = mobaGames[roomCode];
+        game.switchTeam(socket.id);
+        io.to(roomCode).emit('mobaStateUpdate', game.getState());
+    });
+    socket.on('moba:addBot', ({ team, championId } = {}) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !mobaGames[roomCode])
+            return;
+        const game = mobaGames[roomCode];
+        game.addBot(team, championId);
+        io.to(roomCode).emit('mobaStateUpdate', game.getState());
+    });
+    socket.on('moba:startGame', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !mobaGames[roomCode])
+            return;
+        const game = mobaGames[roomCode];
+        game.startGame();
+        io.to(roomCode).emit('mobaStateUpdate', game.getState());
+    });
+    socket.on('moba:move', ({ targetX, targetY }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !mobaGames[roomCode])
+            return;
+        mobaGames[roomCode].handleMove(socket.id, targetX, targetY);
+    });
+    socket.on('moba:inputVelocity', ({ vx, vy }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !mobaGames[roomCode])
+            return;
+        mobaGames[roomCode].handleInputVelocity(socket.id, vx, vy);
+    });
+    socket.on('moba:attack', ({ targetId }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !mobaGames[roomCode])
+            return;
+        mobaGames[roomCode].handleAttack(socket.id, targetId);
+    });
+    socket.on('moba:castSpell', ({ spellKey, mouseX, mouseY, targetId }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !mobaGames[roomCode])
+            return;
+        mobaGames[roomCode].handleCastSpell(socket.id, spellKey, mouseX, mouseY, targetId);
+    });
+    socket.on('moba:summonerSpell', ({ key, mouseX, mouseY }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !mobaGames[roomCode])
+            return;
+        mobaGames[roomCode].handleSummonerSpell(socket.id, key, mouseX, mouseY);
+    });
+    socket.on('moba:recall', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !mobaGames[roomCode])
+            return;
+        mobaGames[roomCode].handleRecall(socket.id);
+    });
+    socket.on('moba:upgradeSpell', ({ spellKey }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !mobaGames[roomCode])
+            return;
+        const game = mobaGames[roomCode];
+        game.handleUpgradeSpell(socket.id, spellKey);
+        io.to(roomCode).emit('mobaStateUpdate', game.getState());
+    });
+    socket.on('moba:buyItem', ({ itemId }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !mobaGames[roomCode])
+            return;
+        const game = mobaGames[roomCode];
+        game.handleBuyItem(socket.id, itemId);
+        io.to(roomCode).emit('mobaStateUpdate', game.getState());
+    });
+    socket.on('moba:resetGame', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !mobaGames[roomCode])
+            return;
+        const game = mobaGames[roomCode];
+        game.resetGame();
+        io.to(roomCode).emit('mobaStateUpdate', game.getState());
+    });
     // ─── Disconnect ────────────────────────────────────────────────────────────
     socket.on('disconnect', () => {
         const roomCode = socket.roomCode;
@@ -1009,6 +1120,16 @@ io.on('connection', (socket) => {
             if (game.getPlayers().length === 0) {
                 game.stopLoop();
                 delete clashGames[roomCode];
+            }
+        }
+        else if (gameType === 'moba' && roomCode && mobaGames[roomCode]) {
+            const game = mobaGames[roomCode];
+            game.removePlayer(socket.id);
+            io.to(roomCode).emit('mobaStateUpdate', game.getState());
+            console.log(`[MOBA] Déconnexion de ${username} du salon ${roomCode}`);
+            if (game.getState().players.filter(p => !p.isBot).length === 0) {
+                game.stop();
+                delete mobaGames[roomCode];
             }
         }
         else if (gameType === 'rts' && roomCode && rtsGames[roomCode]) {

@@ -12,6 +12,7 @@ import ClashApp from './ClashApp';
 import AlchemyApp from './AlchemyApp';
 import SumoApp from './SumoApp';
 import RtsApp from './RtsApp';
+import MobaApp from './MobaApp';
 
 export default function Router() {
   return (
@@ -32,6 +33,8 @@ export default function Router() {
       <Route path="/sumo" element={<SumoApp />} />
       <Route path="/rts" element={<RtsApp />} />
       <Route path="/nexus" element={<RtsApp />} />
+      <Route path="/moba" element={<MobaApp />} />
+      <Route path="/nexusclash" element={<MobaApp />} />
     </Routes>
   );
 }

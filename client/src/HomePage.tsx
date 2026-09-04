@@ -20,6 +20,20 @@ interface GameTheme {
 
 const GAMES: GameTheme[] = [
   {
+    emoji: '⚔️',
+    title: 'Nexus Clash : MOBA Arena',
+    subtitle: 'Arène Action & Contrôles LoL / ZQSD',
+    description: 'MOBA dynamique en temps réel ! 10 Champions avec Passifs uniques + sorts A/Z/E/R, contrôles LoL au clic droit OU déplacement ZQSD au clavier, vagues de sbires, tourelles, jungle & buffs Baron/Dragon.',
+    route: '/moba',
+    fontClass: 'font-display font-black tracking-wide',
+    cardTheme: 'bg-gradient-to-b from-amber-950/80 via-slate-950 to-orange-950/40',
+    borderTheme: 'border-amber-500/50 hover:border-amber-300 hover:shadow-amber-900/60',
+    titleGradient: 'from-amber-300 via-orange-300 to-red-400',
+    badge: 'NOUVEAU • MOBA EN LIGNE 🏆',
+    badgeStyle: 'bg-gradient-to-r from-amber-950 to-orange-900 text-amber-300 border-amber-500/50 animate-pulse',
+    players: '1v1, Multi-joueurs ou avec Bots IA 🤖',
+  },
+  {
     emoji: '🤖',
     title: 'Cyber-Grid : Nexus Wars',
     subtitle: 'RTS Futuriste & Guerre Énergétique',
