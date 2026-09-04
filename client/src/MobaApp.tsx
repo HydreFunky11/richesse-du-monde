@@ -30,8 +30,11 @@ export default function MobaApp() {
   const [selectedChampion, setSelectedChampion] = useState<ChampionId>('ignis');
   const [controlScheme, setControlScheme] = useState<ControlScheme>('LOL_AZERTY');
   const [isShopOpen, setIsShopOpen] = useState(false);
+  const [shopTab, setShopTab] = useState<'buy' | 'sell'>('buy');
   const [isScoreboardOpen, setIsScoreboardOpen] = useState(false);
   const [aimingSpell, setAimingSpell] = useState<SpellKey | null>(null);
+  const [hoveredSpell, setHoveredSpell] = useState<SpellKey | null>(null);
+  const [hoveredPassive, setHoveredPassive] = useState(false);
 
   // Canvas & Interaction
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -44,7 +47,7 @@ export default function MobaApp() {
   const me = gameState?.players.find(p => p.id === socket?.id);
 
   // ─── AUDIO SYNTHESIS ──────────────────────────────────────────────────────
-  const playSfx = useCallback((type: 'hit' | 'kill' | 'levelup' | 'flash' | 'buy') => {
+  const playSfx = useCallback((type: 'hit' | 'kill' | 'levelup' | 'flash' | 'buy' | 'sell') => {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtx) return;
@@ -90,6 +93,14 @@ export default function MobaApp() {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(523, ctx.currentTime);
         osc.frequency.setValueAtTime(659, ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.2);
+      } else if (type === 'sell') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(659, ctx.currentTime);
+        osc.frequency.setValueAtTime(523, ctx.currentTime + 0.08);
         gain.gain.setValueAtTime(0.2, ctx.currentTime);
         gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.2);
         osc.start();
@@ -332,7 +343,8 @@ export default function MobaApp() {
       const target = findEntityAtPos(wx, wy);
 
       if (target && target.team !== me?.team) {
-        socket.emit('moba:attack', { targetId: target.id });
+        const targetId = target.id || (target.team === 'blue' ? 'nexus_blue' : 'nexus_red');
+        socket.emit('moba:attack', { targetId });
         clickFxListRef.current.push({
           x: target.x,
           y: target.y,
@@ -364,23 +376,28 @@ export default function MobaApp() {
     }
   };
 
+  // Improved entity detection for auto-attacks
   const findEntityAtPos = (wx: number, wy: number): any => {
     if (!gameState) return null;
-    // Enemy champions
+    // 1. Enemy champions (priority)
     for (const p of gameState.players) {
       if (p.isAlive && Math.hypot(p.x - wx, p.y - wy) <= p.radius + 15) return p;
     }
-    // Enemy minions
+    // 2. Enemy minions
     for (const m of gameState.minions) {
-      if (Math.hypot(m.x - wx, m.y - wy) <= m.radius + 12) return m;
+      if (m.hp > 0 && Math.hypot(m.x - wx, m.y - wy) <= m.radius + 18) return m;
     }
-    // Turrets
+    // 3. Enemy turrets
     for (const t of gameState.turrets) {
-      if (t.hp > 0 && Math.hypot(t.x - wx, t.y - wy) <= t.radius + 10) return t;
+      if (t.hp > 0 && Math.hypot(t.x - wx, t.y - wy) <= t.radius + 20) return t;
     }
-    // Monsters
+    // 4. Enemy nexus
+    for (const n of gameState.nexuses) {
+      if (n.hp > 0 && Math.hypot(n.x - wx, n.y - wy) <= n.radius + 25) return n;
+    }
+    // 5. Jungle monsters & bosses
     for (const mon of gameState.jungleMonsters) {
-      if (mon.isAlive && Math.hypot(mon.x - wx, mon.y - wy) <= mon.radius + 15) return mon;
+      if (mon.isAlive && Math.hypot(mon.x - wx, mon.y - wy) <= mon.radius + 18) return mon;
     }
     return null;
   };
@@ -421,6 +438,11 @@ export default function MobaApp() {
   const handleBuyItem = (itemId: string) => {
     socket?.emit('moba:buyItem', { itemId });
     playSfx('buy');
+  };
+
+  const handleSellItem = (itemIndex: number) => {
+    socket?.emit('moba:sellItem', { itemIndex });
+    playSfx('sell');
   };
 
   const handleResetGame = () => {
@@ -794,7 +816,7 @@ export default function MobaApp() {
         <div className="flex items-center gap-3 pointer-events-auto">
           <button
             onClick={() => navigate('/')}
-            className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800"
+            className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 shadow-md"
           >
             ← Quitter
           </button>
@@ -802,7 +824,7 @@ export default function MobaApp() {
           <select
             value={controlScheme}
             onChange={e => setControlScheme(e.target.value as ControlScheme)}
-            className="text-xs bg-slate-900/90 border border-slate-700 text-amber-400 font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none"
+            className="text-xs bg-slate-900/90 border border-slate-700 text-amber-400 font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none shadow-md"
           >
             <option value="LOL_AZERTY">🎮 LoL AZERTY (Clic droit + A/Z/E/R)</option>
             <option value="LOL_QWERTY">🎮 LoL QWERTY (Clic droit + Q/W/E/R)</option>
@@ -824,8 +846,8 @@ export default function MobaApp() {
           </div>
         </div>
 
-        {/* Right: Player KDA & CS */}
-        <div className="flex items-center gap-4 bg-slate-900/90 border border-slate-800 px-4 py-1.5 rounded-2xl pointer-events-auto">
+        {/* Right: Player KDA, CS & Gold */}
+        <div className="flex items-center gap-4 bg-slate-900/90 border border-slate-800 px-4 py-1.5 rounded-2xl shadow-xl pointer-events-auto">
           <div className="text-xs text-slate-300">
             <span className="text-emerald-400 font-bold">{me?.kills || 0}</span> /{' '}
             <span className="text-rose-400 font-bold">{me?.deaths || 0}</span> /{' '}
@@ -858,14 +880,141 @@ export default function MobaApp() {
         ))}
       </div>
 
-      {/* 4. Bottom Center LoL Action Bar */}
+      {/* 4. Rich In-Game Spell / Passive Tooltip (Hover) */}
+      {hoveredSpell && me && (
+        <div className="absolute bottom-28 left-1/2 -translate-x-1/2 w-80 bg-slate-900/95 border-2 border-amber-500/80 rounded-2xl p-4 shadow-2xl backdrop-blur-md pointer-events-none z-50 text-xs animate-fade-in">
+          {(() => {
+            const sp = curChampDef.spells[hoveredSpell];
+            const lvl = me.spellsLevel[hoveredSpell];
+            const cd = sp.cooldown / 20;
+            const keyLabel = getKeyLabel(hoveredSpell);
+
+            return (
+              <>
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{sp.icon}</span>
+                    <div>
+                      <div className="font-bold text-white text-sm flex items-center gap-1.5">
+                        {sp.name}
+                        <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/30">
+                          [{keyLabel}]
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {sp.targetType === 'skillshot'
+                          ? 'Tir de compétence'
+                          : sp.targetType === 'area'
+                          ? 'Zone d\'effet (AoE)'
+                          : sp.targetType === 'dash'
+                          ? 'Ruée rapide'
+                          : sp.targetType === 'self'
+                          ? 'Effet personnel'
+                          : 'Ciblage direct'}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-bold text-amber-400">
+                    {lvl > 0 ? `Rang ${lvl}` : 'Non appris'}
+                  </span>
+                </div>
+
+                <p className="text-slate-300 leading-relaxed mb-3">
+                  {sp.description}
+                </p>
+
+                <div className="grid grid-cols-2 gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-[11px]">
+                  <div className="text-blue-400 font-semibold flex items-center gap-1">
+                    <span>💧 Coût :</span>
+                    <span>{sp.manaCost} Mana</span>
+                  </div>
+                  <div className="text-amber-400 font-semibold flex items-center gap-1">
+                    <span>⏱️ Rechargement :</span>
+                    <span>{cd.toFixed(1)}s</span>
+                  </div>
+                  <div className="text-purple-400 font-semibold flex items-center gap-1">
+                    <span>💥 Dégâts de base :</span>
+                    <span>{sp.damage || 0}</span>
+                  </div>
+                  <div className="text-emerald-400 font-semibold flex items-center gap-1">
+                    <span>🎯 Portée :</span>
+                    <span>{sp.range} px</span>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Passive Tooltip (Hover) */}
+      {hoveredPassive && me && (
+        <div className="absolute bottom-28 left-1/2 -translate-x-1/2 w-80 bg-slate-900/95 border-2 border-amber-500/80 rounded-2xl p-4 shadow-2xl backdrop-blur-md pointer-events-none z-50 text-xs animate-fade-in">
+          <div className="flex items-center gap-2 pb-2 border-b border-slate-800 mb-2">
+            <span className="text-2xl">{curChampDef.passive.icon}</span>
+            <div>
+              <div className="font-bold text-white text-sm">Passif : {curChampDef.passive.name}</div>
+              <div className="text-[10px] text-amber-400 font-semibold">{curChampDef.name} ({curChampDef.role})</div>
+            </div>
+          </div>
+          <p className="text-slate-300 leading-relaxed">
+            {curChampDef.passive.description}
+          </p>
+        </div>
+      )}
+
+      {/* 5. Bottom Center LoL Action Bar with Stats Panel */}
       {me && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-end gap-3 pointer-events-auto">
-          {/* Champion Avatar & Stats */}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-end gap-2.5 pointer-events-auto">
+          {/* Character Stats HUD Panel (AD, AP, AR, MR, AS, MS, Range) */}
+          <div className="bg-slate-900/95 border-2 border-slate-800 rounded-2xl p-2.5 grid grid-cols-2 gap-x-3 gap-y-1 shadow-2xl backdrop-blur-md text-[11px]">
+            {/* AD */}
+            <div className="flex items-center gap-1.5 text-amber-400 font-bold" title="Dégâts d'Attaque (AD)">
+              <span>🗡️</span>
+              <span className="text-slate-400 text-[10px] font-normal">AD:</span>
+              <span>{me.attackDamage}</span>
+            </div>
+            {/* AP */}
+            <div className="flex items-center gap-1.5 text-purple-400 font-bold" title="Puissance Magique (AP)">
+              <span>🧙</span>
+              <span className="text-slate-400 text-[10px] font-normal">AP:</span>
+              <span>{me.abilityPower}</span>
+            </div>
+            {/* Armor */}
+            <div className="flex items-center gap-1.5 text-yellow-500 font-bold" title="Armure Physique (AR)">
+              <span>🛡️</span>
+              <span className="text-slate-400 text-[10px] font-normal">AR:</span>
+              <span>{me.armor}</span>
+            </div>
+            {/* MR */}
+            <div className="flex items-center gap-1.5 text-cyan-400 font-bold" title="Résistance Magique (RM)">
+              <span>🔮</span>
+              <span className="text-slate-400 text-[10px] font-normal">RM:</span>
+              <span>{me.magicResist}</span>
+            </div>
+            {/* Attack Speed */}
+            <div className="flex items-center gap-1.5 text-orange-400 font-bold" title="Vitesse d'Attaque (AS)">
+              <span>⚡</span>
+              <span className="text-slate-400 text-[10px] font-normal">AS:</span>
+              <span>{me.attackSpeed.toFixed(2)}</span>
+            </div>
+            {/* Move Speed */}
+            <div className="flex items-center gap-1.5 text-emerald-400 font-bold" title="Vitesse de Déplacement (MS)">
+              <span>👟</span>
+              <span className="text-slate-400 text-[10px] font-normal">MS:</span>
+              <span>{(me.moveSpeed * 100).toFixed(0)}</span>
+            </div>
+          </div>
+
+          {/* Champion Avatar & HP/Mana Bars */}
           <div className="bg-slate-900/95 border-2 border-slate-800 rounded-2xl p-2.5 flex items-center gap-3 shadow-2xl backdrop-blur-md">
-            <div className="relative">
+            <div
+              className="relative cursor-pointer"
+              onMouseEnter={() => setHoveredPassive(true)}
+              onMouseLeave={() => setHoveredPassive(false)}
+            >
               <div
-                className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl shadow-md border-2 border-amber-500"
+                className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl shadow-md border-2 border-amber-500 hover:scale-105 transition"
                 style={{ backgroundColor: curChampDef.color }}
               >
                 {curChampDef.passive.icon}
@@ -880,7 +1029,7 @@ export default function MobaApp() {
               {/* HP Bar */}
               <div>
                 <div className="flex justify-between text-[10px] font-bold text-emerald-400 mb-0.5">
-                  <span>PV</span>
+                  <span>PV {me.shield > 0 && <span className="text-cyan-300">(+{me.shield})</span>}</span>
                   <span>{me.hp} / {me.maxHp}</span>
                 </div>
                 <div className="w-full h-3 bg-slate-950 rounded-md overflow-hidden border border-slate-700">
@@ -906,7 +1055,7 @@ export default function MobaApp() {
             </div>
           </div>
 
-          {/* Spell Slots (Q, W, E, R) */}
+          {/* Spell Slots (Q, W, E, R) with Hover Tooltip Trigger */}
           <div className="bg-slate-900/95 border-2 border-slate-800 rounded-2xl p-2.5 flex items-center gap-2 shadow-2xl backdrop-blur-md">
             {(['q', 'w', 'e', 'r'] as SpellKey[]).map(key => {
               const spell = curChampDef.spells[key];
@@ -922,6 +1071,7 @@ export default function MobaApp() {
                     <button
                       onClick={() => handleUpgradeSpell(key)}
                       className="w-7 h-5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black rounded-md flex items-center justify-center animate-bounce shadow-md"
+                      title={`Améliorer ${spell.name}`}
                     >
                       +
                     </button>
@@ -940,6 +1090,8 @@ export default function MobaApp() {
 
                   {/* Spell Button */}
                   <button
+                    onMouseEnter={() => setHoveredSpell(key)}
+                    onMouseLeave={() => setHoveredSpell(null)}
                     onClick={() => {
                       if (level > 0 && cd <= 0) {
                         setAimingSpell(prev => (prev === key ? null : key));
@@ -950,7 +1102,7 @@ export default function MobaApp() {
                         ? 'border-amber-400 bg-amber-500/20 ring-2 ring-amber-400'
                         : cd > 0 || level === 0
                         ? 'border-slate-800 bg-slate-950/80 opacity-60'
-                        : 'border-slate-700 bg-slate-900 hover:border-slate-500'
+                        : 'border-slate-700 bg-slate-900 hover:border-slate-500 hover:bg-slate-800/80'
                     }`}
                   >
                     <span className="text-xl">{spell.icon}</span>
@@ -973,7 +1125,7 @@ export default function MobaApp() {
           {/* Summoners & Recall & Shop */}
           <div className="bg-slate-900/95 border-2 border-slate-800 rounded-2xl p-2.5 flex items-center gap-2 shadow-2xl backdrop-blur-md">
             {/* Flash (D) */}
-            <div className="relative w-12 h-12 rounded-xl border-2 border-slate-700 bg-slate-900 flex flex-col items-center justify-center">
+            <div className="relative w-12 h-12 rounded-xl border-2 border-slate-700 bg-slate-900 flex flex-col items-center justify-center" title="Saut Éclair (Flash) [D]">
               <span className="text-lg">⚡</span>
               <span className="absolute bottom-0.5 right-1 text-[9px] font-black text-amber-400">D</span>
               {me.summonerSpells.d.cooldown > 0 && (
@@ -984,7 +1136,7 @@ export default function MobaApp() {
             </div>
 
             {/* Heal (F) */}
-            <div className="relative w-12 h-12 rounded-xl border-2 border-slate-700 bg-slate-900 flex flex-col items-center justify-center">
+            <div className="relative w-12 h-12 rounded-xl border-2 border-slate-700 bg-slate-900 flex flex-col items-center justify-center" title="Soins & Vitesse (Heal) [F]">
               <span className="text-lg">💚</span>
               <span className="absolute bottom-0.5 right-1 text-[9px] font-black text-amber-400">F</span>
               {me.summonerSpells.f.cooldown > 0 && (
@@ -1002,6 +1154,7 @@ export default function MobaApp() {
                   ? 'border-blue-400 bg-blue-500/20 animate-pulse'
                   : 'border-slate-700 bg-slate-900 hover:border-slate-500'
               }`}
+              title="Rappel à la base (Recall) [B]"
             >
               <span className="text-lg">🌀</span>
               <span className="absolute bottom-0.5 right-1 text-[9px] font-black text-amber-400">B</span>
@@ -1010,14 +1163,15 @@ export default function MobaApp() {
             {/* Shop Toggle Button */}
             <button
               onClick={() => setIsShopOpen(prev => !prev)}
-              className="w-12 h-12 rounded-xl border-2 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-bold flex flex-col items-center justify-center transition"
+              className="w-12 h-12 rounded-xl border-2 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-bold flex flex-col items-center justify-center transition shadow-md"
+              title="Ouvrir la Boutique / Vendre [P]"
             >
               <span className="text-lg">🛍️</span>
               <span className="text-[9px] font-black">P</span>
             </button>
           </div>
 
-          {/* Item Inventory (6 slots) */}
+          {/* Item Inventory (6 slots) with click to open shop */}
           <div className="bg-slate-900/95 border-2 border-slate-800 rounded-2xl p-2.5 grid grid-cols-3 gap-1.5 shadow-2xl backdrop-blur-md">
             {Array.from({ length: 6 }).map((_, idx) => {
               const itemId = me.items[idx];
@@ -1026,8 +1180,17 @@ export default function MobaApp() {
               return (
                 <div
                   key={idx}
-                  className="w-9 h-9 rounded-lg border border-slate-800 bg-slate-950 flex items-center justify-center text-sm shadow-inner"
-                  title={item ? `${item.name} (${item.description})` : 'Emplacement vide'}
+                  onClick={() => {
+                    if (itemId) {
+                      setShopTab('sell');
+                      setIsShopOpen(true);
+                    } else {
+                      setShopTab('buy');
+                      setIsShopOpen(true);
+                    }
+                  }}
+                  className="w-9 h-9 rounded-lg border border-slate-800 bg-slate-950 hover:border-slate-600 cursor-pointer flex items-center justify-center text-sm shadow-inner transition"
+                  title={item ? `${item.name} (${item.description}) - Cliquez pour gérer` : 'Emplacement vide (Boutique)'}
                 >
                   {item ? item.icon : ''}
                 </div>
@@ -1037,7 +1200,7 @@ export default function MobaApp() {
         </div>
       )}
 
-      {/* 5. Radar Minimap (Bottom Right) */}
+      {/* 6. Radar Minimap (Bottom Right) */}
       <div className="absolute bottom-4 right-4 w-52 h-32 bg-slate-900/90 border-2 border-slate-700 rounded-xl overflow-hidden shadow-2xl pointer-events-auto">
         <div className="relative w-full h-full bg-slate-950">
           {/* Lane indicator */}
@@ -1105,10 +1268,11 @@ export default function MobaApp() {
         </div>
       </div>
 
-      {/* 6. Item Shop Modal */}
+      {/* 7. Item Shop Modal (With 70% Resale Tab!) */}
       {isShopOpen && (
         <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-6 z-50">
           <div className="max-w-2xl w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+            {/* Shop Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
               <div className="flex items-center gap-3">
                 <span className="text-2xl">🛍️</span>
@@ -1125,45 +1289,117 @@ export default function MobaApp() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto">
-              {Object.values(MOBA_ITEMS).map(item => {
-                const canAfford = (me?.gold || 0) >= item.cost;
-                const isFull = (me?.items.length || 0) >= 6;
-
-                return (
-                  <div
-                    key={item.id}
-                    className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="text-3xl">{item.icon}</div>
-                      <div>
-                        <div className="font-bold text-sm text-white">{item.name}</div>
-                        <div className="text-xs text-slate-400">{item.description}</div>
-                        <div className="text-xs font-bold text-amber-400 mt-1">🪙 {item.cost} Or</div>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => handleBuyItem(item.id)}
-                      disabled={!canAfford || isFull}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                        canAfford && !isFull
-                          ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md'
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                      }`}
-                    >
-                      Acheter
-                    </button>
-                  </div>
-                );
-              })}
+            {/* Shop Tabs: Acheter vs Vendre */}
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setShopTab('buy')}
+                className={`flex-1 py-2 px-4 rounded-xl font-bold text-xs transition ${
+                  shopTab === 'buy'
+                    ? 'bg-amber-500 text-slate-950 shadow-md'
+                    : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                }`}
+              >
+                🛒 Catalogue des Objets
+              </button>
+              <button
+                onClick={() => setShopTab('sell')}
+                className={`flex-1 py-2 px-4 rounded-xl font-bold text-xs transition ${
+                  shopTab === 'sell'
+                    ? 'bg-amber-500 text-slate-950 shadow-md'
+                    : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                }`}
+              >
+                💰 Vendre mes Objets (70% du prix) ({me?.items.length || 0}/6)
+              </button>
             </div>
+
+            {/* Tab 1: Buy Catalog */}
+            {shopTab === 'buy' && (
+              <div className="grid grid-cols-2 gap-3 max-h-[55vh] overflow-y-auto">
+                {Object.values(MOBA_ITEMS).map(item => {
+                  const canAfford = (me?.gold || 0) >= item.cost;
+                  const isFull = (me?.items.length || 0) >= 6;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="text-3xl">{item.icon}</div>
+                        <div>
+                          <div className="font-bold text-sm text-white">{item.name}</div>
+                          <div className="text-xs text-slate-400">{item.description}</div>
+                          <div className="text-xs font-bold text-amber-400 mt-1">🪙 {item.cost} Or</div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleBuyItem(item.id)}
+                        disabled={!canAfford || isFull}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                          canAfford && !isFull
+                            ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md'
+                            : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                        }`}
+                      >
+                        Acheter
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Tab 2: Sell Owned Items */}
+            {shopTab === 'sell' && (
+              <div className="max-h-[55vh] overflow-y-auto">
+                {(!me?.items || me.items.length === 0) ? (
+                  <div className="p-8 text-center text-slate-500 text-sm">
+                    Votre inventaire est vide. Aucun objet à revendre pour l'instant !
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {me.items.map((itemId, idx) => {
+                      const item = MOBA_ITEMS[itemId];
+                      if (!item) return null;
+                      const resaleValue = Math.floor(item.cost * 0.7);
+
+                      return (
+                        <div
+                          key={idx}
+                          className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="text-3xl">{item.icon}</div>
+                            <div>
+                              <div className="font-bold text-sm text-white">{item.name}</div>
+                              <div className="text-xs text-slate-400">{item.description}</div>
+                              <div className="text-xs text-slate-500 mt-1">
+                                Acheté : <span className="line-through">{item.cost}g</span> → Prix de vente :{' '}
+                                <span className="font-bold text-emerald-400">+{resaleValue} Or (70%)</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => handleSellItem(idx)}
+                            className="px-4 py-2 rounded-lg text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500 hover:text-slate-950 transition shadow-md"
+                          >
+                            Vendre (+{resaleValue}g)
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* 7. Tab Scoreboard Overlay */}
+      {/* 8. Tab Scoreboard Overlay */}
       {isScoreboardOpen && (
         <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-8 z-40 pointer-events-none">
           <div className="max-w-3xl w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
@@ -1228,7 +1464,7 @@ export default function MobaApp() {
         </div>
       )}
 
-      {/* 8. Victory / Defeat Modal */}
+      {/* 9. Victory / Defeat Modal */}
       {gameState.status === 'FINISHED' && (
         <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-6 z-50">
           <div className="max-w-md w-full bg-slate-900 border-2 border-slate-800 rounded-3xl p-8 text-center shadow-2xl">

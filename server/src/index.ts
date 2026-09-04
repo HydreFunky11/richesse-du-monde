@@ -1061,6 +1061,14 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('mobaStateUpdate', game.getState());
   });
 
+  socket.on('moba:sellItem', ({ itemIndex }: { itemIndex: number }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !mobaGames[roomCode]) return;
+    const game = mobaGames[roomCode];
+    game.handleSellItem(socket.id, itemIndex);
+    io.to(roomCode).emit('mobaStateUpdate', game.getState());
+  });
+
   socket.on('moba:resetGame', () => {
     const roomCode = (socket as any).roomCode;
     if (!roomCode || !mobaGames[roomCode]) return;

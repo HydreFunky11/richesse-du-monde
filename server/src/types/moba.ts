@@ -124,6 +124,7 @@ export interface MobaPlayer {
   vy: number;
   angle: number;
   radius: number;
+  currentTargetId?: string | null;
 
   // State flags
   isInBush: boolean;
@@ -202,6 +203,7 @@ export interface MobaTurret {
 }
 
 export interface MobaNexus {
+  id: string;
   team: MobaTeam;
   x: number;
   y: number;

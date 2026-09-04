@@ -74,8 +74,8 @@ export class MobaEngine {
 
     // Nexuses
     this.state.nexuses = [
-      { team: "blue", x: 180, y: LANE_Y, hp: 5000, maxHp: 5000, radius: 65 },
-      { team: "red", x: 2220, y: LANE_Y, hp: 5000, maxHp: 5000, radius: 65 }
+      { id: "nexus_blue", team: "blue", x: 180, y: LANE_Y, hp: 5000, maxHp: 5000, radius: 65 },
+      { id: "nexus_red", team: "red", x: 2220, y: LANE_Y, hp: 5000, maxHp: 5000, radius: 65 }
     ];
 
     // Turrets: 2 per team along mid lane
@@ -517,6 +517,7 @@ export class MobaEngine {
     p.targetY = Math.max(20, Math.min(MAP_HEIGHT - 20, targetY));
     p.vx = 0;
     p.vy = 0;
+    p.currentTargetId = null;
     p.isRecalling = false;
   }
 
@@ -528,6 +529,7 @@ export class MobaEngine {
     if (vx !== 0 || vy !== 0) {
       p.targetX = null;
       p.targetY = null;
+      p.currentTargetId = null;
       p.isRecalling = false;
     }
   }
@@ -539,20 +541,25 @@ export class MobaEngine {
 
     // Find target
     const target = this.findTarget(targetId);
-    if (!target || !target.isAlive) return;
+    if (!target) return;
+    const isAlive = target.isAlive !== undefined ? target.isAlive : target.hp > 0;
+    if (!isAlive) return;
+
+    p.currentTargetId = targetId;
 
     const dx = target.x - p.x;
     const dy = target.y - p.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     if (dist <= p.attackRange + target.radius) {
-      // Within attack range
+      p.targetX = null;
+      p.targetY = null;
+      p.angle = Math.atan2(dy, dx);
       if (p.attackCooldown <= 0) {
         this.performBasicAttack(p, target);
         p.attackCooldown = Math.round(TICK_RATE / Math.max(0.4, p.attackSpeed));
       }
     } else {
-      // Walk towards target
       p.targetX = target.x;
       p.targetY = target.y;
     }
@@ -668,6 +675,34 @@ export class MobaEngine {
     p.items.push(itemId);
     this.applyChampionStats(p, p.championId);
     this.addFloatingText(p.x, p.y - 25, `Acheté: ${item.name}`, "#10B981");
+  }
+
+  public handleSellItem(playerId: string, itemIndex: number) {
+    const p = this.state.players.find(pl => pl.id === playerId);
+    if (!p || !p.isAlive) return;
+
+    // Must be in base (within 380px of nexus)
+    const nexus = this.state.nexuses.find(n => n.team === p.team);
+    if (nexus) {
+      const dist = Math.hypot(p.x - nexus.x, p.y - nexus.y);
+      if (dist > 380) {
+        this.addFloatingText(p.x, p.y - 25, "Boutique accessible à la base !", "#EF4444");
+        return;
+      }
+    }
+
+    if (itemIndex < 0 || itemIndex >= p.items.length) return;
+
+    const itemId = p.items[itemIndex];
+    const item = MOBA_ITEMS[itemId];
+    if (!item) return;
+
+    const refund = Math.floor(item.cost * 0.7);
+    p.items.splice(itemIndex, 1);
+    p.gold += refund;
+    this.applyChampionStats(p, p.championId);
+    this.addFloatingText(p.x, p.y - 25, `Vendu: +${refund}g (70%) !`, "#FBBF24");
+    this.state.log.push(`${p.username} a vendu ${item.name} pour ${refund}g.`);
   }
 
   // --- Core Game Loop ---
@@ -860,6 +895,31 @@ export class MobaEngine {
           p.isRecalling = false;
           p.recallProgress = 0;
           this.addFloatingText(p.x, p.y - 20, "Retour à la base !", "#60A5FA");
+        }
+      }
+
+      // Continuous Target Auto-Attack Pursuit
+      if (p.currentTargetId && !p.isStunned && !p.isRecalling) {
+        const target = this.findTarget(p.currentTargetId);
+        const isAlive = target ? (target.isAlive !== undefined ? target.isAlive : target.hp > 0) : false;
+        if (!target || !isAlive) {
+          p.currentTargetId = null;
+        } else {
+          const dx = target.x - p.x;
+          const dy = target.y - p.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist <= p.attackRange + target.radius) {
+            p.targetX = null;
+            p.targetY = null;
+            p.angle = Math.atan2(dy, dx);
+            if (p.attackCooldown <= 0) {
+              this.performBasicAttack(p, target);
+              p.attackCooldown = Math.round(TICK_RATE / Math.max(0.4, p.attackSpeed));
+            }
+          } else if (p.vx === 0 && p.vy === 0) {
+            p.targetX = target.x;
+            p.targetY = target.y;
+          }
         }
       }
 
@@ -1284,11 +1344,13 @@ export class MobaEngine {
     // Trigger champion passives on attack
     this.handleAttackPassive(attacker, target);
 
+    const targetId = target.id || (target.team === "blue" ? "nexus_blue" : "nexus_red");
+
     if (isRanged) {
       this.createHomingProjectile(
         attacker.id,
         attacker.team,
-        target.id,
+        targetId,
         attacker.x,
         attacker.y,
         target.x,
@@ -1478,10 +1540,19 @@ export class MobaEngine {
 
     // If victim is a minion
     if (victim.type && (victim.type === "melee" || victim.type === "caster" || victim.type === "cannon")) {
+      // Passive XP for ALL alive enemy champions within 750px of minion death!
+      const nearbyEnemies = this.state.players.filter(
+        p => p.team !== victim.team && p.isAlive && Math.hypot(p.x - victim.x, p.y - victim.y) <= 750
+      );
+      for (const ep of nearbyEnemies) {
+        this.rewardXp(ep, victim.bountyXp);
+        this.addFloatingText(ep.x, ep.y - 25, `+${victim.bountyXp} XP`, "#60A5FA");
+      }
+
+      // Last-hit gold & CS for killer
       if (killerPlayer) {
         killerPlayer.cs++;
         killerPlayer.gold += victim.bountyGold;
-        this.rewardXp(killerPlayer, victim.bountyXp);
         this.addFloatingText(victim.x, victim.y - 15, `+${victim.bountyGold}g`, "#FBBF24");
       }
     }
@@ -1548,7 +1619,7 @@ export class MobaEngine {
       this.state.minions.find(m => m.id === id) ||
       this.state.turrets.find(t => t.id === id) ||
       this.state.jungleMonsters.find(j => j.id === id) ||
-      this.state.nexuses.find(n => (n.team === "blue" ? "nexus_blue" : "nexus_red") === id)
+      this.state.nexuses.find(n => n.id === id || (n.team === "blue" ? "nexus_blue" : "nexus_red") === id)
     );
   }
 
