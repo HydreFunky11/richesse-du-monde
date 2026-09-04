@@ -2,32 +2,77 @@ import {
   ChaosGameState,
   ChaosPlayer,
   ChaosCell,
-  ChaosCellType,
-  ChaosRule
+  ChaosRule,
+  ChaosEnemy,
+  ChaosStatDef,
+  ChaosCombatEvent,
+  ChaosRuleEffect
 } from '../types/chaos';
-import { interpretChaosRule, getCellDefaultMeta } from './chaosAi';
+import { interpretChaosRule } from './chaosAi';
 
-const INITIAL_BOARD: Omit<ChaosCell, 'index'>[] = [
-  { type: 'DEPART', name: 'Départ', icon: '🏁', description: '+300 Or et +20 PV en passant' },
-  { type: 'NORMAL', name: 'Chemin Paisible', icon: '🌲', description: 'Une case calme... pour l\'instant.' },
-  { type: 'GAMBLE', name: 'Casino Maudit', icon: '🎰', description: 'Pariez votre or au jeu du hasard !' },
-  { type: 'CHEST', name: 'Coffre Mystère', icon: '📦', description: 'Trésor, or ou relique inconnue.' },
-  { type: 'DEBT', name: 'Banque Toxique', icon: '🏦', description: 'Empruntez 400g, mais payez des intérêts mortels.' },
-  { type: 'NORMAL', name: 'Plaine Nue', icon: '🌾', description: 'Rien à signaler... méfiez-vous.' },
-  { type: 'FIGHT', name: 'Antre du Monstre', icon: '⚔️', description: 'Combattez une bête pour du butin !' },
-  { type: 'LAVA', name: 'Fosse de Lave', icon: '🔥', description: 'Chaleur insoutenable : -25 PV !' },
-  { type: 'PORTAL', name: 'Vortex Dimensionnel', icon: '🌀', description: 'Téléportation aléatoire sur le plateau.' },
-  { type: 'NORMAL', name: 'Sentier Oublié', icon: '🍂', description: 'Un vent mystique souffle ici.' },
-  { type: 'BUFF', name: 'Autel de Force', icon: '💪', description: '+5 Force permanente pour vos combats.' },
-  { type: 'GAMBLE', name: 'Taverne des Joueurs', icon: '🎲', description: 'Double ou rien sur un coup de dé !' },
-  { type: 'NORMAL', name: 'Clairière Sombre', icon: '🌑', description: 'Les ombres vous observent.' },
-  { type: 'FIGHT', name: 'Colosse Gardien', icon: '👾', description: 'Un monstre redoutable garde ce passage.' },
-  { type: 'CURSE', name: 'Cercle Maudit', icon: '💀', description: 'Malédiction : perte de force et d\'or.' },
-  { type: 'CHEST', name: 'Urne Sacrée', icon: '🏺', description: 'Un cadeau des anciens dieux du chaos.' },
-  { type: 'LAVA', name: 'Lac de Magma', icon: '🌋', description: 'Danger mortel : -30 PV brûlants !' },
-  { type: 'NORMAL', name: 'Passage Étroit', icon: '🧱', description: 'Respirez un grand coup.' },
-  { type: 'DEBT', name: 'Usurier de l\'Ombre', icon: '💸', description: 'Vos dettes augmentent de 15% ici.' },
-  { type: 'CHAOS', name: 'Roue du Chaos', icon: '🔮', description: 'Effet totalement imprévisible !' }
+const INITIAL_CELLS: ChaosCell[] = [
+  {
+    id: 'cell_0_0',
+    x: 0,
+    y: 0,
+    name: 'Clairière Sacrée',
+    icon: '🌲',
+    description: 'Une zone paisible... pour le moment.',
+    colorTheme: 'from-emerald-950/80 to-teal-900/60 border-emerald-500/60 text-emerald-300',
+    enemies: []
+  },
+  {
+    id: 'cell_1_0',
+    x: 1,
+    y: 0,
+    name: 'Autel de Sang',
+    icon: '🩸',
+    description: 'La fureur du combat imprègne ce lieu (+5 ATK temporaire).',
+    colorTheme: 'from-rose-950/80 to-red-950/60 border-rose-500/60 text-rose-300',
+    enemies: []
+  },
+  {
+    id: 'cell_2_0',
+    x: 2,
+    y: 0,
+    name: 'Fosse aux Vipères',
+    icon: '🐍',
+    description: 'Le sol grouille de venin : -10 PV au passage !',
+    colorTheme: 'from-purple-950/80 to-indigo-900/60 border-purple-500/60 text-purple-300',
+    effect: { type: 'DAMAGE', value: 10, description: '-10 PV' },
+    enemies: []
+  },
+  {
+    id: 'cell_0_1',
+    x: 0,
+    y: 1,
+    name: 'Sanctuaire de Vie',
+    icon: '⛩️',
+    description: 'Des sources curatives régénérantes (+20 PV).',
+    colorTheme: 'from-blue-950/80 to-cyan-900/60 border-blue-500/60 text-blue-300',
+    effect: { type: 'HEAL', value: 20, description: '+20 PV' },
+    enemies: []
+  },
+  {
+    id: 'cell_1_1',
+    x: 1,
+    y: 1,
+    name: 'Arène de Duel',
+    icon: '⚔️',
+    description: 'Le sol idéal pour régler ses comptes en duel à mort.',
+    colorTheme: 'from-amber-950/80 to-orange-950/60 border-amber-500/60 text-amber-300',
+    enemies: []
+  },
+  {
+    id: 'cell_2_1',
+    x: 2,
+    y: 1,
+    name: 'Vortex des Ombres',
+    icon: '🌀',
+    description: 'Des créatures impies traversent le voile arcanique.',
+    colorTheme: 'from-violet-950 to-pink-900/80 border-pink-500/70 text-pink-200',
+    enemies: []
+  }
 ];
 
 export class ChaosEngine {
@@ -43,16 +88,17 @@ export class ChaosEngine {
       maxRounds: 5,
       players: [],
       currentPlayerIndex: 0,
-      board: INITIAL_BOARD.map((c, idx) => ({ ...c, index: idx })),
-      lastDiceRoll: null,
+      cells: JSON.parse(JSON.stringify(INITIAL_CELLS)),
+      definedStats: [],
       activeRules: [],
       draftingPlayerId: null,
       draftingPlayerName: null,
       draftingReason: null,
       isAiGenerating: false,
       lastAnnouncement: null,
+      lastCombatEvent: null,
       winner: null,
-      log: ['Arène du Chaos prête. Rejoignez le salon et préparez-vous au pire !'],
+      log: ['Arène du Chaos 3x2 initialisée. Choisissez votre case et tuez pour survivre !'],
       aiLogs: []
     };
   }
@@ -72,31 +118,37 @@ export class ChaosEngine {
     const exists = this.state.players.find(p => p.id === id);
     if (exists) return true;
 
+    // Distribute spawn cell
+    const spawnIndex = this.state.players.length % this.state.cells.length;
+    const spawnCellId = this.state.cells[spawnIndex]?.id || 'cell_0_0';
+
     this.state.players.push({
       id,
       username,
       color,
-      position: 0,
-      health: 100,
-      maxHealth: 100,
-      gold: 500,
-      power: 10,
-      debt: 0,
+      cellId: spawnCellId,
+      hp: 100,
+      maxHp: 100,
+      atk: 25,
+      customStats: {},
       isEliminated: false,
-      roundsWon: 0,
-      lapsCompleted: 0
+      kills: 0,
+      roundsWon: 0
     });
 
-    this.state.log.push(`${username} a rejoint le Conseil du Chaos.`);
+    this.state.log.push(`${username} a rejoint l'Arène du Chaos.`);
     return true;
   }
 
-  public removePlayer(id: string) {
+  public removePlayer(id: string): void {
     const idx = this.state.players.findIndex(p => p.id === id);
     if (idx !== -1) {
       const p = this.state.players[idx];
-      this.state.log.push(`${p.username} a fui le Chaos.`);
       this.state.players.splice(idx, 1);
+      this.state.log.push(`${p.username} a quitté la partie.`);
+      if (this.state.currentPlayerIndex >= this.state.players.length) {
+        this.state.currentPlayerIndex = 0;
+      }
     }
   }
 
@@ -109,228 +161,183 @@ export class ChaosEngine {
     this.state.activeRules = [];
     this.state.winner = null;
     this.state.currentPlayerIndex = 0;
-    this.state.log.push('🏁 La Manche 1 commence ! Aucune règle chaotique pour l\'instant... profitez-en.');
+
+    // Reset positions and stats
+    for (let i = 0; i < this.state.players.length; i++) {
+      const p = this.state.players[i];
+      p.cellId = this.state.cells[i % this.state.cells.length].id;
+      p.hp = 100;
+      p.maxHp = 100;
+      p.atk = 25;
+      p.isEliminated = false;
+    }
+
+    this.state.log.push('🏁 La Manche 1 commence ! Cliquez sur une case adjacente pour vous déplacer.');
     return true;
   }
 
-  public rollDice(socketId: string): boolean {
+  // ─── TACTICAL MOVEMENT & COMBAT (CLICK TO MOVE) ───────────────────────────
+  public movePlayer(socketId: string, targetCellId: string): boolean {
     const activePlayer = this.state.players[this.state.currentPlayerIndex];
     if (
       !activePlayer ||
       activePlayer.id !== socketId ||
-      this.state.status !== 'PLAYING' ||
-      this.state.lastDiceRoll !== null
+      this.state.status !== 'PLAYING'
     ) {
       return false;
     }
 
-    // Roll 1 to 6
-    const roll = Math.floor(Math.random() * 6) + 1;
-    this.state.lastDiceRoll = roll;
+    const currentCell = this.state.cells.find(c => c.id === activePlayer.cellId);
+    const targetCell = this.state.cells.find(c => c.id === targetCellId);
 
-    this.state.log.push(`🎲 ${activePlayer.username} a lancé un ${roll} !`);
+    if (!targetCell) return false;
 
-    // 1. Evaluate ON_DICE_ROLL rules
-    this.evaluateRules('ON_DICE_ROLL', { roll, activePlayer });
+    // Check reachability: can move to adjacent cells (orthogonally or diagonally), or within speed
+    if (currentCell) {
+      const dx = Math.abs(targetCell.x - currentCell.x);
+      const dy = Math.abs(targetCell.y - currentCell.y);
+      const isSelf = targetCell.id === currentCell.id;
+      const speed = activePlayer.customStats['Vitesse'] || activePlayer.customStats['vitesse'] || 1;
+
+      if (isSelf || dx > speed || dy > speed) {
+        // Not reachable
+        return false;
+      }
+    }
+
+    // 1. Move player
+    activePlayer.cellId = targetCellId;
+    this.state.log.push(`🚶 ${activePlayer.username} se déplace vers [${targetCell.name} ${targetCell.icon}].`);
+
+    // 2. Evaluate ON_MOVE rules
+    this.evaluateRules('ON_MOVE', { activePlayer, targetCell });
     if ((this.state.status as string) === 'DRAFTING_RULE') return true;
 
-    // 2. Move player
-    const prevPos = activePlayer.position;
-    const newPos = (prevPos + roll) % this.state.board.length;
-    activePlayer.position = newPos;
-
-    // Check if passed or landed on DEPART
-    if (newPos < prevPos || newPos === 0) {
-      activePlayer.gold += 300;
-      activePlayer.health = Math.min(activePlayer.maxHealth, activePlayer.health + 20);
-      activePlayer.lapsCompleted++;
-      this.state.log.push(`🏁 ${activePlayer.username} passe par le DEPART (+300 Or, +20 PV).`);
-
-      this.evaluateRules('ON_PASS_DEPART', { activePlayer });
-      if ((this.state.status as string) === 'DRAFTING_RULE') return true;
+    // 3. Cell Effect
+    if (targetCell.effect) {
+      if (targetCell.effect.type === 'HEAL') {
+        activePlayer.hp = Math.min(activePlayer.maxHp, activePlayer.hp + targetCell.effect.value);
+        this.state.log.push(`💚 [Soin] ${activePlayer.username} récupère ${targetCell.effect.value} PV (${activePlayer.hp}/${activePlayer.maxHp}).`);
+      } else if (targetCell.effect.type === 'DAMAGE') {
+        activePlayer.hp -= targetCell.effect.value;
+        this.state.log.push(`💥 [Piège] ${activePlayer.username} subit ${targetCell.effect.value} dégâts de piège !`);
+        if (activePlayer.hp <= 0) {
+          this.handlePlayerDeath(activePlayer, `Tué par le piège de ${targetCell.name}`);
+          return true;
+        }
+      }
     }
 
-    // 3. Resolve cell landing
-    this.resolveCellLanding(activePlayer);
+    // 4. PVE COMBAT (Monsters on cell)
+    if (targetCell.enemies && targetCell.enemies.length > 0) {
+      const enemy = targetCell.enemies[0];
+      this.state.log.push(`⚔️ [PVE] ${activePlayer.username} affronte [${enemy.name} ${enemy.icon}] !`);
 
-    return true;
-  }
+      // Player attacks monster
+      enemy.hp -= activePlayer.atk;
+      this.state.log.push(`🗡️ ${activePlayer.username} inflige ${activePlayer.atk} dégâts à [${enemy.name}] (reste ${Math.max(0, enemy.hp)} PV).`);
 
-  private resolveCellLanding(player: ChaosPlayer) {
-    const cell = this.state.board[player.position];
-    this.state.log.push(`📍 ${player.username} atterrit sur [${cell.icon} ${cell.name}].`);
-
-    // Standard cell resolutions
-    switch (cell.type) {
-      case 'NORMAL':
-        break;
-      case 'LAVA':
-        player.health -= 25;
-        this.state.log.push(`🔥 Brûlure ! ${player.username} perd 25 PV dans la lave !`);
-        break;
-      case 'BUFF':
-        player.power += 5;
-        this.state.log.push(`💪 Bénédiction : ${player.username} gagne +5 Puissance !`);
-        break;
-      case 'CURSE':
-        player.power = Math.max(0, player.power - 5);
-        player.gold = Math.max(0, player.gold - 50);
-        this.state.log.push(`💀 Malédiction : ${player.username} perd 5 Puissance et 50 Or !`);
-        break;
-      case 'GOLD':
-        player.gold += 150;
-        this.state.log.push(`💰 Mine d'Or : ${player.username} récolte 150 pièces d'or !`);
-        break;
-      case 'CHEST':
-        const chestGold = Math.floor(Math.random() * 200) + 100;
-        player.gold += chestGold;
-        this.state.log.push(`📦 Coffre : ${player.username} trouve ${chestGold} pièces d'or !`);
-        break;
-      case 'PORTAL':
-        const targetCell = Math.floor(Math.random() * this.state.board.length);
-        player.position = targetCell;
-        this.state.log.push(`🌀 VORTEX : ${player.username} est téléporté sur la case #${targetCell} !`);
-        break;
-      case 'DEBT':
-        player.gold += 400;
-        player.debt += 500;
-        this.state.log.push(`🏦 Banque Toxique : ${player.username} emprunte 400 Or (Dette: ${player.debt}g).`);
-        break;
-      case 'CHAOS':
-        const chaosChoices = [
-          () => { player.health += 30; this.state.log.push(`🔮 Roue du Chaos : Soin mystique +30 PV !`); },
-          () => { player.gold += 400; this.state.log.push(`🔮 Roue du Chaos : Pluie d'or +400g !`); },
-          () => { player.health -= 20; this.state.log.push(`🔮 Roue du Chaos : Coup de foudre -20 PV !`); },
-          () => { player.power += 10; this.state.log.push(`🔮 Roue du Chaos : Puissance divine +10 Force !`); }
-        ];
-        chaosChoices[Math.floor(Math.random() * chaosChoices.length)]();
-        break;
-      default:
-        // GAMBLE and FIGHT require interactive actions
-        break;
-    }
-
-    // 4. Evaluate ON_LAND_CELL rules
-    this.evaluateRules('ON_LAND_CELL', { activePlayer: player, cell });
-
-    // Check elimination
-    this.checkElimination(player, `Atterrissage sur ${cell.name}`);
-  }
-
-  public playAction(socketId: string, actionType: 'GAMBLE' | 'FIGHT', params: any = {}): boolean {
-    const activePlayer = this.state.players[this.state.currentPlayerIndex];
-    if (!activePlayer || activePlayer.id !== socketId || this.state.status !== 'PLAYING') {
-      return false;
-    }
-
-    const cell = this.state.board[activePlayer.position];
-
-    if (actionType === 'GAMBLE') {
-      const bet = Math.max(50, Math.min(activePlayer.gold, Number(params.betAmount) || 100));
-      if (activePlayer.gold < bet) return false;
-
-      const win = Math.random() > 0.48;
-      if (win) {
-        activePlayer.gold += bet;
-        this.state.log.push(`🎰 JACKPOT ! ${activePlayer.username} mise ${bet}g et remporte le double (+${bet}g) !`);
+      if (enemy.hp <= 0) {
+        // Monster defeated
+        targetCell.enemies.shift();
+        activePlayer.atk += 5;
+        activePlayer.hp = Math.min(activePlayer.maxHp, activePlayer.hp + 20);
+        this.state.log.push(`🏆 [${enemy.name}] est VAINCU ! ${activePlayer.username} gagne +5 ATK permanente et +20 PV !`);
+        this.evaluateRules('ON_KILL', { killer: activePlayer, victimName: enemy.name });
       } else {
-        activePlayer.gold -= bet;
-        this.state.log.push(`🎰 RÂTÉ ! ${activePlayer.username} perd sa mise de ${bet}g.`);
+        // Monster retaliates
+        activePlayer.hp -= enemy.atk;
+        this.state.log.push(`👹 [${enemy.name}] contre-attaque et inflige ${enemy.atk} dégâts à ${activePlayer.username} !`);
+        if (activePlayer.hp <= 0) {
+          this.handlePlayerDeath(activePlayer, `Terrassé par [${enemy.name}]`);
+          return true;
+        }
       }
+    }
 
-      this.evaluateRules('ON_GAMBLE', { activePlayer, bet, win });
-    } else if (actionType === 'FIGHT') {
-      const monsterPower = Math.floor(Math.random() * 15) + 8; // 8 to 22
-      this.state.log.push(`⚔️ Duel : ${activePlayer.username} (Force ${activePlayer.power}) affronte une abomination (Force ${monsterPower}).`);
+    // 5. PVP COMBAT (Other players on cell)
+    const opponents = this.state.players.filter(
+      p => p.id !== activePlayer.id && p.cellId === targetCellId && !p.isEliminated
+    );
 
-      if (activePlayer.power >= monsterPower) {
-        const reward = 250 + (activePlayer.power - monsterPower) * 10;
-        activePlayer.gold += reward;
-        activePlayer.power += 2;
-        this.state.log.push(`🏆 VICTOIRE ! ${activePlayer.username} terrasse la bête et gagne ${reward}g et +2 Force !`);
+    if (opponents.length > 0) {
+      const defender = opponents[0];
+      this.state.log.push(`⚔️ [DUEL PVP] ${activePlayer.username} attaque ${defender.username} sur [${targetCell.name}] !`);
+
+      // Attacker strikes defender
+      defender.hp -= activePlayer.atk;
+      this.state.log.push(`💥 ${activePlayer.username} inflige ${activePlayer.atk} dégâts à ${defender.username} (${Math.max(0, defender.hp)} PV restants) !`);
+
+      this.evaluateRules('ON_PVP', { attacker: activePlayer, defender });
+
+      if (defender.hp <= 0) {
+        activePlayer.kills++;
+        this.state.log.push(`💀 [PVP] ${defender.username} a succombé sous les coups de ${activePlayer.username} !`);
+        this.state.lastCombatEvent = {
+          id: `combat_${Date.now()}`,
+          timestamp: new Date().toLocaleTimeString('fr-FR'),
+          attackerName: activePlayer.username,
+          targetName: defender.username,
+          damageDealt: activePlayer.atk,
+          targetDied: true,
+          attackerDied: false,
+          isPvP: true,
+          message: `${activePlayer.username} a massacré ${defender.username} en duel !`
+        };
+        this.handlePlayerDeath(defender, `Exécuté par ${activePlayer.username}`);
+        return true;
       } else {
-        const diff = monsterPower - activePlayer.power;
-        const dmg = diff * 4;
-        activePlayer.health -= dmg;
-        this.state.log.push(`💥 DÉFAITE ! Le monstre blesse lourdement ${activePlayer.username} (-${dmg} PV).`);
-      }
+        // Defender retaliates!
+        activePlayer.hp -= defender.atk;
+        this.state.log.push(`🛡️ ${defender.username} riposte immédiatement et inflige ${defender.atk} dégâts à ${activePlayer.username} !`);
 
-      this.evaluateRules('ON_FIGHT', { activePlayer, monsterPower });
-    }
-
-    this.checkElimination(activePlayer, actionType === 'FIGHT' ? 'Mort en combat' : 'Faillite au casino');
-    return true;
-  }
-
-  public passTurn(socketId: string): boolean {
-    const activePlayer = this.state.players[this.state.currentPlayerIndex];
-    if (
-      !activePlayer ||
-      activePlayer.id !== socketId ||
-      this.state.status !== 'PLAYING' ||
-      this.state.lastDiceRoll === null
-    ) {
-      return false;
-    }
-
-    // Apply debt interest at end of turn
-    if (activePlayer.debt > 0) {
-      const interest = Math.floor(activePlayer.debt * 0.12);
-      activePlayer.debt += interest;
-      this.state.log.push(`💸 Dette : ${activePlayer.username} accumule ${interest}g d'intérêts (Total: ${activePlayer.debt}g).`);
-      if (activePlayer.debt >= 2000) {
-        this.checkElimination(activePlayer, 'Endettement mortel (Dette > 2000g)');
-        if ((this.state.status as string) === 'DRAFTING_RULE') return true;
+        if (activePlayer.hp <= 0) {
+          defender.kills++;
+          this.state.log.push(`💀 [PVP] ${activePlayer.username} a été abattu par la riposte de ${defender.username} !`);
+          this.state.lastCombatEvent = {
+            id: `combat_${Date.now()}`,
+            timestamp: new Date().toLocaleTimeString('fr-FR'),
+            attackerName: defender.username,
+            targetName: activePlayer.username,
+            damageDealt: defender.atk,
+            targetDied: true,
+            attackerDied: false,
+            isPvP: true,
+            message: `${defender.username} a riposté et tué ${activePlayer.username} !`
+          };
+          this.handlePlayerDeath(activePlayer, `Mort sur la riposte de ${defender.username}`);
+          return true;
+        }
       }
     }
 
-    // Reset roll
-    this.state.lastDiceRoll = null;
-
-    // Advance turn
-    this.nextTurn();
+    // 6. Turn passes to next player
+    this.passTurnToNext();
     return true;
   }
 
-  public modifyCell(socketId: string, cellIndex: number, newType: ChaosCellType): boolean {
-    if (cellIndex >= 0 && cellIndex < this.state.board.length) {
-      this.state.board[cellIndex].type = newType;
-      return true;
-    }
-    return false;
-  }
-
-  private nextTurn() {
+  private passTurnToNext() {
+    if (this.state.status !== 'PLAYING') return;
     this.state.currentPlayerIndex = (this.state.currentPlayerIndex + 1) % this.state.players.length;
-    const activePlayer = this.state.players[this.state.currentPlayerIndex];
-
-    this.state.log.push(`👉 C'est au tour de ${activePlayer.username}.`);
-
-    // Evaluate ON_TURN_START
-    this.evaluateRules('ON_TURN_START', { activePlayer });
-  }
-
-  // ─── ELIMINATION & DEATH TRIGGER ──────────────────────────────────────────
-  private checkElimination(player: ChaosPlayer, reason: string) {
-    if (player.health <= 0 || player.debt >= 2000) {
-      player.isEliminated = true;
-      player.health = 0;
-
-      // TRIGGER THE CORE HOOK: STOP THE ROUND AND ENTER DRAFTING_RULE!
-      this.state.status = 'DRAFTING_RULE';
-      this.state.draftingPlayerId = player.id;
-      this.state.draftingPlayerName = player.username;
-      this.state.draftingReason = reason;
-
-      this.state.log.push(
-        `💀💀💀 ${player.username.toUpperCase()} A ÉTÉ ÉLIMINÉ (${reason}) ! LA MANCHE S'ARRÊTE ! 💀💀💀`
-      );
-      this.state.log.push(
-        `📜 ${player.username} devient le Législateur du Chaos et prépare une nouvelle règle pour la prochaine manche...`
-      );
+    const nextPlayer = this.state.players[this.state.currentPlayerIndex];
+    if (nextPlayer) {
+      this.state.log.push(`👉 Tour de ${nextPlayer.username} (PV: ${nextPlayer.hp}, ATK: ${nextPlayer.atk}).`);
+      this.evaluateRules('ON_TURN_START', { activePlayer: nextPlayer });
     }
   }
 
+  private handlePlayerDeath(victim: ChaosPlayer, reason: string) {
+    victim.isEliminated = true;
+    this.state.status = 'DRAFTING_RULE';
+    this.state.draftingPlayerId = victim.id;
+    this.state.draftingPlayerName = victim.username;
+    this.state.draftingReason = reason;
+
+    this.state.log.push(`⚖️ ARRÊT DE MANCHE ! ${victim.username} est tombé (${reason}).`);
+    this.state.log.push(`👑 ${victim.username} devient le Législateur du Chaos et prépare son décret divin...`);
+  }
+
+  // ─── DECREE / RULE CREATION (THE CORE ROGUELITE MECHANIC) ───────────────────
   public async submitNewRule(
     socketId: string,
     ruleText: string,
@@ -345,7 +352,7 @@ export class ChaosEngine {
     this.state.isAiGenerating = true;
 
     try {
-      // Ask OpenRouter AI to parse, flavour and structure the rule
+      // 1. Call AI to structure the rule and mutations
       const parsedRule = await interpretChaosRule(
         ruleText,
         author,
@@ -357,59 +364,17 @@ export class ChaosEngine {
         }
       );
 
-      // Append to active cumulative rules
+      // 2. Append to active cumulative rules
       this.state.activeRules.push(parsedRule);
 
-      // Apply any board modifications (Creating new cells or mutating existing ones)
-      if (parsedRule.boardModifications && parsedRule.boardModifications.length > 0) {
-        for (const mod of parsedRule.boardModifications) {
-          const meta = getCellDefaultMeta(mod.newType);
-          const cellName = mod.name || meta.name;
-          const cellIcon = mod.icon || meta.icon;
-          const cellDesc = mod.description || meta.description;
-
-          if (mod.action === 'ADD' || (mod.cellIndex === undefined && !mod.filter)) {
-            const newIndex = this.state.board.length;
-            this.state.board.push({
-              index: newIndex,
-              type: mod.newType,
-              name: cellName,
-              icon: cellIcon,
-              description: cellDesc
-            });
-            this.state.log.push(`🗺️ NOUVELLE CASE #${newIndex} CRÉÉE : [${cellName} ${cellIcon}] - ${cellDesc}`);
-          } else if (mod.cellIndex !== undefined && this.state.board[mod.cellIndex]) {
-            const c = this.state.board[mod.cellIndex];
-            c.type = mod.newType;
-            c.name = cellName;
-            c.icon = cellIcon;
-            c.description = cellDesc;
-            this.state.log.push(`🔄 CASE #${mod.cellIndex} MUTÉE : devient [${cellName} ${cellIcon}] !`);
-          } else if (mod.filter === 'even') {
-            this.state.board.forEach((c, idx) => {
-              if (idx > 0 && idx % 2 === 0) {
-                c.type = mod.newType;
-                c.name = cellName;
-                c.icon = cellIcon;
-                c.description = cellDesc;
-              }
-            });
-            this.state.log.push(`🔄 TOUTES LES CASES PAIRES MUTÉES en [${cellName} ${cellIcon}] !`);
-          } else if (mod.filter === 'odd') {
-            this.state.board.forEach((c, idx) => {
-              if (idx % 2 === 1) {
-                c.type = mod.newType;
-                c.name = cellName;
-                c.icon = cellIcon;
-                c.description = cellDesc;
-              }
-            });
-            this.state.log.push(`🔄 TOUTES LES CASES IMPAIRES MUTÉES en [${cellName} ${cellIcon}] !`);
-          }
+      // 3. Apply board mutations (ADD/REMOVE/MODIFY cells, SPAWN enemies, ADD stats)
+      if (parsedRule.boardMutations && parsedRule.boardMutations.length > 0) {
+        for (const mut of parsedRule.boardMutations) {
+          this.applyMutation(mut);
         }
       }
 
-      // Announce the new rule with a unique ID
+      // 4. Set announcement with unique ID
       this.state.lastAnnouncement = {
         id: parsedRule.id,
         title: parsedRule.title,
@@ -417,10 +382,10 @@ export class ChaosEngine {
         author
       };
 
-      this.state.log.push(`🔥 DÉCRET OFFICIEL #${this.state.activeRules.length} : [${parsedRule.title}]`);
+      this.state.log.push(`🔥 DÉCRET #${this.state.activeRules.length} PROCLAMÉ : [${parsedRule.title}]`);
       this.state.log.push(`📜 ${parsedRule.description}`);
 
-      // Start Next Round!
+      // 5. Start next round with resurrection!
       this.startNextRound();
       return true;
     } finally {
@@ -428,82 +393,181 @@ export class ChaosEngine {
     }
   }
 
+  private applyMutation(mut: any) {
+    switch (mut.action) {
+      case 'ADD_CELL': {
+        const maxX = this.state.cells.reduce((max, c) => Math.max(max, c.x), 0);
+        const maxY = this.state.cells.reduce((max, c) => Math.max(max, c.y), 0);
+        const newX = mut.cell?.x ?? (maxX >= 3 ? 0 : maxX + 1);
+        const newY = mut.cell?.y ?? (maxX >= 3 ? maxY + 1 : 0);
+        const newId = `cell_${newX}_${newY}_${Date.now() % 1000}`;
+
+        const newCell: ChaosCell = {
+          id: newId,
+          x: newX,
+          y: newY,
+          name: mut.cell?.name || 'Sanctuaire Maudit',
+          icon: mut.cell?.icon || '🏰',
+          description: mut.cell?.description || 'Une nouvelle zone façonnée par le décret.',
+          colorTheme: mut.cell?.colorTheme || 'from-purple-950/80 to-indigo-900/60 border-purple-500/60 text-purple-300',
+          enemies: []
+        };
+        this.state.cells.push(newCell);
+        this.state.log.push(`🗺️ NOUVELLE CASE AJOUTÉE : [${newCell.name} ${newCell.icon}] en (${newX}, ${newY}) !`);
+        break;
+      }
+
+      case 'REMOVE_CELL': {
+        if (this.state.cells.length <= 2) break; // Keep at least 2 cells
+        let targetIdx = -1;
+        if (mut.cellId) {
+          targetIdx = this.state.cells.findIndex(c => c.id === mut.cellId);
+        }
+        if (targetIdx === -1) {
+          targetIdx = Math.floor(Math.random() * this.state.cells.length);
+        }
+        const removed = this.state.cells.splice(targetIdx, 1)[0];
+        if (removed) {
+          // Relocate players on this cell
+          const safeCellId = this.state.cells[0]?.id || 'cell_0_0';
+          for (const p of this.state.players) {
+            if (p.cellId === removed.id) {
+              p.cellId = safeCellId;
+            }
+          }
+          this.state.log.push(`💥 CASE SUPPRIMÉE : [${removed.name} ${removed.icon}] s'effondre dans le vide !`);
+        }
+        break;
+      }
+
+      case 'MODIFY_CELL': {
+        let cell = mut.cellId ? this.state.cells.find(c => c.id === mut.cellId) : null;
+        if (!cell && this.state.cells.length > 0) {
+          cell = this.state.cells[Math.floor(Math.random() * this.state.cells.length)];
+        }
+        if (cell && mut.cell) {
+          if (mut.cell.name) cell.name = mut.cell.name;
+          if (mut.cell.icon) cell.icon = mut.cell.icon;
+          if (mut.cell.description) cell.description = mut.cell.description;
+          if (mut.cell.colorTheme) cell.colorTheme = mut.cell.colorTheme;
+          this.state.log.push(`🔄 CASE MUTÉE : Devient [${cell.name} ${cell.icon}] !`);
+        }
+        break;
+      }
+
+      case 'SPAWN_ENEMY': {
+        const targetCell = (mut.cellId && this.state.cells.find(c => c.id === mut.cellId))
+          || this.state.cells[Math.floor(Math.random() * this.state.cells.length)];
+
+        if (targetCell) {
+          const enemy: ChaosEnemy = {
+            id: `enemy_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+            name: mut.enemy?.name || 'Ombre Rampante',
+            icon: mut.enemy?.icon || '👹',
+            hp: mut.enemy?.hp || 40,
+            maxHp: mut.enemy?.hp || 40,
+            atk: mut.enemy?.atk || 15,
+            reward: mut.enemy?.reward || '+5 ATK permanent'
+          };
+          targetCell.enemies.push(enemy);
+          this.state.log.push(`👾 ENNEMI INVOQUÉ : [${enemy.name} ${enemy.icon}] (PV: ${enemy.hp}, ATK: ${enemy.atk}) apparaît sur [${targetCell.name}] !`);
+        }
+        break;
+      }
+
+      case 'ADD_STAT': {
+        if (mut.statDef) {
+          const exists = this.state.definedStats.find(s => s.name.toLowerCase() === mut.statDef.name.toLowerCase());
+          if (!exists) {
+            this.state.definedStats.push(mut.statDef);
+            for (const p of this.state.players) {
+              p.customStats[mut.statDef.name] = mut.statDef.defaultValue;
+            }
+            this.state.log.push(`✨ NOUVELLE STATISTIQUE GLOBALE : [${mut.statDef.name} ${mut.statDef.icon}] (base: ${mut.statDef.defaultValue}) !`);
+          }
+        }
+        break;
+      }
+
+      case 'MODIFY_STAT': {
+        if (mut.statName && mut.value) {
+          for (const p of this.state.players) {
+            if (mut.statName === 'atk') p.atk = Math.max(1, p.atk + mut.value);
+            else if (mut.statName === 'hp') p.hp = Math.min(p.maxHp, p.hp + mut.value);
+            else {
+              p.customStats[mut.statName] = (p.customStats[mut.statName] || 0) + mut.value;
+            }
+          }
+          this.state.log.push(`⚡ Statistique [${mut.statName}] modifiée de ${mut.value > 0 ? '+' : ''}${mut.value} pour les joueurs !`);
+        }
+        break;
+      }
+    }
+  }
+
   private startNextRound() {
     this.state.roundNumber++;
 
     if (this.state.roundNumber > this.state.maxRounds) {
-      // Game over! Winner has highest gold or survived rounds
-      const sorted = [...this.state.players].sort((a, b) => b.gold - a.gold);
+      // Game over! Winner has most kills
+      const sorted = [...this.state.players].sort((a, b) => b.kills - a.kills || b.hp - a.hp);
       this.state.winner = sorted[0];
       this.state.status = 'FINISHED';
-      this.state.log.push(`🏆 FIN DE LA PARTIE DU CHAOS ! ${sorted[0].username} est couronné Vainqueur Suprême !`);
+      this.state.log.push(`🏆 FIN DU JEU DU CHAOS ! ${sorted[0].username} triomphe avec ${sorted[0].kills} éliminations !`);
       return;
     }
 
-    // Reset all players for next round
-    for (const p of this.state.players) {
-      p.position = 0;
-      p.health = 100;
-      p.gold = 500;
-      p.power = 10;
-      p.debt = 0;
+    // Resurrect all players and reposition
+    for (let i = 0; i < this.state.players.length; i++) {
+      const p = this.state.players[i];
+      p.hp = p.maxHp;
       p.isEliminated = false;
+      const cellIndex = i % this.state.cells.length;
+      p.cellId = this.state.cells[cellIndex]?.id || 'cell_0_0';
     }
 
     this.state.status = 'PLAYING';
     this.state.draftingPlayerId = null;
     this.state.draftingPlayerName = null;
     this.state.draftingReason = null;
-    this.state.lastDiceRoll = null;
     this.state.currentPlayerIndex = 0;
 
-    this.state.log.push(`✨ MANCHE ${this.state.roundNumber} COMMENCE ! Tous les joueurs ressuscitent.`);
-    this.state.log.push(`⚠️ ${this.state.activeRules.length} RÈGLE(S) DU CHAOS SONT ACTIVES DANS CETTE MANCHE !`);
+    this.state.log.push(`✨ MANCHE ${this.state.roundNumber} / ${this.state.maxRounds} COMMENCE ! Tous les joueurs ressuscitent.`);
+    this.state.log.push(`⚠️ ${this.state.activeRules.length} DÉCRET(S) DU CHAOS SONT ACTIFS !`);
 
-    // Evaluate ON_ROUND_START rules
     this.evaluateRules('ON_ROUND_START', {});
   }
 
-  // ─── DYNAMIC RULE EXECUTION ENGINE ────────────────────────────────────────
+  // ─── RULE EVALUATION ──────────────────────────────────────────────────────
   private evaluateRules(trigger: ChaosRule['trigger'], ctx: any) {
     for (const rule of this.state.activeRules) {
       if (rule.trigger !== trigger) continue;
 
-      // Check condition
-      if (!this.checkRuleCondition(rule.condition, ctx)) continue;
-
-      this.state.log.push(`⚡ Règle active [${rule.title}] déclenchée !`);
-
-      // Apply each effect
       for (const eff of rule.effects) {
-        const targets = this.resolveEffectTargets(eff.target, ctx);
-
+        const targets = this.resolveTargets(eff.target, ctx);
         for (const target of targets) {
           switch (eff.type) {
             case 'DAMAGE':
-              target.health -= eff.value;
-              this.state.log.push(`💥 ${target.username} subit ${eff.value} dégâts (${rule.title}) !`);
-              this.checkElimination(target, `Tué par [${rule.title}]`);
+              target.hp -= eff.value;
+              this.state.log.push(`💥 [${rule.title}] inflige ${eff.value} dégâts à ${target.username} !`);
+              if (target.hp <= 0 && this.state.status === 'PLAYING') {
+                this.handlePlayerDeath(target, `Anéanti par le décret [${rule.title}]`);
+                return;
+              }
               break;
             case 'HEAL':
-              target.health = Math.min(target.maxHealth, target.health + eff.value);
-              this.state.log.push(`💚 ${target.username} récupère ${eff.value} PV (${rule.title}) !`);
+              target.hp = Math.min(target.maxHp, target.hp + eff.value);
+              this.state.log.push(`💚 [${rule.title}] soigne ${target.username} de ${eff.value} PV !`);
               break;
-            case 'GOLD_CHANGE':
-              target.gold = Math.max(0, target.gold + eff.value);
-              this.state.log.push(`🪙 ${target.username} ${eff.value >= 0 ? '+' : ''}${eff.value} Or (${rule.title}).`);
+            case 'MODIFY_ATK':
+              target.atk = Math.max(1, target.atk + eff.value);
+              this.state.log.push(`🗡️ [${rule.title}] modifie l'ATK de ${target.username} de ${eff.value > 0 ? '+' : ''}${eff.value} !`);
               break;
-            case 'POWER_CHANGE':
-              target.power = Math.max(0, target.power + eff.value);
-              this.state.log.push(`💪 ${target.username} ${eff.value >= 0 ? '+' : ''}${eff.value} Puissance (${rule.title}).`);
-              break;
-            case 'DEBT_CHANGE':
-              target.debt = Math.max(0, target.debt + eff.value);
-              this.state.log.push(`💸 Dette de ${target.username} modifiée de ${eff.value}g (${rule.title}).`);
-              break;
-            case 'EXTRA_MOVE':
-              target.position = (target.position + eff.value + this.state.board.length) % this.state.board.length;
-              this.state.log.push(`🏃 ${target.username} est propulsé de ${eff.value} cases (${rule.title}) !`);
+            case 'MODIFY_STAT':
+              if (eff.statName) {
+                target.customStats[eff.statName] = (target.customStats[eff.statName] || 0) + eff.value;
+                this.state.log.push(`✨ [${rule.title}] ajuste ${eff.statName} de ${target.username} (${eff.value > 0 ? '+' : ''}${eff.value}).`);
+              }
               break;
           }
         }
@@ -511,44 +575,21 @@ export class ChaosEngine {
     }
   }
 
-  private checkRuleCondition(cond: ChaosRule['condition'], ctx: any): boolean {
-    if (!cond || cond.type === 'ALWAYS') return true;
-
-    if (cond.type === 'ROLL_EQUALS') {
-      return ctx.roll === cond.value;
-    }
-    if (cond.type === 'ROLL_IS_EVEN') {
-      return ctx.roll % 2 === 0;
-    }
-    if (cond.type === 'ROLL_IS_ODD') {
-      return ctx.roll % 2 === 1;
-    }
-    if (cond.type === 'ROLL_GREATER_THAN') {
-      return ctx.roll > (cond.value || 3);
-    }
-    if (cond.type === 'CELL_TYPE') {
-      return ctx.cell?.type === cond.value;
-    }
-
-    return true;
-  }
-
-  private resolveEffectTargets(targetType: string, ctx: any): ChaosPlayer[] {
-    const active = ctx.activePlayer || this.state.players[this.state.currentPlayerIndex];
-
+  private resolveTargets(targetType: ChaosRuleEffect['target'], ctx: any): ChaosPlayer[] {
+    const active = ctx?.activePlayer || ctx?.attacker || this.state.players[this.state.currentPlayerIndex];
     switch (targetType) {
       case 'CURRENT_PLAYER':
         return active ? [active] : [];
       case 'ALL_PLAYERS':
-        return this.state.players;
+        return this.state.players.filter(p => !p.isEliminated);
       case 'ALL_OTHER_PLAYERS':
-        return this.state.players.filter(p => p.id !== active?.id);
-      case 'RICHEST_PLAYER':
-        const richest = [...this.state.players].sort((a, b) => b.gold - a.gold)[0];
-        return richest ? [richest] : [];
-      case 'POOREST_PLAYER':
-        const poorest = [...this.state.players].sort((a, b) => a.gold - b.gold)[0];
-        return poorest ? [poorest] : [];
+        return this.state.players.filter(p => p.id !== active?.id && !p.isEliminated);
+      case 'TARGET_PLAYER':
+        return ctx?.defender ? [ctx.defender] : [];
+      case 'RANDOM_PLAYER': {
+        const alive = this.state.players.filter(p => !p.isEliminated);
+        return alive.length > 0 ? [alive[Math.floor(Math.random() * alive.length)]] : [];
+      }
       default:
         return active ? [active] : [];
     }
@@ -558,22 +599,24 @@ export class ChaosEngine {
     this.state.status = 'LOBBY';
     this.state.roundNumber = 1;
     this.state.activeRules = [];
-    this.state.lastDiceRoll = null;
     this.state.winner = null;
     this.state.draftingPlayerId = null;
     this.state.lastAnnouncement = null;
-    this.state.board = INITIAL_BOARD.map((c, idx) => ({ ...c, index: idx }));
-    for (const p of this.state.players) {
-      p.position = 0;
-      p.health = 100;
-      p.gold = 500;
-      p.power = 10;
-      p.debt = 0;
-      p.isEliminated = false;
-      p.roundsWon = 0;
-      p.lapsCompleted = 0;
-    }
+    this.state.cells = JSON.parse(JSON.stringify(INITIAL_CELLS));
+    this.state.definedStats = [];
     this.state.aiLogs = [];
+
+    for (let i = 0; i < this.state.players.length; i++) {
+      const p = this.state.players[i];
+      p.cellId = this.state.cells[i % this.state.cells.length].id;
+      p.hp = 100;
+      p.maxHp = 100;
+      p.atk = 25;
+      p.customStats = {};
+      p.isEliminated = false;
+      p.kills = 0;
+      p.roundsWon = 0;
+    }
     this.state.log = ['Partie réinitialisée. En attente du départ...'];
     return true;
   }

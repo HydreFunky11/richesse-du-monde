@@ -1,32 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
-import type { ChaosGameState, ChaosCellType } from './chaos/chaosTypes';
+import type { ChaosGameState, ChaosCell } from './chaos/chaosTypes';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
-
-const CELL_BG_COLORS: Record<ChaosCellType, string> = {
-  DEPART: 'from-emerald-950/80 to-teal-900/60 border-emerald-500/60 text-emerald-300',
-  NORMAL: 'from-slate-900 to-slate-950 border-slate-800 text-slate-300',
-  GOLD: 'from-amber-950/80 to-yellow-900/60 border-amber-500/60 text-amber-300',
-  GAMBLE: 'from-purple-950/80 to-indigo-900/60 border-purple-500/60 text-purple-300',
-  DEBT: 'from-rose-950/80 to-red-950/60 border-rose-500/60 text-rose-300',
-  FIGHT: 'from-amber-950 to-red-950/80 border-amber-500/80 text-amber-200',
-  LAVA: 'from-red-950 to-orange-900/80 border-red-500/80 text-red-200 animate-pulse',
-  BUFF: 'from-blue-950/80 to-cyan-900/60 border-blue-500/60 text-blue-300',
-  CURSE: 'from-fuchsia-950/80 to-purple-900/60 border-fuchsia-500/60 text-fuchsia-300',
-  CHEST: 'from-yellow-950/80 to-amber-900/60 border-yellow-500/60 text-yellow-300',
-  PORTAL: 'from-cyan-950/80 to-blue-900/60 border-cyan-500/60 text-cyan-300',
-  CHAOS: 'from-violet-950 to-pink-900/80 border-pink-500/70 text-pink-200 animate-pulse'
-};
+// Use production websocket url or origin, never localhost on deployed domains
+const SERVER_URL =
+  import.meta.env.VITE_WS_SERVER_URL ||
+  import.meta.env.VITE_SERVER_URL ||
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+    ? 'https://richesse-du-monde-server.onrender.com'
+    : 'http://localhost:3001');
 
 const RULE_SUGGESTIONS = [
-  "Ajouter une case Casino Clandestin sur le plateau !",
-  "Créer une nouvelle case Fosse de Lave mortelle (-30 PV) !",
-  "Transformer la case 4 en Banque Toxique (+500 dette) !",
-  "Si un joueur fait un 6, il subit 25 dégâts et donne 50 or à tous !",
-  "Toutes les cases paires deviennent des fosses de lave brûlantes !",
-  "Chaque passage par la case départ vole 50 d'or aux autres joueurs !"
+  "Invoquer un Dragon Ancestral (80 PV, 30 ATK) sur le plateau !",
+  "Ajouter une nouvelle case Donjon Maudit remplie de pièges !",
+  "Supprimer une case dangereuse du plateau !",
+  "Transformer la case (1, 1) en Fosse de Lave mortelle (-30 PV) !",
+  "Ajouter une nouvelle stat Armure (base 5) réduisant les dégâts !",
+  "Tous les duels PvP volent +10 PV à la victime !",
+  "Chaque déplacement soigne 10 PV mais réduit l'ATK de 2."
 ];
 
 export default function ChaosApp() {
@@ -40,10 +32,8 @@ export default function ChaosApp() {
   // Game state
   const [gameState, setGameState] = useState<ChaosGameState | null>(null);
   const [customRuleInput, setCustomRuleInput] = useState('');
-  const [betAmount, setBetAmount] = useState(100);
-  const [diceRolling, setDiceRolling] = useState(false);
 
-  // Popup & UI tabs
+  // UI state
   const [dismissedAnnouncementId, setDismissedAnnouncementId] = useState<string | null>(null);
   const [rightTab, setRightTab] = useState<'RULES' | 'AILOGS' | 'CHRONICLE'>('RULES');
 
@@ -56,6 +46,7 @@ export default function ChaosApp() {
 
   // ─── SOCKET CONNECTION ───────────────────────────────────────────────────
   useEffect(() => {
+    console.log('[CHAOS] Connexion à :', SERVER_URL);
     const s = io(SERVER_URL, {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 5,
@@ -64,16 +55,13 @@ export default function ChaosApp() {
     setSocket(s);
 
     s.on('connect', () => {
-      console.log('[CHAOS] Connecté au serveur Socket.IO :', s.id);
+      console.log('[CHAOS] Connecté avec socket ID :', s.id);
     });
 
     s.on('chaosStateUpdate', (newState: ChaosGameState) => {
       setGameState(newState);
       setJoined(true);
       setErrorMsg(null);
-      setDiceRolling(false);
-      // NOTE: We deliberately do NOT reset dismissedAnnouncementId here!
-      // This prevents the announcement popup from reappearing on every subsequent action/roll.
     });
 
     s.on('error', (err: string) => {
@@ -113,18 +101,19 @@ export default function ChaosApp() {
     socket?.emit('chaos:startGame');
   };
 
-  const handleRollDice = () => {
-    if (!isMyTurn || diceRolling || gameState?.lastDiceRoll !== null) return;
-    setDiceRolling(true);
-    socket?.emit('chaos:rollDice');
-  };
+  const handleCellClick = (cell: ChaosCell) => {
+    if (!isMyTurn || !me) return;
+    const currentCell = gameState?.cells.find(c => c.id === me.cellId);
+    if (!currentCell) return;
 
-  const handlePlayAction = (actionType: 'GAMBLE' | 'FIGHT', params: any = {}) => {
-    socket?.emit('chaos:playAction', { actionType, params });
-  };
+    // Check adjacency
+    const dx = Math.abs(cell.x - currentCell.x);
+    const dy = Math.abs(cell.y - currentCell.y);
+    const speed = me.customStats['Vitesse'] || me.customStats['vitesse'] || 1;
 
-  const handleEndTurn = () => {
-    socket?.emit('chaos:endTurn');
+    if (cell.id !== currentCell.id && dx <= speed && dy <= speed) {
+      socket?.emit('chaos:move', { targetCellId: cell.id });
+    }
   };
 
   const handleSubmitRule = (e: React.FormEvent) => {
@@ -151,33 +140,33 @@ export default function ChaosApp() {
           <div className="flex items-center justify-between mb-6">
             <button
               onClick={() => navigate('/')}
-              className="text-xs text-slate-400 hover:text-white transition flex items-center gap-1.5"
+              className="text-xs text-slate-400 hover:text-white transition flex items-center gap-1.5 cursor-pointer"
             >
               ← Retour à l'accueil
             </button>
-            <span className="text-xs font-black tracking-widest uppercase text-amber-400 px-2.5 py-0.5 rounded bg-amber-950/60 border border-amber-800">
-              OpenRouter IA Active
+            <span className="text-[10px] font-black tracking-widest uppercase text-amber-400 px-2.5 py-0.5 rounded bg-amber-950/60 border border-amber-800">
+              TACTIQUE & IA ROGUELITE
             </span>
           </div>
 
           <div className="text-center mb-8">
-            <div className="text-6xl mb-3 animate-bounce">🎲</div>
+            <div className="text-6xl mb-3 animate-bounce">⚔️👑</div>
             <h1 className="text-3xl font-black bg-gradient-to-r from-amber-400 via-purple-400 to-rose-400 bg-clip-text text-transparent">
               CHAOS BOARD
             </h1>
-            <p className="text-xs text-slate-400 mt-2">
-              Le roguelite de plateau où le joueur éliminé décrète une règle créée par l'IA qui s'accumule à chaque manche !
+            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+              Plateau 3x2 tactique • Déplacement par clic • Combats PvP & PvE • Décrets de mort par l'IA modifiant n'importe quel élément !
             </p>
           </div>
 
           <form onSubmit={handleJoin} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Pseudo</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Votre Pseudo</label>
               <input
                 type="text"
                 value={usernameInput}
                 onChange={e => setUsernameInput(e.target.value)}
-                placeholder="Ex: Législateur Fou"
+                placeholder="Ex: Gladiateur du Chaos"
                 className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-amber-500 transition text-sm"
                 required
               />
@@ -205,7 +194,7 @@ export default function ChaosApp() {
               type="submit"
               className="w-full py-3.5 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-slate-950 font-black rounded-xl shadow-lg transition transform active:scale-98 text-sm cursor-pointer"
             >
-              REJOINDRE L'ARÈNE DU CHAOS 🔥
+              REJOINDRE L'ARÈNE 🔥
             </button>
           </form>
         </div>
@@ -223,7 +212,7 @@ export default function ChaosApp() {
           <div className="flex items-center justify-between mb-6">
             <button
               onClick={() => navigate('/')}
-              className="text-xs text-slate-400 hover:text-white transition"
+              className="text-xs text-slate-400 hover:text-white transition cursor-pointer"
             >
               ← Quitter le salon
             </button>
@@ -236,12 +225,12 @@ export default function ChaosApp() {
           </div>
 
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-black text-white">Conseil des Législateurs</h2>
-            <p className="text-xs text-slate-400 mt-1">En attente des joueurs pour démarrer la Manche 1...</p>
+            <h2 className="text-2xl font-black text-white">Conseil des Combattants</h2>
+            <p className="text-xs text-slate-400 mt-1">Préparez-vous au combat tactique...</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-6">
-            {gameState.players.map((p, idx) => (
+            {gameState.players.map(p => (
               <div
                 key={p.id}
                 className="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center gap-3"
@@ -256,17 +245,21 @@ export default function ChaosApp() {
                   <div className="font-bold text-xs text-white truncate">
                     {p.username} {p.id === socket?.id && <span className="text-amber-400 text-[10px]">(Vous)</span>}
                   </div>
-                  <div className="text-[10px] text-slate-500">Joueur #{idx + 1}</div>
+                  <div className="text-[10px] text-slate-500 flex items-center gap-2">
+                    <span>❤️ 100 PV</span>
+                    <span>⚔️ 25 ATK</span>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
 
           <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/80 mb-6 text-xs text-slate-400 space-y-1.5">
-            <div className="font-bold text-slate-300">Règles du Chaos :</div>
-            <div>• Le premier joueur à 0 PV ou 2 000 pièces de dette meurt sur-le-champ.</div>
-            <div>• Le joueur éliminé dicte une <strong>NOUVELLE RÈGLE</strong> (ou crée une nouvelle case) rédigée par l'IA.</div>
-            <div>• Tous les joueurs ressuscitent, et les règles <strong>s'accumulent manche après manche</strong> !</div>
+            <div className="font-bold text-slate-300">Règles du Chaos Tactique :</div>
+            <div>• Plateau initial de <strong>6 cases (3 x 2)</strong>. Cliquez pour vous déplacer.</div>
+            <div>• Rejoindre une case avec un joueur déclenche un <strong>duel PvP immédiat</strong> !</div>
+            <div>• Des <strong>monstres</strong> peuvent occuper les cases. Tuez-les pour des bonus permanents.</div>
+            <div>• Le premier joueur éliminé devient le <strong>Législateur</strong> et réécrit n'importe quel élément avec l'IA !</div>
           </div>
 
           <button
@@ -282,10 +275,14 @@ export default function ChaosApp() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // VIEW: PLAYING & BOARD
+  // VIEW: PLAYING
   // ─────────────────────────────────────────────────────────────────────────
   const activePlayer = gameState.players[gameState.currentPlayerIndex];
-  const activeCell = gameState.board[me?.position || 0] || gameState.board[0];
+  const myCurrentCell = gameState.cells.find(c => c.id === me?.cellId);
+
+  // Group cells into a 2D layout (find maxX and maxY)
+  const maxX = gameState.cells.reduce((max, c) => Math.max(max, c.x), 0);
+  const maxY = gameState.cells.reduce((max, c) => Math.max(max, c.y), 0);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col overflow-hidden font-sans">
@@ -294,18 +291,18 @@ export default function ChaosApp() {
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate('/')}
-            className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 transition"
+            className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 transition cursor-pointer"
           >
             ← Quitter
           </button>
           <div className="flex items-center gap-2">
-            <span className="text-lg">🎲</span>
+            <span className="text-lg">⚔️</span>
             <span className="font-black text-white text-sm tracking-wider">CHAOS BOARD</span>
             <span className="text-xs font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
               MANCHE {gameState.roundNumber} / {gameState.maxRounds}
             </span>
             <span className="text-[11px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-              {gameState.board.length} Cases
+              {gameState.cells.length} Cases
             </span>
           </div>
         </div>
@@ -320,112 +317,46 @@ export default function ChaosApp() {
           </div>
 
           <div className="text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-xl">
-            📜 {gameState.activeRules.length} Règle(s) Active(s)
+            📜 {gameState.activeRules.length} Décret(s) Actif(s)
           </div>
         </div>
       </header>
 
-      {/* 2. Main Game Body (Board + Sidebars) */}
+      {/* 2. Main Game Layout */}
       <div className="flex-1 grid grid-cols-12 gap-4 p-4 overflow-hidden">
-        {/* Left Column: Player Stats & Game Controls */}
+        {/* Left Column: Player Stats */}
         <div className="col-span-3 flex flex-col gap-3 overflow-y-auto">
-          {/* Active Turn Actions Card */}
+          {/* Active Turn Banner */}
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl">
-            <div className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center justify-between">
-              <span>Votre Tour</span>
-              {isMyTurn && <span className="text-emerald-400 animate-pulse">● C'est à vous !</span>}
+            <div className="text-xs font-bold text-slate-400 uppercase mb-2 flex items-center justify-between">
+              <span>Tour de Jeu</span>
+              {isMyTurn ? (
+                <span className="text-emerald-400 font-black animate-pulse">● C'EST À VOUS !</span>
+              ) : (
+                <span className="text-slate-500">En attente...</span>
+              )}
             </div>
-
             {isMyTurn ? (
-              <div className="space-y-3">
-                {gameState.lastDiceRoll === null ? (
-                  <button
-                    onClick={handleRollDice}
-                    disabled={diceRolling}
-                    className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black rounded-xl shadow-lg transition transform active:scale-95 text-sm cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <span className="text-xl">🎲</span>
-                    {diceRolling ? 'Le dé roule...' : 'LANCER LE DÉ (1-6)'}
-                  </button>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                      <span className="text-xs text-slate-400">Vous avez obtenu un</span>
-                      <div className="text-4xl font-black text-amber-400 my-1">{gameState.lastDiceRoll}</div>
-                      <span className="text-[11px] text-slate-500">Case : {activeCell.name}</span>
-                    </div>
-
-                    {/* Interactive cell buttons */}
-                    {activeCell.type === 'GAMBLE' && (
-                      <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-800/60 text-xs">
-                        <div className="font-bold text-purple-300 mb-2">🎰 Casino Maudit : Parier</div>
-                        <div className="flex gap-2 mb-2">
-                          <button
-                            onClick={() => setBetAmount(50)}
-                            className={`flex-1 py-1 rounded border ${betAmount === 50 ? 'bg-purple-600 border-purple-400 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
-                          >
-                            50g
-                          </button>
-                          <button
-                            onClick={() => setBetAmount(100)}
-                            className={`flex-1 py-1 rounded border ${betAmount === 100 ? 'bg-purple-600 border-purple-400 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
-                          >
-                            100g
-                          </button>
-                          <button
-                            onClick={() => setBetAmount(250)}
-                            className={`flex-1 py-1 rounded border ${betAmount === 250 ? 'bg-purple-600 border-purple-400 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
-                          >
-                            250g
-                          </button>
-                        </div>
-                        <button
-                          onClick={() => handlePlayAction('GAMBLE', { amount: betAmount })}
-                          className="w-full py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-lg transition"
-                        >
-                          Tenter le Pari ({betAmount}g) 🎲
-                        </button>
-                      </div>
-                    )}
-
-                    {activeCell.type === 'FIGHT' && (
-                      <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-800/60 text-xs">
-                        <div className="font-bold text-rose-300 mb-2">⚔️ Antre du Monstre</div>
-                        <button
-                          onClick={() => handlePlayAction('FIGHT')}
-                          className="w-full py-2 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold rounded-lg transition"
-                        >
-                          Combattre la Bête ! 🗡️
-                        </button>
-                      </div>
-                    )}
-
-                    <button
-                      onClick={handleEndTurn}
-                      className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl text-xs transition"
-                    >
-                      Terminer mon Tour ⏩
-                    </button>
-                  </div>
-                )}
+              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-xs text-emerald-200">
+                👉 <strong>Cliquez sur une case adjacente</strong> pour vous déplacer, attaquer un joueur ou affronter un monstre !
               </div>
             ) : (
-              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 text-center text-xs text-slate-500">
-                En attente du coup de {activePlayer?.username}...
+              <div className="text-xs text-slate-400">
+                {activePlayer?.username} réfléchit à son prochain déplacement...
               </div>
             )}
           </div>
 
-          {/* Players Status List */}
+          {/* Players Roster */}
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl flex-1 flex flex-col">
-            <div className="text-xs font-bold text-slate-400 uppercase mb-3">Joueurs & Survie</div>
+            <div className="text-xs font-bold text-slate-400 uppercase mb-3">Combattants & Statistiques</div>
             <div className="space-y-2.5 flex-1 overflow-y-auto">
               {gameState.players.map(p => (
                 <div
                   key={p.id}
                   className={`p-3 rounded-xl border transition ${
                     p.id === activePlayer?.id
-                      ? 'bg-slate-950 border-amber-500/60 shadow-md'
+                      ? 'bg-slate-950 border-amber-500/60 shadow-md ring-1 ring-amber-500/40'
                       : 'bg-slate-950/60 border-slate-800'
                   }`}
                 >
@@ -435,96 +366,162 @@ export default function ChaosApp() {
                       {p.username}
                       {p.id === socket?.id && <span className="text-[10px] text-amber-400">(Vous)</span>}
                     </span>
-                    <span className="text-[11px] text-slate-400 font-mono">Case #{p.position}</span>
+                    <span className="text-[11px] text-rose-400 font-mono font-bold">
+                      💀 {p.kills} Kills
+                    </span>
                   </div>
 
                   {/* HP Bar */}
-                  <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden mb-2 border border-slate-800">
+                  <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden mb-2 border border-slate-800">
                     <div
-                      className="h-full bg-emerald-500 transition-all duration-300"
-                      style={{ width: `${Math.max(0, Math.min(100, (p.health / p.maxHealth) * 100))}%` }}
+                      className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-300"
+                      style={{ width: `${Math.max(0, Math.min(100, (p.hp / p.maxHp) * 100))}%` }}
                     />
                   </div>
 
-                  <div className="grid grid-cols-4 gap-1 text-[10px] text-center">
-                    <div className="bg-slate-900/80 p-1 rounded">
-                      <span className="text-emerald-400 font-bold block">{p.health}</span>
-                      <span className="text-slate-500">PV</span>
-                    </div>
-                    <div className="bg-slate-900/80 p-1 rounded">
-                      <span className="text-amber-400 font-bold block">{p.gold}</span>
-                      <span className="text-slate-500">Or</span>
-                    </div>
-                    <div className="bg-slate-900/80 p-1 rounded">
-                      <span className="text-blue-400 font-bold block">{p.power}</span>
-                      <span className="text-slate-500">Force</span>
-                    </div>
-                    <div className="bg-slate-900/80 p-1 rounded">
-                      <span className="text-rose-400 font-bold block">{p.debt}</span>
-                      <span className="text-slate-500">Dette</span>
-                    </div>
+                  <div className="flex items-center justify-between text-[11px] font-bold">
+                    <span className="text-emerald-400">❤️ {p.hp} / {p.maxHp} PV</span>
+                    <span className="text-amber-400">⚔️ {p.atk} ATK</span>
                   </div>
+
+                  {/* Custom Stats defined by AI rules */}
+                  {Object.keys(p.customStats).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-slate-800/60">
+                      {Object.entries(p.customStats).map(([stat, val]) => (
+                        <span key={stat} className="px-1.5 py-0.5 rounded bg-purple-950/80 border border-purple-800/60 text-[10px] text-purple-300">
+                          {stat}: <strong>{val}</strong>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Center: The Board (Dynamic Grid Cells) */}
+        {/* Center: The Tactical 2D Grid Board */}
         <div className="col-span-6 flex flex-col gap-3">
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl flex-1 flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800 mb-3 text-xs">
-              <span className="font-bold text-slate-300">
-                Plateau du Chaos ({gameState.board.length} Cases)
+              <span className="font-bold text-slate-200 flex items-center gap-2">
+                <span>🗺️</span> Plateau Tactique ({maxX + 1} x {maxY + 1})
               </span>
-              <span className="text-slate-500">Sens horaire • Cases mutables par les décrets de l'IA</span>
+              <span className="text-slate-500">
+                {isMyTurn ? 'Cases lumineuses = Déplacement cliquable' : 'Déplacement tour par tour'}
+              </span>
             </div>
 
-            {/* Grid of Cells with auto-wrap and scrolling */}
-            <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5 flex-1 overflow-y-auto pr-1">
-              {gameState.board.map(cell => {
-                const playersHere = gameState.players.filter(p => p.position === cell.index);
-                const theme = CELL_BG_COLORS[cell.type] || CELL_BG_COLORS.NORMAL;
-                const isNewTile = cell.index >= 20;
+            {/* Tactical Grid Render */}
+            <div className="flex-1 overflow-auto flex items-center justify-center p-2">
+              <div
+                className="grid gap-3 w-full max-w-2xl"
+                style={{
+                  gridTemplateColumns: `repeat(${Math.max(3, maxX + 1)}, minmax(0, 1fr))`
+                }}
+              >
+                {gameState.cells.map(cell => {
+                  const playersOnCell = gameState.players.filter(p => p.cellId === cell.id && !p.isEliminated);
+                  const isCurrentCell = me?.cellId === cell.id;
 
-                return (
-                  <div
-                    key={cell.index}
-                    className={`relative p-2.5 rounded-xl border bg-gradient-to-b ${theme} flex flex-col justify-between transition hover:scale-102 shadow-md min-h-[92px]`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-mono font-bold opacity-60">#{cell.index}</span>
-                      {isNewTile && (
-                        <span className="text-[8px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 px-1 rounded">
-                          NOUVELLE
+                  // Check if reachable on my turn
+                  let isReachable = false;
+                  if (isMyTurn && myCurrentCell && cell.id !== myCurrentCell.id) {
+                    const dx = Math.abs(cell.x - myCurrentCell.x);
+                    const dy = Math.abs(cell.y - myCurrentCell.y);
+                    const speed = me?.customStats['Vitesse'] || me?.customStats['vitesse'] || 1;
+                    if (dx <= speed && dy <= speed) {
+                      isReachable = true;
+                    }
+                  }
+
+                  const hasEnemyPlayers = playersOnCell.some(p => p.id !== me?.id);
+                  const hasMonsters = cell.enemies && cell.enemies.length > 0;
+
+                  return (
+                    <div
+                      key={cell.id}
+                      onClick={() => isReachable && handleCellClick(cell)}
+                      className={`relative p-3 rounded-2xl border transition-all duration-200 flex flex-col justify-between min-h-[140px] select-none ${
+                        cell.colorTheme || 'from-slate-900 to-slate-950 border-slate-800 text-slate-300'
+                      } bg-gradient-to-b ${
+                        isReachable
+                          ? 'cursor-pointer ring-2 ring-emerald-400 border-emerald-400 shadow-lg shadow-emerald-500/20 hover:scale-102 hover:brightness-110'
+                          : isCurrentCell
+                          ? 'ring-2 ring-amber-400/80 border-amber-400 shadow-md'
+                          : 'opacity-90'
+                      }`}
+                    >
+                      {/* Top Header of Cell */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono font-bold opacity-60">
+                          ({cell.x}, {cell.y})
                         </span>
-                      )}
-                      <span className="text-base">{cell.icon}</span>
-                    </div>
-
-                    <div>
-                      <div className="font-bold text-xs truncate" title={cell.name}>{cell.name}</div>
-                      <div className="text-[9px] opacity-75 truncate" title={cell.description}>{cell.description}</div>
-                    </div>
-
-                    {/* Players Pins on this cell */}
-                    {playersHere.length > 0 && (
-                      <div className="flex items-center gap-1 mt-1 flex-wrap">
-                        {playersHere.map(p => (
-                          <div
-                            key={p.id}
-                            className="w-5 h-5 rounded-full border border-white text-[9px] font-black flex items-center justify-center text-white shadow-lg"
-                            style={{ backgroundColor: p.color }}
-                            title={`${p.username} (${p.health} PV)`}
-                          >
-                            {p.username[0].toUpperCase()}
-                          </div>
-                        ))}
+                        <div className="flex items-center gap-1">
+                          {isCurrentCell && (
+                            <span className="text-[8px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded">
+                              VOUS
+                            </span>
+                          )}
+                          <span className="text-xl">{cell.icon}</span>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+
+                      {/* Cell Info */}
+                      <div className="my-1">
+                        <div className="font-black text-xs text-white truncate" title={cell.name}>
+                          {cell.name}
+                        </div>
+                        <div className="text-[10px] text-slate-300 opacity-80 line-clamp-2 leading-tight">
+                          {cell.description}
+                        </div>
+                      </div>
+
+                      {/* Monsters / Enemies Present */}
+                      {hasMonsters && (
+                        <div className="space-y-1 my-1">
+                          {cell.enemies.map(en => (
+                            <div
+                              key={en.id}
+                              className="p-1 rounded bg-rose-950/80 border border-rose-800/80 flex items-center justify-between text-[9px] text-rose-200"
+                            >
+                              <span className="font-bold flex items-center gap-1">
+                                <span>{en.icon}</span> {en.name}
+                              </span>
+                              <span className="font-mono text-rose-300">
+                                {en.hp}PV | {en.atk}ATK
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Players Tokens Present on this cell */}
+                      <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-white/10">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {playersOnCell.map(p => (
+                            <div
+                              key={p.id}
+                              className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-black text-white shadow-md"
+                              style={{ backgroundColor: p.color }}
+                              title={`${p.username} (${p.hp} PV, ${p.atk} ATK)`}
+                            >
+                              {p.username[0].toUpperCase()}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Interactive prompt button if reachable */}
+                        {isReachable && (
+                          <div className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500 text-slate-950 shadow animate-pulse">
+                            {hasEnemyPlayers ? '⚔️ DUEL PVP' : hasMonsters ? '🗡️ ATTAQUER' : '🚶 ALLER'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
@@ -536,7 +533,7 @@ export default function ChaosApp() {
             <div className="flex border-b border-purple-900/40 pb-2 mb-3 gap-1">
               <button
                 onClick={() => setRightTab('RULES')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
                   rightTab === 'RULES'
                     ? 'bg-purple-950 text-purple-200 border border-purple-700/60 shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
@@ -546,7 +543,7 @@ export default function ChaosApp() {
               </button>
               <button
                 onClick={() => setRightTab('AILOGS')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition relative ${
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer relative ${
                   rightTab === 'AILOGS'
                     ? 'bg-purple-950 text-purple-200 border border-purple-700/60 shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
@@ -559,13 +556,13 @@ export default function ChaosApp() {
               </button>
               <button
                 onClick={() => setRightTab('CHRONICLE')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
                   rightTab === 'CHRONICLE'
                     ? 'bg-purple-950 text-purple-200 border border-purple-700/60 shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                📋 Chronique
+                📋 Combats
               </button>
             </div>
 
@@ -574,7 +571,7 @@ export default function ChaosApp() {
               <div className="space-y-2 flex-1 overflow-y-auto pr-1">
                 {gameState.activeRules.length === 0 ? (
                   <div className="text-slate-500 text-xs text-center py-12">
-                    Aucun décret actif pour l'instant. Attendez la première mort d'un joueur... 😈
+                    Aucun décret actif pour l'instant. Dès qu'un joueur meurt, il réécrit le jeu ! 😈
                   </div>
                 ) : (
                   gameState.activeRules.map((rule, idx) => (
@@ -590,7 +587,7 @@ export default function ChaosApp() {
                       </div>
                       <p className="text-slate-200 text-[11px] leading-snug mb-1.5">{rule.description}</p>
                       <div className="text-[10px] text-purple-400 italic">
-                        — Décrété par {rule.authorName}
+                        — Proclamé par {rule.authorName}
                       </div>
                     </div>
                   ))
@@ -608,7 +605,7 @@ export default function ChaosApp() {
 
                 {(!gameState.aiLogs || gameState.aiLogs.length === 0) ? (
                   <div className="text-slate-500 text-xs text-center py-12">
-                    Aucun appel IA pour l'instant. Les logs d'analyse apparaîtront dès qu'un joueur formulera un décret.
+                    Aucun log IA pour l'instant. Les requêtes s'afficheront dès qu'un joueur décédé rédigera son décret.
                   </div>
                 ) : (
                   gameState.aiLogs.map((log, idx) => {
@@ -675,8 +672,9 @@ export default function ChaosApp() {
                   <h2 className="text-2xl font-black bg-gradient-to-r from-purple-400 to-amber-400 bg-clip-text text-transparent">
                     VOUS AVEZ PÉRI !
                   </h2>
-                  <p className="text-xs text-slate-300 mt-1">
-                    En tant que <strong>Législateur du Chaos</strong>, vous avez le droit divin d'inventer une NOUVELLE RÈGLE ou de CRÉER UNE NOUVELLE CASE sur le plateau.
+                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                    En tant que <strong>Législateur du Chaos</strong>, vous avez le pouvoir absolu de dicter <strong>N'IMPORTE QUELLE MODIFICATION</strong> :
+                    créer ou détruire une case, invoquer un monstre, inventer une nouvelle statistique, ou modifier les duels PvP !
                   </p>
                 </div>
 
@@ -688,7 +686,7 @@ export default function ChaosApp() {
                     <textarea
                       value={customRuleInput}
                       onChange={e => setCustomRuleInput(e.target.value)}
-                      placeholder="Ex: Ajouter une case Casino Clandestin sur le plateau, ou faire un 6 inflige 30 dégâts à tout le monde..."
+                      placeholder="Ex: Invoquer un Dragon Ancestral de 80 PV et 30 ATK sur le plateau, ou ajouter une stat Armure de base 5..."
                       rows={3}
                       className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 text-xs transition"
                       required
@@ -697,7 +695,7 @@ export default function ChaosApp() {
 
                   {/* Suggestion Chips */}
                   <div>
-                    <div className="text-[10px] text-slate-500 uppercase font-bold mb-1.5">Idées de Décrets & Cases :</div>
+                    <div className="text-[10px] text-slate-500 uppercase font-bold mb-1.5">Idées & Inspirations :</div>
                     <div className="flex flex-wrap gap-1.5">
                       {RULE_SUGGESTIONS.map((sug, i) => (
                         <button
@@ -716,7 +714,7 @@ export default function ChaosApp() {
                     <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-purple-950/40 border border-purple-800 text-purple-300 text-xs">
                       <div className="flex items-center gap-2 font-bold">
                         <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
-                        <span>L'IA analyse et structure votre décret...</span>
+                        <span>L'IA analyse et matérialise votre décret...</span>
                       </div>
                       {gameState.aiLogs && gameState.aiLogs.length > 0 && (
                         <div className="text-[10px] text-slate-400 font-mono truncate max-w-full">
@@ -738,13 +736,13 @@ export default function ChaosApp() {
               // Surviving players wait for the dead player
               <div className="text-center py-6 space-y-4">
                 <div className="text-5xl animate-pulse">⚖️👑</div>
-                <h2 className="text-2xl font-black text-amber-400">UN JOUEUR EST MORT !</h2>
+                <h2 className="text-2xl font-black text-amber-400">UN COMBATTANT EST MORT !</h2>
                 <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-300">
                   {gameState.isAiGenerating ? (
                     <div className="flex flex-col items-center justify-center gap-2 text-purple-300 font-bold">
                       <div className="flex items-center gap-2">
                         <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
-                        L'IA structure le nouveau décret...
+                        L'IA matérialise le nouveau décret...
                       </div>
                       {gameState.aiLogs && gameState.aiLogs.length > 0 && (
                         <div className="text-[10px] text-slate-400 font-mono truncate max-w-full">
@@ -754,7 +752,7 @@ export default function ChaosApp() {
                     </div>
                   ) : (
                     <span>
-                      <strong>{gameState.draftingPlayerName}</strong> est actuellement en train de rédiger un décret divin... Préparez-vous à revivre avec cette nouvelle règle active !
+                      <strong>{gameState.draftingPlayerName}</strong> est actuellement en train de réécrire la réalité du jeu avec l'IA...
                     </span>
                   )}
                 </div>
@@ -794,7 +792,7 @@ export default function ChaosApp() {
               }}
               className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-bold rounded-xl text-xs transition cursor-pointer"
             >
-              C'est compris, que le Chaos commence ! 🎲
+              C'est compris, au combat ! ⚔️
             </button>
           </div>
         </div>
@@ -809,16 +807,16 @@ export default function ChaosApp() {
             <div className="text-5xl mb-4 animate-bounce">🏆👑</div>
             <h2 className="text-3xl font-black text-amber-400 mb-2">FIN DE LA PARTIE !</h2>
             <p className="text-sm text-slate-300 mb-4">
-              Après <strong>{gameState.maxRounds} manches</strong> d'apocalypse et <strong>{gameState.activeRules.length} règles chaotiques</strong> accumulées :
+              Après <strong>{gameState.maxRounds} manches</strong> d'apocalypse et <strong>{gameState.activeRules.length} décrets</strong> accumulés :
             </p>
 
             <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-sm text-white font-bold mb-6">
-              Vainqueur Suprême : <span className="text-amber-400 text-lg">{gameState.winner?.username}</span> (avec {gameState.winner?.gold} d'or !)
+              Champion Suprême : <span className="text-amber-400 text-lg">{gameState.winner?.username}</span> (avec {gameState.winner?.kills} éliminations !)
             </div>
 
             <button
               onClick={handleResetGame}
-              className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl text-sm transition"
+              className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl text-sm transition cursor-pointer"
             >
               Rejouer une Partie du Chaos 😈
             </button>

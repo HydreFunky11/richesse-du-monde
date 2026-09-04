@@ -1,44 +1,88 @@
-export type ChaosCellType = 
-  | 'DEPART' 
-  | 'NORMAL' 
-  | 'GOLD' 
-  | 'GAMBLE' 
-  | 'DEBT' 
-  | 'FIGHT' 
-  | 'LAVA' 
-  | 'BUFF' 
-  | 'CURSE' 
-  | 'CHEST' 
-  | 'PORTAL' 
-  | 'CHAOS';
-
-export interface ChaosCell {
-  index: number;
-  type: ChaosCellType;
+export interface ChaosEnemy {
+  id: string;
   name: string;
   icon: string;
+  hp: number;
+  maxHp: number;
+  atk: number;
+  reward?: string;
+}
+
+export interface ChaosCellEffect {
+  type: 'HEAL' | 'DAMAGE' | 'BUFF_ATK' | 'DEBUFF_ATK' | 'CUSTOM_STAT' | 'NONE';
+  value: number;
+  statName?: string;
   description: string;
 }
 
+export interface ChaosCell {
+  id: string;
+  name: string;
+  icon: string;
+  x: number;
+  y: number;
+  description: string;
+  colorTheme?: string;
+  effect?: ChaosCellEffect;
+  enemies: ChaosEnemy[];
+}
+
+export interface ChaosStatDef {
+  name: string;
+  icon: string;
+  description: string;
+  defaultValue: number;
+}
+
+export interface ChaosPlayer {
+  id: string;
+  username: string;
+  color: string;
+  cellId: string;
+  hp: number;
+  maxHp: number;
+  atk: number;
+  customStats: Record<string, number>;
+  isEliminated: boolean;
+  kills: number;
+  roundsWon: number;
+}
+
 export interface ChaosRuleEffect {
-  type: 'DAMAGE' | 'HEAL' | 'GOLD_CHANGE' | 'POWER_CHANGE' | 'DEBT_CHANGE' | 'EXTRA_MOVE';
-  target: 'CURRENT_PLAYER' | 'ALL_PLAYERS' | 'ALL_OTHER_PLAYERS' | 'RICHEST_PLAYER' | 'POOREST_PLAYER';
+  type: 'DAMAGE' | 'HEAL' | 'MODIFY_ATK' | 'MODIFY_STAT' | 'SPAWN_ENEMY' | 'TELEPORT';
+  target: 'CURRENT_PLAYER' | 'ALL_PLAYERS' | 'ALL_OTHER_PLAYERS' | 'TARGET_PLAYER' | 'RANDOM_PLAYER';
+  statName?: string;
   value: number;
 }
 
-export interface ChaosRuleCondition {
-  type: 'ROLL_EQUALS' | 'ROLL_IS_EVEN' | 'ROLL_IS_ODD' | 'ROLL_GREATER_THAN' | 'CELL_TYPE' | 'ALWAYS';
-  value?: any;
-}
-
-export interface ChaosBoardMod {
-  action?: 'ADD' | 'MODIFY' | 'REPLACE';
-  cellIndex?: number;
-  filter?: 'even' | 'odd' | 'all';
-  newType: ChaosCellType;
-  name?: string;
-  icon?: string;
-  description?: string;
+export interface ChaosBoardMutation {
+  action: 'ADD_CELL' | 'MODIFY_CELL' | 'REMOVE_CELL' | 'SPAWN_ENEMY' | 'ADD_STAT' | 'MODIFY_STAT';
+  cellId?: string;
+  cell?: {
+    id?: string;
+    name?: string;
+    icon?: string;
+    x?: number;
+    y?: number;
+    description?: string;
+    colorTheme?: string;
+  };
+  enemy?: {
+    name: string;
+    icon: string;
+    hp: number;
+    atk: number;
+    reward?: string;
+  };
+  statDef?: {
+    name: string;
+    icon: string;
+    description: string;
+    defaultValue: number;
+  };
+  target?: 'ALL_PLAYERS' | 'CURRENT_PLAYER' | 'KILLER' | 'VICTIM';
+  statName?: string;
+  value?: number;
 }
 
 export interface ChaosRule {
@@ -49,25 +93,9 @@ export interface ChaosRule {
   title: string;
   description: string;
   flavorText: string;
-  trigger: 'ON_DICE_ROLL' | 'ON_PASS_DEPART' | 'ON_TURN_START' | 'ON_LAND_CELL' | 'ON_FIGHT' | 'ON_GAMBLE' | 'ON_ROUND_START';
-  condition: ChaosRuleCondition;
+  trigger: 'ON_MOVE' | 'ON_PVP' | 'ON_PVE' | 'ON_KILL' | 'ON_TURN_START' | 'ON_ROUND_START' | 'ON_CELL_ENTER';
   effects: ChaosRuleEffect[];
-  boardModifications?: ChaosBoardMod[];
-}
-
-export interface ChaosPlayer {
-  id: string;
-  username: string;
-  color: string;
-  position: number;
-  health: number;
-  maxHealth: number;
-  gold: number;
-  power: number;
-  debt: number;
-  isEliminated: boolean;
-  roundsWon: number;
-  lapsCompleted: number;
+  boardMutations?: ChaosBoardMutation[];
 }
 
 export interface ChaosAiLog {
@@ -80,6 +108,19 @@ export interface ChaosAiLog {
   latencyMs?: number;
 }
 
+export interface ChaosCombatEvent {
+  id: string;
+  timestamp: string;
+  attackerName: string;
+  targetName: string;
+  damageDealt: number;
+  targetRetaliationDamage?: number;
+  targetDied: boolean;
+  attackerDied: boolean;
+  isPvP: boolean;
+  message: string;
+}
+
 export interface ChaosGameState {
   status: 'LOBBY' | 'PLAYING' | 'DRAFTING_RULE' | 'FINISHED';
   roomCode: string;
@@ -87,8 +128,8 @@ export interface ChaosGameState {
   maxRounds: number;
   players: ChaosPlayer[];
   currentPlayerIndex: number;
-  board: ChaosCell[];
-  lastDiceRoll: number | null;
+  cells: ChaosCell[];
+  definedStats: ChaosStatDef[];
   activeRules: ChaosRule[];
   draftingPlayerId: string | null;
   draftingPlayerName: string | null;
@@ -100,6 +141,7 @@ export interface ChaosGameState {
     message: string;
     author: string;
   } | null;
+  lastCombatEvent: ChaosCombatEvent | null;
   winner: ChaosPlayer | null;
   log: string[];
   aiLogs: ChaosAiLog[];

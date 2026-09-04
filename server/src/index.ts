@@ -547,20 +547,11 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('chaos:rollDice', () => {
+  socket.on('chaos:move', ({ targetCellId }: { targetCellId: string }) => {
     const roomCode = (socket as any).roomCode;
     if (!roomCode || !chaosGames[roomCode]) return;
     const game = chaosGames[roomCode];
-    if (game.rollDice(socket.id)) {
-      io.to(roomCode).emit('chaosStateUpdate', game.getState());
-    }
-  });
-
-  socket.on('chaos:playAction', ({ actionType, params }: { actionType: string, params: any }) => {
-    const roomCode = (socket as any).roomCode;
-    if (!roomCode || !chaosGames[roomCode]) return;
-    const game = chaosGames[roomCode];
-    if (game.playAction(socket.id, actionType as 'GAMBLE' | 'FIGHT', params)) {
+    if (game.movePlayer(socket.id, targetCellId)) {
       io.to(roomCode).emit('chaosStateUpdate', game.getState());
     }
   });
@@ -575,24 +566,6 @@ io.on('connection', (socket) => {
       io.to(roomCode).emit('chaosStateUpdate', game.getState());
     });
     io.to(roomCode).emit('chaosStateUpdate', game.getState());
-  });
-
-  socket.on('chaos:modifyCell', ({ cellIndex, newType }: { cellIndex: number, newType: any }) => {
-    const roomCode = (socket as any).roomCode;
-    if (!roomCode || !chaosGames[roomCode]) return;
-    const game = chaosGames[roomCode];
-    if (game.modifyCell(socket.id, cellIndex, newType)) {
-      io.to(roomCode).emit('chaosStateUpdate', game.getState());
-    }
-  });
-
-  socket.on('chaos:passTurn', () => {
-    const roomCode = (socket as any).roomCode;
-    if (!roomCode || !chaosGames[roomCode]) return;
-    const game = chaosGames[roomCode];
-    if (game.passTurn(socket.id)) {
-      io.to(roomCode).emit('chaosStateUpdate', game.getState());
-    }
   });
 
   socket.on('chaos:resetGame', () => {
