@@ -124,6 +124,12 @@ export default function RtsApp() {
       const dt = (currentTime - lastTime) / 1000;
       lastTime = currentTime;
 
+      // Ensure canvas internal buffer always strictly matches browser window
+      if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+
       // Handle WASD camera panning
       const panSpeed = 500 * dt;
       if (keysDownRef.current['z'] || keysDownRef.current['w'] || keysDownRef.current['arrowup']) cameraRef.current.y -= panSpeed;
@@ -180,7 +186,7 @@ export default function RtsApp() {
     };
   }, [gameState, placementMode, mouseWorldPos, selectedUnitIds, selectedBuildingId, selectionBox]);
 
-  // Window resize handler
+  // Window resize handler & canvas sizing
   useEffect(() => {
     const handleResize = () => {
       if (canvasRef.current) {
@@ -191,7 +197,18 @@ export default function RtsApp() {
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [gameState?.status]);
+
+  // Center camera on player's Nexus on match start
+  useEffect(() => {
+    if (gameState?.status === 'PLAYING' && me) {
+      const myNexus = gameState.buildings.find(b => b.playerId === me.id && b.type === 'nexus');
+      if (myNexus) {
+        cameraRef.current.x = myNexus.x;
+        cameraRef.current.y = myNexus.y;
+      }
+    }
+  }, [gameState?.status, me?.id]);
 
   // ─── COORDINATE CONVERSION ───────────────────────────────────────────────
 
@@ -425,6 +442,15 @@ export default function RtsApp() {
     e.preventDefault();
     const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
     cameraRef.current.zoom = Math.max(0.5, Math.min(2.0, cameraRef.current.zoom * zoomFactor));
+  };
+
+  const handleMinimapClick = (e: MouseEvent<HTMLDivElement>) => {
+    if (!gameState) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = (e.clientX - rect.left) / rect.width;
+    const clickY = (e.clientY - rect.top) / rect.height;
+    cameraRef.current.x = Math.max(200, Math.min(gameState.mapWidth - 200, clickX * gameState.mapWidth));
+    cameraRef.current.y = Math.max(150, Math.min(gameState.mapHeight - 150, clickY * gameState.mapHeight));
   };
 
   // ─── LOBBY ACTIONS ───────────────────────────────────────────────────────
@@ -675,12 +701,14 @@ export default function RtsApp() {
       {/* 1. Main RTS Canvas Viewport */}
       <canvas
         ref={canvasRef}
+        width={window.innerWidth}
+        height={window.innerHeight}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onWheel={handleWheel}
         onContextMenu={e => e.preventDefault()}
-        className="absolute inset-0 cursor-crosshair"
+        className="absolute inset-0 w-full h-full cursor-crosshair block"
       />
 
       {/* 2. Top Header Resources & Power Bar */}
@@ -1038,7 +1066,10 @@ export default function RtsApp() {
 
         {/* Right: Radar Minimap */}
         <div className="w-56 bg-slate-950 rounded-xl border border-slate-800 p-2 flex flex-col items-center justify-center relative overflow-hidden">
-          <div className="w-full h-full relative bg-slate-900/60 rounded border border-slate-800">
+          <div
+            onClick={handleMinimapClick}
+            className="w-full h-full relative bg-slate-900/60 rounded border border-slate-800 cursor-pointer"
+          >
             {/* Live Units blips on Minimap */}
             {gameState?.units.map(u => (
               <div
