@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
-import type { ChaosGameState, ChaosCell } from './chaos/chaosTypes';
+import type { ChaosGameState, ChaosCell, ChaosDuelState } from './chaos/chaosTypes';
 
 // Use production websocket url or origin, never localhost on deployed domains
 const SERVER_URL =
@@ -12,15 +12,176 @@ const SERVER_URL =
     : 'http://localhost:3001');
 
 const RULE_SUGGESTIONS = [
-  "Invoquer un Dragon Ancestral (80 PV, 30 ATK) sur le plateau !",
-  "Ajouter une nouvelle case Donjon Maudit remplie de pièges !",
-  "Supprimer une case dangereuse du plateau !",
-  "Transformer la case (1, 1) en Fosse de Lave mortelle (-30 PV) !",
-  "Ajouter une nouvelle stat Armure (base 5) réduisant les dégâts !",
-  "Tous les duels PvP volent +10 PV à la victime !",
-  "Chaque déplacement soigne 10 PV mais réduit l'ATK de 2."
+  "Invoquer un Dragon Ancestral (3 ATK) sur le plateau !",
+  "Ajouter une nouvelle case Donjon Maudit en (3, 0) !",
+  "Supprimer la case du milieu du plateau !",
+  "Transformer la case (0, 0) en Fosse de Lave mortelle (-1 PV) !",
+  "Ajouter une nouvelle stat Armure (base 1) !",
+  "Tous les duels PvP font perdre 2 PV au perdant au lieu de 1 !",
+  "Chaque déplacement redonne 1 PV."
 ];
 
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPONENT: ROULETTE DU DESTIN (WHEEL OF FORTUNE MODAL)
+// ─────────────────────────────────────────────────────────────────────────────
+function RouletteModal({ duel, onResolve }: { duel: ChaosDuelState; onResolve: () => void }) {
+  const [rotation, setRotation] = useState(0);
+  const [isSpinning, setIsSpinning] = useState(true);
+  const [hasLanded, setHasLanded] = useState(false);
+
+  useEffect(() => {
+    // Start rotation shortly after mount
+    const spinTimer = setTimeout(() => {
+      setRotation(duel.targetAngle);
+    }, 120);
+
+    const landTimer = setTimeout(() => {
+      setIsSpinning(false);
+      setHasLanded(true);
+    }, 3350);
+
+    return () => {
+      clearTimeout(spinTimer);
+      clearTimeout(landTimer);
+    };
+  }, [duel]);
+
+  const attackerSliceDeg = (duel.attackerChance / 100) * 360;
+  const gradient = `conic-gradient(${duel.attackerColor || '#ef4444'} 0deg ${attackerSliceDeg}deg, ${duel.defenderColor || '#3b82f6'} ${attackerSliceDeg}deg 360deg)`;
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in select-none">
+      <div className="max-w-lg w-full bg-slate-900 border-2 border-amber-500 rounded-3xl p-6 shadow-2xl text-center relative overflow-hidden">
+        <div className="absolute -top-16 -right-16 w-44 h-44 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Modal Header */}
+        <div className="mb-3">
+          <span className="text-[10px] uppercase font-black tracking-widest text-amber-400 bg-amber-950/80 px-2.5 py-1 rounded-full border border-amber-800">
+            🎰 Duel PvP • La Roulette du Destin
+          </span>
+          <h2 className="text-2xl font-black text-white mt-1">
+            {isSpinning ? 'LA ROUE DU DESTIN TOURNE...' : 'LE VERDICT EST TOMBÉ !'}
+          </h2>
+        </div>
+
+        {/* Duelists Cards: Attacker vs Defender */}
+        <div className="grid grid-cols-5 items-center gap-2 mb-4">
+          {/* Attacker */}
+          <div className="col-span-2 p-2.5 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col items-center">
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-black text-white shadow-lg mb-1"
+              style={{ backgroundColor: duel.attackerColor }}
+            >
+              {duel.attackerName[0].toUpperCase()}
+            </div>
+            <div className="font-bold text-xs text-white truncate max-w-[120px]">{duel.attackerName}</div>
+            <div className="text-[10px] text-amber-400 font-mono">⚔️ {duel.attackerAtk} ATK</div>
+            <div className="mt-1 px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-[10px] font-black text-emerald-400">
+              {duel.attackerChance}% de chances
+            </div>
+          </div>
+
+          {/* VS badge */}
+          <div className="col-span-1 flex flex-col items-center justify-center">
+            <div className="w-9 h-9 rounded-full bg-amber-500/20 border border-amber-500/50 flex items-center justify-center font-black text-xs text-amber-400">
+              VS
+            </div>
+          </div>
+
+          {/* Defender */}
+          <div className="col-span-2 p-2.5 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col items-center">
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-black text-white shadow-lg mb-1"
+              style={{ backgroundColor: duel.defenderColor }}
+            >
+              {duel.defenderName[0].toUpperCase()}
+            </div>
+            <div className="font-bold text-xs text-white truncate max-w-[120px]">{duel.defenderName}</div>
+            <div className="text-[10px] text-amber-400 font-mono">⚔️ {duel.defenderAtk} ATK</div>
+            <div className="mt-1 px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-[10px] font-black text-emerald-400">
+              {duel.defenderChance}% de chances
+            </div>
+          </div>
+        </div>
+
+        {/* THE WHEEL */}
+        <div className="relative w-64 h-64 mx-auto my-3 flex items-center justify-center">
+          {/* Top Golden Pointer */}
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center">
+            <div className="w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[20px] border-t-amber-400 drop-shadow-[0_4px_6px_rgba(0,0,0,0.9)] animate-pulse" />
+          </div>
+
+          {/* Outer Ring */}
+          <div className="w-full h-full rounded-full p-2 bg-gradient-to-tr from-amber-600 via-yellow-400 to-amber-700 shadow-2xl shadow-purple-950/80 border-2 border-amber-300 flex items-center justify-center">
+            {/* Spinning Disk */}
+            <div
+              className="w-full h-full rounded-full relative overflow-hidden shadow-inner flex items-center justify-center"
+              style={{
+                background: gradient,
+                transform: `rotate(${rotation}deg)`,
+                transition: 'transform 3200ms cubic-bezier(0.12, 0.8, 0.18, 1)'
+              }}
+            >
+              {/* Dividers */}
+              <div className="absolute w-full h-[2px] bg-slate-950/80" style={{ transform: 'rotate(0deg)' }} />
+              <div className="absolute w-full h-[2px] bg-slate-950/80" style={{ transform: `rotate(${attackerSliceDeg}deg)` }} />
+
+              {/* Attacker Label */}
+              <div
+                className="absolute text-center text-white font-black text-xs drop-shadow-[0_2px_4px_rgba(0,0,0,1)] pointer-events-none"
+                style={{
+                  transform: `rotate(${attackerSliceDeg / 2}deg) translateY(-60px)`
+                }}
+              >
+                <div className="truncate max-w-[90px]">{duel.attackerName}</div>
+                <div className="text-[10px] opacity-90">{duel.attackerChance}%</div>
+              </div>
+
+              {/* Defender Label */}
+              <div
+                className="absolute text-center text-white font-black text-xs drop-shadow-[0_2px_4px_rgba(0,0,0,1)] pointer-events-none"
+                style={{
+                  transform: `rotate(${attackerSliceDeg + (360 - attackerSliceDeg) / 2}deg) translateY(-60px)`
+                }}
+              >
+                <div className="truncate max-w-[90px]">{duel.defenderName}</div>
+                <div className="text-[10px] opacity-90">{duel.defenderChance}%</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Center Hub */}
+          <div className="absolute w-14 h-14 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-300 border-2 border-white shadow-xl flex items-center justify-center text-lg z-10 font-bold">
+            ⚔️
+          </div>
+        </div>
+
+        {/* Result & Continue */}
+        {hasLanded ? (
+          <div className="mt-3 space-y-2 animate-fade-in">
+            <div className="p-3 rounded-2xl bg-emerald-950/60 border border-emerald-500/80 text-emerald-200 text-xs font-bold">
+              🎉 <strong>{duel.winnerName}</strong> remporte le duel ! <strong>{duel.loserName}</strong> perd 1 PV !
+            </div>
+            <button
+              onClick={onResolve}
+              className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black rounded-xl text-xs transition shadow-lg cursor-pointer"
+            >
+              Continuer le Combat ⏩
+            </button>
+          </div>
+        ) : (
+          <div className="text-xs text-slate-400 animate-pulse font-bold mt-2">
+            La roue tourne... Que le sort décide du vainqueur !
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN COMPONENT: ChaosApp
+// ─────────────────────────────────────────────────────────────────────────────
 export default function ChaosApp() {
   const navigate = useNavigate();
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -46,7 +207,7 @@ export default function ChaosApp() {
 
   // ─── SOCKET CONNECTION ───────────────────────────────────────────────────
   useEffect(() => {
-    console.log('[CHAOS] Connexion à :', SERVER_URL);
+    console.log('[CHAOS] Connexion au serveur :', SERVER_URL);
     const s = io(SERVER_URL, {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 5,
@@ -102,11 +263,10 @@ export default function ChaosApp() {
   };
 
   const handleCellClick = (cell: ChaosCell) => {
-    if (!isMyTurn || !me) return;
+    if (!isMyTurn || !me || gameState?.activeDuel) return;
     const currentCell = gameState?.cells.find(c => c.id === me.cellId);
     if (!currentCell) return;
 
-    // Check adjacency
     const dx = Math.abs(cell.x - currentCell.x);
     const dy = Math.abs(cell.y - currentCell.y);
     const speed = me.customStats['Vitesse'] || me.customStats['vitesse'] || 1;
@@ -114,6 +274,10 @@ export default function ChaosApp() {
     if (cell.id !== currentCell.id && dx <= speed && dy <= speed) {
       socket?.emit('chaos:move', { targetCellId: cell.id });
     }
+  };
+
+  const handleResolveDuel = () => {
+    socket?.emit('chaos:resolveDuel');
   };
 
   const handleSubmitRule = (e: React.FormEvent) => {
@@ -150,12 +314,12 @@ export default function ChaosApp() {
           </div>
 
           <div className="text-center mb-8">
-            <div className="text-6xl mb-3 animate-bounce">⚔️👑</div>
+            <div className="text-6xl mb-3 animate-bounce">⚔️🎰</div>
             <h1 className="text-3xl font-black bg-gradient-to-r from-amber-400 via-purple-400 to-rose-400 bg-clip-text text-transparent">
               CHAOS BOARD
             </h1>
             <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              Plateau 3x2 tactique • Déplacement par clic • Combats PvP & PvE • Décrets de mort par l'IA modifiant n'importe quel élément !
+              Plateau 3x2 • Déplacement par clic • Roulette PvP pondérée par l'ATK • Décrets illimités par l'IA !
             </p>
           </div>
 
@@ -258,8 +422,8 @@ export default function ChaosApp() {
             <div className="font-bold text-slate-300">Règles du Chaos Tactique :</div>
             <div>• Stats de départ : <strong>3 PV</strong> et <strong>1 ATK</strong>. Perdre un combat fait perdre <strong>1 PV</strong>.</div>
             <div>• Plateau initial de <strong>6 cases (3 x 2)</strong> neutres. Cliquez pour vous déplacer.</div>
-            <div>• Rejoindre une case avec un joueur déclenche un <strong>duel PvP immédiat</strong> !</div>
-            <div>• Le joueur éliminé à 0 PV dicte un décret absolu avec l'IA et tout le monde ressuscite !</div>
+            <div>• Duel PvP à la <strong>Roulette du Destin</strong> : 50/50 si même ATK, sinon pourcentage selon l'ATK !</div>
+            <div>• Manches <strong>illimitées</strong> : le joueur à 0 PV dicte une règle et tout le monde ressuscite !</div>
           </div>
 
           <button
@@ -280,7 +444,6 @@ export default function ChaosApp() {
   const activePlayer = gameState.players[gameState.currentPlayerIndex];
   const myCurrentCell = gameState.cells.find(c => c.id === me?.cellId);
 
-  // Group cells into a 2D layout (find maxX and maxY)
   const maxX = gameState.cells.reduce((max, c) => Math.max(max, c.x), 0);
   const maxY = gameState.cells.reduce((max, c) => Math.max(max, c.y), 0);
 
@@ -338,7 +501,7 @@ export default function ChaosApp() {
             </div>
             {isMyTurn ? (
               <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-xs text-emerald-200">
-                👉 <strong>Cliquez sur une case adjacente</strong> pour vous déplacer, attaquer un joueur ou affronter un monstre !
+                👉 <strong>Cliquez sur une case adjacente</strong> pour vous déplacer ou lancer un duel à la roulette !
               </div>
             ) : (
               <div className="text-xs text-slate-400">
@@ -384,7 +547,7 @@ export default function ChaosApp() {
                     <span className="text-amber-400">⚔️ {p.atk} ATK</span>
                   </div>
 
-                  {/* Custom Stats defined by AI rules */}
+                  {/* Custom Stats */}
                   {Object.keys(p.customStats).length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-slate-800/60">
                       {Object.entries(p.customStats).map(([stat, val]) => (
@@ -424,9 +587,8 @@ export default function ChaosApp() {
                   const playersOnCell = gameState.players.filter(p => p.cellId === cell.id && !p.isEliminated);
                   const isCurrentCell = me?.cellId === cell.id;
 
-                  // Check if reachable on my turn
                   let isReachable = false;
-                  if (isMyTurn && myCurrentCell && cell.id !== myCurrentCell.id) {
+                  if (isMyTurn && myCurrentCell && cell.id !== myCurrentCell.id && !gameState.activeDuel) {
                     const dx = Math.abs(cell.x - myCurrentCell.x);
                     const dy = Math.abs(cell.y - myCurrentCell.y);
                     const speed = me?.customStats['Vitesse'] || me?.customStats['vitesse'] || 1;
@@ -477,7 +639,7 @@ export default function ChaosApp() {
                         </div>
                       </div>
 
-                      {/* Monsters / Enemies Present */}
+                      {/* Monsters */}
                       {hasMonsters && (
                         <div className="space-y-1 my-1">
                           {cell.enemies.map(en => (
@@ -496,7 +658,7 @@ export default function ChaosApp() {
                         </div>
                       )}
 
-                      {/* Players Tokens Present on this cell */}
+                      {/* Players Tokens */}
                       <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-white/10">
                         <div className="flex items-center gap-1 flex-wrap">
                           {playersOnCell.map(p => (
@@ -504,17 +666,16 @@ export default function ChaosApp() {
                               key={p.id}
                               className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-black text-white shadow-md"
                               style={{ backgroundColor: p.color }}
-                              title={`${p.username} (${p.hp} PV, ${p.atk} ATK)`}
+                              title={`${p.username} (${p.hp}/${p.maxHp} PV, ${p.atk} ATK)`}
                             >
                               {p.username[0].toUpperCase()}
                             </div>
                           ))}
                         </div>
 
-                        {/* Interactive prompt button if reachable */}
                         {isReachable && (
                           <div className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500 text-slate-950 shadow animate-pulse">
-                            {hasEnemyPlayers ? '⚔️ DUEL PVP' : hasMonsters ? '🗡️ ATTAQUER' : '🚶 ALLER'}
+                            {hasEnemyPlayers ? '🎰 ROULETTE PVP' : hasMonsters ? '🗡️ COMBAT' : '🚶 ALLER'}
                           </div>
                         )}
                       </div>
@@ -526,7 +687,7 @@ export default function ChaosApp() {
           </div>
         </div>
 
-        {/* Right Column: Multi-tab Panel (Décrets / Logs IA / Chronique) */}
+        {/* Right Column: Multi-tab Panel */}
         <div className="col-span-3 flex flex-col gap-3 overflow-hidden">
           <div className="bg-slate-900/90 border border-purple-900/60 rounded-2xl p-4 shadow-xl flex-1 flex flex-col overflow-hidden">
             {/* Tab Selector */}
@@ -657,6 +818,13 @@ export default function ChaosApp() {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────────
+          MODAL 0: ROULETTE DU DESTIN (ACTIVE DUEL)
+      ────────────────────────────────────────────────────────────────────── */}
+      {gameState.activeDuel && (
+        <RouletteModal duel={gameState.activeDuel} onResolve={handleResolveDuel} />
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────────
           MODAL 1: DRAFTING RULE (THE CORE HOOK WHEN SOMEONE DIES)
       ────────────────────────────────────────────────────────────────────── */}
       {gameState.status === 'DRAFTING_RULE' && (
@@ -665,7 +833,6 @@ export default function ChaosApp() {
             <div className="absolute -top-16 -right-16 w-44 h-44 bg-purple-600/20 rounded-full blur-3xl pointer-events-none" />
 
             {isMeDrafting ? (
-              // The dead player writes their rule!
               <div>
                 <div className="text-center mb-6">
                   <div className="text-5xl mb-2 animate-bounce">💀📜</div>
@@ -686,14 +853,13 @@ export default function ChaosApp() {
                     <textarea
                       value={customRuleInput}
                       onChange={e => setCustomRuleInput(e.target.value)}
-                      placeholder="Ex: Invoquer un Dragon Ancestral de 80 PV et 30 ATK sur le plateau, ou ajouter une stat Armure de base 5..."
+                      placeholder="Ex: Invoquer un Dragon Ancestral (3 ATK), ou ajouter une stat Armure (base 1)..."
                       rows={3}
                       className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 text-xs transition"
                       required
                     />
                   </div>
 
-                  {/* Suggestion Chips */}
                   <div>
                     <div className="text-[10px] text-slate-500 uppercase font-bold mb-1.5">Idées & Inspirations :</div>
                     <div className="flex flex-wrap gap-1.5">
@@ -733,7 +899,6 @@ export default function ChaosApp() {
                 </form>
               </div>
             ) : (
-              // Surviving players wait for the dead player
               <div className="text-center py-6 space-y-4">
                 <div className="text-5xl animate-pulse">⚖️👑</div>
                 <h2 className="text-2xl font-black text-amber-400">UN COMBATTANT EST MORT !</h2>

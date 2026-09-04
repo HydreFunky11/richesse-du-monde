@@ -121,6 +121,28 @@ export interface ChaosCombatEvent {
   message: string;
 }
 
+export interface ChaosDuelState {
+  id: string;
+  attackerId: string;
+  attackerName: string;
+  attackerColor: string;
+  attackerAtk: number;
+  attackerChance: number;
+  defenderId: string;
+  defenderName: string;
+  defenderColor: string;
+  defenderAtk: number;
+  defenderChance: number;
+  winnerId: string;
+  winnerName: string;
+  loserId: string;
+  loserName: string;
+  targetAngle: number;
+  startedAt: number;
+  durationMs: number;
+  isResolved: boolean;
+}
+
 export interface ChaosGameState {
   status: 'LOBBY' | 'PLAYING' | 'DRAFTING_RULE' | 'FINISHED';
   roomCode: string;
@@ -145,4 +167,5 @@ export interface ChaosGameState {
   winner: ChaosPlayer | null;
   log: string[];
   aiLogs: ChaosAiLog[];
+  activeDuel: ChaosDuelState | null;
 }

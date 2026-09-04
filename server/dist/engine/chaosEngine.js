@@ -87,7 +87,8 @@ class ChaosEngine {
             lastCombatEvent: null,
             winner: null,
             log: ['Arène du Chaos 3x2 initialisée. Choisissez votre case et tuez pour survivre !'],
-            aiLogs: []
+            aiLogs: [],
+            activeDuel: null
         };
     }
     getPlayers() {
@@ -220,40 +221,102 @@ class ChaosEngine {
                 }
             }
         }
-        // 5. PVP COMBAT (Other players on cell)
+        // 5. PVP COMBAT (Roulette du Destin)
         const opponents = this.state.players.filter(p => p.id !== activePlayer.id && p.cellId === targetCellId && !p.isEliminated);
         if (opponents.length > 0) {
             const defender = opponents[0];
-            this.state.log.push(`⚔️ [DUEL PVP] ${activePlayer.username} (${activePlayer.atk} ATK) affronte ${defender.username} (${defender.atk} ATK) !`);
-            this.evaluateRules('ON_PVP', { attacker: activePlayer, defender });
-            // Higher ATK wins. Attacker wins ties (initiative of movement)
-            const attackerWins = activePlayer.atk >= defender.atk;
+            // Calculate chances based on ATK:
+            // "si ils ont la meme atk alors c'est 50/50 sinon c'est des pourcentage en fonction de l'atk"
+            let attackerChance;
+            let defenderChance;
+            const totalAtk = Math.max(1, activePlayer.atk + defender.atk);
+            if (activePlayer.atk === defender.atk) {
+                attackerChance = 50;
+                defenderChance = 50;
+            }
+            else {
+                attackerChance = Math.round((activePlayer.atk / totalAtk) * 100);
+                defenderChance = 100 - attackerChance;
+            }
+            // Determine winner with weighted probability
+            const roll = Math.random() * 100;
+            const attackerWins = roll < attackerChance;
             const winner = attackerWins ? activePlayer : defender;
             const loser = attackerWins ? defender : activePlayer;
-            // Losing a combat makes you lose 1 HP
-            loser.hp -= 1;
-            this.state.log.push(attackerWins
-                ? `🏆 ${activePlayer.username} remporte le duel ! ${defender.username} perd 1 PV (${Math.max(0, defender.hp)}/${defender.maxHp} PV).`
-                : `🛡️ ${defender.username} remporte le duel en défense ! ${activePlayer.username} perd 1 PV (${Math.max(0, activePlayer.hp)}/${activePlayer.maxHp} PV).`);
-            this.state.lastCombatEvent = {
-                id: `combat_${Date.now()}`,
-                timestamp: new Date().toLocaleTimeString('fr-FR'),
-                attackerName: activePlayer.username,
-                targetName: defender.username,
-                damageDealt: 1,
-                targetDied: defender.hp <= 0,
-                attackerDied: activePlayer.hp <= 0,
-                isPvP: true,
-                message: `${winner.username} a vaincu ${loser.username} (-1 PV) !`
-            };
-            if (loser.hp <= 0) {
-                winner.kills++;
-                this.state.log.push(`💀 [MORT] ${loser.username} est tombé à 0 PV !`);
-                this.handlePlayerDeath(loser, `Éliminé en duel par ${winner.username}`);
-                return true;
+            // Calculate stop angle for the roulette:
+            const attackerSliceDeg = (attackerChance / 100) * 360;
+            let landingAngle;
+            if (attackerWins) {
+                landingAngle = attackerSliceDeg * 0.5;
             }
+            else {
+                landingAngle = attackerSliceDeg + (360 - attackerSliceDeg) * 0.5;
+            }
+            // 5 full rotations (1800 deg) + angle alignment with top pointer
+            const targetAngle = 1800 + (360 - landingAngle);
+            const duel = {
+                id: `duel_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                attackerId: activePlayer.id,
+                attackerName: activePlayer.username,
+                attackerColor: activePlayer.color,
+                attackerAtk: activePlayer.atk,
+                attackerChance,
+                defenderId: defender.id,
+                defenderName: defender.username,
+                defenderColor: defender.color,
+                defenderAtk: defender.atk,
+                defenderChance,
+                winnerId: winner.id,
+                winnerName: winner.username,
+                loserId: loser.id,
+                loserName: loser.username,
+                targetAngle,
+                startedAt: Date.now(),
+                durationMs: 3500,
+                isResolved: false
+            };
+            this.state.activeDuel = duel;
+            this.state.log.push(`🎰 [ROULETTE DU DESTIN] Duel entre ${activePlayer.username} (${attackerChance}%) et ${defender.username} (${defenderChance}%) ! La roulette tourne...`);
+            this.evaluateRules('ON_PVP', { attacker: activePlayer, defender });
+            return true;
         }
-        // 6. Turn passes to next player
+        // 6. Turn passes to next player (if no duel)
+        this.passTurnToNext();
+        return true;
+    }
+    resolveDuel() {
+        if (!this.state.activeDuel || this.state.activeDuel.isResolved) {
+            return false;
+        }
+        const duel = this.state.activeDuel;
+        duel.isResolved = true;
+        const winner = this.state.players.find(p => p.id === duel.winnerId);
+        const loser = this.state.players.find(p => p.id === duel.loserId);
+        if (!winner || !loser) {
+            this.state.activeDuel = null;
+            return false;
+        }
+        // Loser loses 1 HP
+        loser.hp -= 1;
+        winner.kills++;
+        this.state.log.push(`🏆 La roulette s'est arrêtée sur ${winner.username} ! ${loser.username} perd 1 PV (${Math.max(0, loser.hp)}/${loser.maxHp} PV).`);
+        this.state.lastCombatEvent = {
+            id: `combat_${Date.now()}`,
+            timestamp: new Date().toLocaleTimeString('fr-FR'),
+            attackerName: duel.attackerName,
+            targetName: duel.defenderName,
+            damageDealt: 1,
+            targetDied: loser.hp <= 0,
+            attackerDied: false,
+            isPvP: true,
+            message: `${winner.username} a triomphé à la roulette face à ${loser.username} (-1 PV) !`
+        };
+        this.state.activeDuel = null;
+        if (loser.hp <= 0) {
+            this.state.log.push(`💀 [MORT] ${loser.username} est tombé à 0 PV !`);
+            this.handlePlayerDeath(loser, `Vaincu en duel à la roulette par ${winner.username}`);
+            return true;
+        }
         this.passTurnToNext();
         return true;
     }
@@ -513,6 +576,7 @@ class ChaosEngine {
         this.state.cells = JSON.parse(JSON.stringify(INITIAL_CELLS));
         this.state.definedStats = [];
         this.state.aiLogs = [];
+        this.state.activeDuel = null;
         for (let i = 0; i < this.state.players.length; i++) {
             const p = this.state.players[i];
             p.cellId = this.state.cells[i % this.state.cells.length].id;

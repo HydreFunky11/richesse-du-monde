@@ -547,6 +547,25 @@ io.on('connection', (socket) => {
         const game = chaosGames[roomCode];
         if (game.movePlayer(socket.id, targetCellId)) {
             io.to(roomCode).emit('chaosStateUpdate', game.getState());
+            const duel = game.getState().activeDuel;
+            if (duel) {
+                setTimeout(() => {
+                    if (game.getState().activeDuel?.id === duel.id) {
+                        if (game.resolveDuel()) {
+                            io.to(roomCode).emit('chaosStateUpdate', game.getState());
+                        }
+                    }
+                }, 4500);
+            }
+        }
+    });
+    socket.on('chaos:resolveDuel', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !chaosGames[roomCode])
+            return;
+        const game = chaosGames[roomCode];
+        if (game.resolveDuel()) {
+            io.to(roomCode).emit('chaosStateUpdate', game.getState());
         }
     });
     socket.on('chaos:draftRule', async ({ ruleText }) => {
