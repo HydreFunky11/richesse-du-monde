@@ -5,7 +5,7 @@ import {
   ChaosCellType,
   ChaosRule
 } from '../types/chaos';
-import { interpretChaosRule } from './chaosAi';
+import { interpretChaosRule, getCellDefaultMeta } from './chaosAi';
 
 const INITIAL_BOARD: Omit<ChaosCell, 'index'>[] = [
   { type: 'DEPART', name: 'Départ', icon: '🏁', description: '+300 Or et +20 PV en passant' },
@@ -52,7 +52,8 @@ export class ChaosEngine {
       isAiGenerating: false,
       lastAnnouncement: null,
       winner: null,
-      log: ['Arène du Chaos prête. Rejoignez le salon et préparez-vous au pire !']
+      log: ['Arène du Chaos prête. Rejoignez le salon et préparez-vous au pire !'],
+      aiLogs: []
     };
   }
 
@@ -175,6 +176,10 @@ export class ChaosEngine {
         player.power = Math.max(0, player.power - 5);
         player.gold = Math.max(0, player.gold - 50);
         this.state.log.push(`💀 Malédiction : ${player.username} perd 5 Puissance et 50 Or !`);
+        break;
+      case 'GOLD':
+        player.gold += 150;
+        this.state.log.push(`💰 Mine d'Or : ${player.username} récolte 150 pièces d'or !`);
         break;
       case 'CHEST':
         const chestGold = Math.floor(Math.random() * 200) + 100;
@@ -326,8 +331,11 @@ export class ChaosEngine {
     }
   }
 
-  // ─── DRAFTING NEW RULE (CALLED FROM CLIENT / AI) ───────────────────────────
-  public async submitNewRule(socketId: string, ruleText: string): Promise<boolean> {
+  public async submitNewRule(
+    socketId: string,
+    ruleText: string,
+    onStepUpdate?: () => void
+  ): Promise<boolean> {
     if (this.state.status !== 'DRAFTING_RULE' || this.state.draftingPlayerId !== socketId) {
       return false;
     }
@@ -338,30 +346,72 @@ export class ChaosEngine {
 
     try {
       // Ask OpenRouter AI to parse, flavour and structure the rule
-      const parsedRule = await interpretChaosRule(ruleText, author, this.state.roundNumber);
+      const parsedRule = await interpretChaosRule(
+        ruleText,
+        author,
+        this.state.roundNumber,
+        (aiLog) => {
+          this.state.aiLogs.push(aiLog);
+          this.state.log.push(aiLog.message);
+          onStepUpdate?.();
+        }
+      );
 
       // Append to active cumulative rules
       this.state.activeRules.push(parsedRule);
 
-      // Apply any board modifications
-      if (parsedRule.boardModifications) {
+      // Apply any board modifications (Creating new cells or mutating existing ones)
+      if (parsedRule.boardModifications && parsedRule.boardModifications.length > 0) {
         for (const mod of parsedRule.boardModifications) {
-          if (mod.cellIndex !== undefined && this.state.board[mod.cellIndex]) {
-            this.state.board[mod.cellIndex].type = mod.newType;
+          const meta = getCellDefaultMeta(mod.newType);
+          const cellName = mod.name || meta.name;
+          const cellIcon = mod.icon || meta.icon;
+          const cellDesc = mod.description || meta.description;
+
+          if (mod.action === 'ADD' || (mod.cellIndex === undefined && !mod.filter)) {
+            const newIndex = this.state.board.length;
+            this.state.board.push({
+              index: newIndex,
+              type: mod.newType,
+              name: cellName,
+              icon: cellIcon,
+              description: cellDesc
+            });
+            this.state.log.push(`🗺️ NOUVELLE CASE #${newIndex} CRÉÉE : [${cellName} ${cellIcon}] - ${cellDesc}`);
+          } else if (mod.cellIndex !== undefined && this.state.board[mod.cellIndex]) {
+            const c = this.state.board[mod.cellIndex];
+            c.type = mod.newType;
+            c.name = cellName;
+            c.icon = cellIcon;
+            c.description = cellDesc;
+            this.state.log.push(`🔄 CASE #${mod.cellIndex} MUTÉE : devient [${cellName} ${cellIcon}] !`);
           } else if (mod.filter === 'even') {
             this.state.board.forEach((c, idx) => {
-              if (idx > 0 && idx % 2 === 0) c.type = mod.newType;
+              if (idx > 0 && idx % 2 === 0) {
+                c.type = mod.newType;
+                c.name = cellName;
+                c.icon = cellIcon;
+                c.description = cellDesc;
+              }
             });
+            this.state.log.push(`🔄 TOUTES LES CASES PAIRES MUTÉES en [${cellName} ${cellIcon}] !`);
           } else if (mod.filter === 'odd') {
             this.state.board.forEach((c, idx) => {
-              if (idx % 2 === 1) c.type = mod.newType;
+              if (idx % 2 === 1) {
+                c.type = mod.newType;
+                c.name = cellName;
+                c.icon = cellIcon;
+                c.description = cellDesc;
+              }
             });
+            this.state.log.push(`🔄 TOUTES LES CASES IMPAIRES MUTÉES en [${cellName} ${cellIcon}] !`);
           }
         }
       }
 
-      // Announce the new rule
+      // Announce the new rule with a unique ID
       this.state.lastAnnouncement = {
+        id: parsedRule.id,
         title: parsedRule.title,
         message: `${parsedRule.flavorText} — ${parsedRule.description}`,
         author
@@ -523,6 +573,7 @@ export class ChaosEngine {
       p.roundsWon = 0;
       p.lapsCompleted = 0;
     }
+    this.state.aiLogs = [];
     this.state.log = ['Partie réinitialisée. En attente du départ...'];
     return true;
   }

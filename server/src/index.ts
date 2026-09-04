@@ -571,7 +571,9 @@ io.on('connection', (socket) => {
     const game = chaosGames[roomCode];
     game.getState().isAiGenerating = true;
     io.to(roomCode).emit('chaosStateUpdate', game.getState());
-    await game.submitNewRule(socket.id, ruleText);
+    await game.submitNewRule(socket.id, ruleText, () => {
+      io.to(roomCode).emit('chaosStateUpdate', game.getState());
+    });
     io.to(roomCode).emit('chaosStateUpdate', game.getState());
   });
 

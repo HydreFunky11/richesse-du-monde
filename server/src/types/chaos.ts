@@ -32,9 +32,13 @@ export interface ChaosRuleCondition {
 }
 
 export interface ChaosBoardMod {
+  action?: 'ADD' | 'MODIFY' | 'REPLACE';
   cellIndex?: number;
   filter?: 'even' | 'odd' | 'all';
   newType: ChaosCellType;
+  name?: string;
+  icon?: string;
+  description?: string;
 }
 
 export interface ChaosRule {
@@ -66,6 +70,16 @@ export interface ChaosPlayer {
   lapsCompleted: number;
 }
 
+export interface ChaosAiLog {
+  timestamp: string;
+  status: 'CALLING' | 'SUCCESS' | 'ERROR' | 'FALLBACK';
+  model?: string;
+  message: string;
+  promptSnippet?: string;
+  responseSnippet?: string;
+  latencyMs?: number;
+}
+
 export interface ChaosGameState {
   status: 'LOBBY' | 'PLAYING' | 'DRAFTING_RULE' | 'FINISHED';
   roomCode: string;
@@ -81,10 +95,12 @@ export interface ChaosGameState {
   draftingReason: string | null;
   isAiGenerating: boolean;
   lastAnnouncement: {
+    id: string;
     title: string;
     message: string;
     author: string;
   } | null;
   winner: ChaosPlayer | null;
   log: string[];
+  aiLogs: ChaosAiLog[];
 }
