@@ -7,62 +7,60 @@ const INITIAL_CELLS = [
         id: 'cell_0_0',
         x: 0,
         y: 0,
-        name: 'Clairière Sacrée',
-        icon: '🌲',
-        description: 'Une zone paisible... pour le moment.',
-        colorTheme: 'from-emerald-950/80 to-teal-900/60 border-emerald-500/60 text-emerald-300',
+        name: 'Case (0, 0)',
+        icon: '⬜',
+        description: 'Case de base neutre.',
+        colorTheme: 'from-slate-900 to-slate-950 border-slate-800 text-slate-300',
         enemies: []
     },
     {
         id: 'cell_1_0',
         x: 1,
         y: 0,
-        name: 'Autel de Sang',
-        icon: '🩸',
-        description: 'La fureur du combat imprègne ce lieu (+5 ATK temporaire).',
-        colorTheme: 'from-rose-950/80 to-red-950/60 border-rose-500/60 text-rose-300',
+        name: 'Case (1, 0)',
+        icon: '⬜',
+        description: 'Case de base neutre.',
+        colorTheme: 'from-slate-900 to-slate-950 border-slate-800 text-slate-300',
         enemies: []
     },
     {
         id: 'cell_2_0',
         x: 2,
         y: 0,
-        name: 'Fosse aux Vipères',
-        icon: '🐍',
-        description: 'Le sol grouille de venin : -10 PV au passage !',
-        colorTheme: 'from-purple-950/80 to-indigo-900/60 border-purple-500/60 text-purple-300',
-        effect: { type: 'DAMAGE', value: 10, description: '-10 PV' },
+        name: 'Case (2, 0)',
+        icon: '⬜',
+        description: 'Case de base neutre.',
+        colorTheme: 'from-slate-900 to-slate-950 border-slate-800 text-slate-300',
         enemies: []
     },
     {
         id: 'cell_0_1',
         x: 0,
         y: 1,
-        name: 'Sanctuaire de Vie',
-        icon: '⛩️',
-        description: 'Des sources curatives régénérantes (+20 PV).',
-        colorTheme: 'from-blue-950/80 to-cyan-900/60 border-blue-500/60 text-blue-300',
-        effect: { type: 'HEAL', value: 20, description: '+20 PV' },
+        name: 'Case (0, 1)',
+        icon: '⬜',
+        description: 'Case de base neutre.',
+        colorTheme: 'from-slate-900 to-slate-950 border-slate-800 text-slate-300',
         enemies: []
     },
     {
         id: 'cell_1_1',
         x: 1,
         y: 1,
-        name: 'Arène de Duel',
-        icon: '⚔️',
-        description: 'Le sol idéal pour régler ses comptes en duel à mort.',
-        colorTheme: 'from-amber-950/80 to-orange-950/60 border-amber-500/60 text-amber-300',
+        name: 'Case (1, 1)',
+        icon: '⬜',
+        description: 'Case de base neutre.',
+        colorTheme: 'from-slate-900 to-slate-950 border-slate-800 text-slate-300',
         enemies: []
     },
     {
         id: 'cell_2_1',
         x: 2,
         y: 1,
-        name: 'Vortex des Ombres',
-        icon: '🌀',
-        description: 'Des créatures impies traversent le voile arcanique.',
-        colorTheme: 'from-violet-950 to-pink-900/80 border-pink-500/70 text-pink-200',
+        name: 'Case (2, 1)',
+        icon: '⬜',
+        description: 'Case de base neutre.',
+        colorTheme: 'from-slate-900 to-slate-950 border-slate-800 text-slate-300',
         enemies: []
     }
 ];
@@ -451,15 +449,8 @@ class ChaosEngine {
         }
     }
     startNextRound() {
+        // Endless rounds: no round limit!
         this.state.roundNumber++;
-        if (this.state.roundNumber > this.state.maxRounds) {
-            // Game over! Winner has most kills
-            const sorted = [...this.state.players].sort((a, b) => b.kills - a.kills || b.hp - a.hp);
-            this.state.winner = sorted[0];
-            this.state.status = 'FINISHED';
-            this.state.log.push(`🏆 FIN DU JEU DU CHAOS ! ${sorted[0].username} triomphe avec ${sorted[0].kills} éliminations !`);
-            return;
-        }
         // Resurrect all players and reposition
         for (let i = 0; i < this.state.players.length; i++) {
             const p = this.state.players[i];

@@ -125,7 +125,7 @@ export interface ChaosGameState {
   status: 'LOBBY' | 'PLAYING' | 'DRAFTING_RULE' | 'FINISHED';
   roomCode: string;
   roundNumber: number;
-  maxRounds: number;
+  maxRounds?: number;
   players: ChaosPlayer[];
   currentPlayerIndex: number;
   cells: ChaosCell[];

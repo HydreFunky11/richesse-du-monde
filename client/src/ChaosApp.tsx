@@ -299,7 +299,7 @@ export default function ChaosApp() {
             <span className="text-lg">⚔️</span>
             <span className="font-black text-white text-sm tracking-wider">CHAOS BOARD</span>
             <span className="text-xs font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
-              MANCHE {gameState.roundNumber} / {gameState.maxRounds}
+              MANCHE {gameState.roundNumber} ♾️
             </span>
             <span className="text-[11px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
               {gameState.cells.length} Cases
@@ -807,7 +807,7 @@ export default function ChaosApp() {
             <div className="text-5xl mb-4 animate-bounce">🏆👑</div>
             <h2 className="text-3xl font-black text-amber-400 mb-2">FIN DE LA PARTIE !</h2>
             <p className="text-sm text-slate-300 mb-4">
-              Après <strong>{gameState.maxRounds} manches</strong> d'apocalypse et <strong>{gameState.activeRules.length} décrets</strong> accumulés :
+              Après <strong>{gameState.roundNumber} manches</strong> d'apocalypse et <strong>{gameState.activeRules.length} décrets</strong> accumulés :
             </p>
 
             <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-sm text-white font-bold mb-6">
