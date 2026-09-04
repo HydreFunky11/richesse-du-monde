@@ -175,6 +175,7 @@ export interface RtsProjectile {
 }
 
 export interface RtsPowerLine {
+  playerId: string;
   fromX: number;
   fromY: number;
   toX: number;

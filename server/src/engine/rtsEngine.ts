@@ -953,6 +953,7 @@ export class RtsEngine {
             if (bothRelays || oneRelay) {
               const active = connectedSet.has(b1.id) && connectedSet.has(b2.id) && player.empRemainingTicks <= 0;
               lines.push({
+                playerId: player.id,
                 fromX: b1.x,
                 fromY: b1.y,
                 toX: b2.x,

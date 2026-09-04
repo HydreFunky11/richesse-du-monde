@@ -223,8 +223,7 @@ export class RtsRenderer {
       this.exploredCanvas.height = Math.ceil(mapH / 4);
       this.exploredCtx = this.exploredCanvas.getContext('2d');
       if (this.exploredCtx) {
-        this.exploredCtx.fillStyle = '#000000';
-        this.exploredCtx.fillRect(0, 0, this.exploredCanvas.width, this.exploredCanvas.height);
+        this.exploredCtx.clearRect(0, 0, this.exploredCanvas.width, this.exploredCanvas.height);
       }
 
       this.fogCanvas = document.createElement('canvas');
@@ -266,7 +265,7 @@ export class RtsRenderer {
     this.drawTerrain(mapW, mapH);
 
     // 2. Power Lines & Electric Grid
-    this.drawPowerLines(powerLines);
+    this.drawPowerLines(powerLines, myPlayerId);
 
     // 3. Resource Nodes (Faceted Crystals, Trees, Coal Rocks)
     this.drawResourceNodes(resourceNodes);
@@ -362,17 +361,58 @@ export class RtsRenderer {
 
   // ─── 2. ELECTRIC POWER GRID & CABLES ──────────────────────────────────────
 
-  private drawPowerLines(lines: RtsPowerLine[]) {
+  private drawPowerLines(lines: RtsPowerLine[], myPlayerId: string) {
     const ctx = this.ctx;
     const time = this.animTime * 3;
 
     for (const line of lines) {
+      const isAlly = line.playerId === myPlayerId;
+
+      // In Fog of War:
+      if (!this.hasGlobalSatellite) {
+        // Enemy power lines: completely invisible unless at least one endpoint is in active sight
+        if (!isAlly) {
+          const fromInSight = this.isPointInActiveSight(line.fromX, line.fromY);
+          const toInSight = this.isPointInActiveSight(line.toX, line.toY);
+          if (!fromInSight && !toInSight) {
+            continue; // Completely hidden in unexplored fog or shroud!
+          }
+        } else {
+          // Ally power lines: only draw if at least one endpoint has been explored
+          const fromExplored = this.isPointExplored(line.fromX, line.fromY);
+          const toExplored = this.isPointExplored(line.toX, line.toY);
+          if (!fromExplored && !toExplored) {
+            continue; // Not yet discovered
+          }
+        }
+      }
+
       const midX = (line.fromX + line.toX) / 2;
       const midY = (line.fromY + line.toY) / 2;
       const dist = Math.hypot(line.toX - line.fromX, line.toY - line.fromY);
       const sag = Math.min(25, dist * 0.08); // realistic catenary cable sag
 
+      // Active sight along cable
+      const isLineInActiveSight = this.hasGlobalSatellite ||
+        this.isPointInActiveSight(line.fromX, line.fromY) ||
+        this.isPointInActiveSight(line.toX, line.toY) ||
+        this.isPointInActiveSight(midX, midY);
+
       ctx.save();
+
+      // If in shroud (explored territory but currently shrouded / no active sight):
+      // Draw as a quiet, dimmed gray memory cable with NO glowing pulses
+      if (!isLineInActiveSight) {
+        ctx.strokeStyle = 'rgba(71, 85, 105, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(line.fromX, line.fromY);
+        ctx.quadraticCurveTo(midX, midY + sag, line.toX, line.toY);
+        ctx.stroke();
+        ctx.restore();
+        continue;
+      }
+
       // Cable shadow
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
       ctx.lineWidth = 2;
@@ -405,6 +445,7 @@ export class RtsRenderer {
           ctx.arc(px, py, 3, 0, Math.PI * 2);
           ctx.fill();
         }
+        ctx.shadowBlur = 0;
       } else {
         // Inactive / severed / brownout cable
         ctx.strokeStyle = '#475569';
@@ -1404,7 +1445,7 @@ export class RtsRenderer {
     // 1. Reset composite and fill with pitch-black unexplored fog
     fCtx.globalCompositeOperation = 'source-over';
     fCtx.globalAlpha = 1.0;
-    fCtx.fillStyle = '#030712'; // deep sci-fi space void
+    fCtx.fillStyle = '#000000'; // 100% pure black, completely opaque
     fCtx.fillRect(0, 0, fw, fh);
 
     // 2. Carve explored regions into shrouded darkness (semi-transparent)

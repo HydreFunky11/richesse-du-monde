@@ -186,6 +186,7 @@ export interface RtsParticleEffect {
 }
 
 export interface RtsPowerLine {
+  playerId: string;
   fromX: number;
   fromY: number;
   toX: number;
