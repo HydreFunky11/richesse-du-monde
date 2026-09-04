@@ -84,7 +84,6 @@ export class ChaosEngine {
       status: 'LOBBY',
       roomCode,
       roundNumber: 1,
-      maxRounds: 5,
       players: [],
       currentPlayerIndex: 0,
       cells: JSON.parse(JSON.stringify(INITIAL_CELLS)),
@@ -583,7 +582,7 @@ export class ChaosEngine {
     this.state.draftingReason = null;
     this.state.currentPlayerIndex = 0;
 
-    this.state.log.push(`✨ MANCHE ${this.state.roundNumber} / ${this.state.maxRounds} COMMENCE ! Tous les joueurs ressuscitent.`);
+    this.state.log.push(`✨ MANCHE ${this.state.roundNumber} (INFINIE ♾️) COMMENCE ! Tous les joueurs ressuscitent.`);
     this.state.log.push(`⚠️ ${this.state.activeRules.length} DÉCRET(S) DU CHAOS SONT ACTIFS !`);
 
     this.evaluateRules('ON_ROUND_START', {});
