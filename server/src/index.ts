@@ -12,6 +12,7 @@ import { KingOfTokyoEngine } from './engine/kingoftokyoEngine';
 import { DungeonMayhemEngine } from './engine/dungeonMayhemEngine';
 import { ClashEngine } from './engine/clashEngine';
 import { SumoEngine } from './engine/sumoEngine';
+import { RtsEngine } from './engine/rtsEngine';
 
 const app = express();
 app.use(cors());
@@ -37,6 +38,7 @@ const kingOfTokyoGames: { [roomCode: string]: KingOfTokyoEngine } = {};
 const mayhemGames: { [roomCode: string]: DungeonMayhemEngine } = {};
 const clashGames: { [roomCode: string]: ClashEngine } = {};
 const sumoGames: { [roomCode: string]: SumoEngine } = {};
+const rtsGames: { [roomCode: string]: RtsEngine } = {};
 const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
 
 
@@ -50,7 +52,7 @@ io.on('connection', (socket) => {
 
   socket.on('joinGame', ({ username, roomCode, gameType }: { username: string, roomCode: string, gameType?: string }) => {
     const formattedRoomCode = roomCode.toUpperCase().trim();
-    const validTypes = ['uno', 'chaos', 'loveletter', 'discretos', 'skyjo', 'kingoftokyo', 'mayhem', 'clash', 'sumo'];
+    const validTypes = ['uno', 'chaos', 'loveletter', 'discretos', 'skyjo', 'kingoftokyo', 'mayhem', 'clash', 'sumo', 'rts'];
     let type = 'richesse';
     if (gameType === 'dungeonmayhem') type = 'mayhem';
     else if (gameType && validTypes.includes(gameType)) type = gameType;
@@ -199,6 +201,26 @@ io.on('connection', (socket) => {
         console.log(`[CLASH LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
       } else {
         socket.emit('error', 'Impossible de rejoindre le salon Clash (partie commencée ou salon plein).');
+      }
+    } else if (type === 'rts') {
+      if (!rtsGames[formattedRoomCode] || rtsGames[formattedRoomCode].getState().status === 'FINISHED' || rtsGames[formattedRoomCode].getPlayers().length === 0) {
+        rtsGames[formattedRoomCode] = new RtsEngine(formattedRoomCode, (state) => {
+          io.to(formattedRoomCode).emit('rtsStateUpdate', state);
+        });
+      }
+      const game = rtsGames[formattedRoomCode];
+      const color = PLAYER_COLORS[game.getPlayers().length] || '#10B981';
+      const success = game.addPlayer(socket.id, username, color);
+
+      if (success) {
+        socket.join(formattedRoomCode);
+        (socket as any).roomCode = formattedRoomCode;
+        (socket as any).username = username;
+        socket.emit('rtsStateUpdate', game.getState());
+        io.to(formattedRoomCode).emit('rtsStateUpdate', game.getState());
+        console.log(`[RTS LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+      } else {
+        socket.emit('error', 'Impossible de rejoindre le salon RTS (partie commencée ou salon plein).');
       }
     } else {
       if (!games[formattedRoomCode] || games[formattedRoomCode].getStatus() === 'FINISHED' || games[formattedRoomCode].getPlayers().length === 0 || games[formattedRoomCode].getPlayers().every(p => p.isBankrupt)) {
@@ -845,6 +867,95 @@ io.on('connection', (socket) => {
     game.resetMatch();
   });
 
+  // ─── RTS (Nexus Wars) Listeners ────────────────────────────────────────────
+
+  socket.on('rts:selectFaction', ({ faction }: { faction: any }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !rtsGames[roomCode]) return;
+    const game = rtsGames[roomCode];
+    if (game.selectFaction(socket.id, faction)) {
+      io.to(roomCode).emit('rtsStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('rts:startGame', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !rtsGames[roomCode]) return;
+    const game = rtsGames[roomCode];
+    if (game.startGame()) {
+      io.to(roomCode).emit('rtsStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('rts:addBot', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !rtsGames[roomCode]) return;
+    const game = rtsGames[roomCode];
+    if (game.addBot()) {
+      io.to(roomCode).emit('rtsStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('rts:order', ({ unitIds, orderType, targetX, targetY, targetId }: { unitIds: string[], orderType: any, targetX?: number, targetY?: number, targetId?: string }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !rtsGames[roomCode]) return;
+    const game = rtsGames[roomCode];
+    game.handleOrder(socket.id, unitIds, orderType, targetX, targetY, targetId);
+  });
+
+  socket.on('rts:build', ({ buildingType, x, y }: { buildingType: any, x: number, y: number }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !rtsGames[roomCode]) return;
+    const game = rtsGames[roomCode];
+    if (game.handleBuild(socket.id, buildingType, x, y)) {
+      io.to(roomCode).emit('rtsStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('rts:produce', ({ buildingId, unitType }: { buildingId: string, unitType: any }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !rtsGames[roomCode]) return;
+    const game = rtsGames[roomCode];
+    if (game.handleProduceUnit(socket.id, buildingId, unitType)) {
+      io.to(roomCode).emit('rtsStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('rts:upgrade', ({ buildingId }: { buildingId: string }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !rtsGames[roomCode]) return;
+    const game = rtsGames[roomCode];
+    if (game.handleUpgradePlant(socket.id, buildingId)) {
+      io.to(roomCode).emit('rtsStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('rts:research', ({ techId }: { techId: any }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !rtsGames[roomCode]) return;
+    const game = rtsGames[roomCode];
+    if (game.handleResearch(socket.id, techId)) {
+      io.to(roomCode).emit('rtsStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('rts:ability', ({ targetX, targetY }: { targetX: number, targetY: number }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !rtsGames[roomCode]) return;
+    const game = rtsGames[roomCode];
+    if (game.handleActivateUltimate(socket.id, targetX, targetY)) {
+      io.to(roomCode).emit('rtsStateUpdate', game.getState());
+    }
+  });
+
+  socket.on('rts:resetGame', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !rtsGames[roomCode]) return;
+    const game = rtsGames[roomCode];
+    game.resetGame();
+    io.to(roomCode).emit('rtsStateUpdate', game.getState());
+  });
+
   // ─── Disconnect ────────────────────────────────────────────────────────────
 
   socket.on('disconnect', () => {
@@ -910,6 +1021,15 @@ io.on('connection', (socket) => {
       if (game.getPlayers().length === 0) {
         game.stopLoop();
         delete clashGames[roomCode];
+      }
+    } else if (gameType === 'rts' && roomCode && rtsGames[roomCode]) {
+      const game = rtsGames[roomCode];
+      game.removePlayer(socket.id);
+      io.to(roomCode).emit('rtsStateUpdate', game.getState());
+      console.log(`[RTS] Déconnexion de ${username} du salon ${roomCode}`);
+      if (game.getPlayers().length === 0) {
+        game.stopLoop();
+        delete rtsGames[roomCode];
       }
     } else if (gameType === 'chaos' && roomCode && chaosGames[roomCode]) {
       const game = chaosGames[roomCode];

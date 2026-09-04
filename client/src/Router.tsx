@@ -11,6 +11,7 @@ import DungeonMayhemApp from './DungeonMayhemApp';
 import ClashApp from './ClashApp';
 import AlchemyApp from './AlchemyApp';
 import SumoApp from './SumoApp';
+import RtsApp from './RtsApp';
 
 export default function Router() {
   return (
@@ -29,6 +30,8 @@ export default function Router() {
       <Route path="/alchimiste" element={<AlchemyApp />} />
       <Route path="/alchemy" element={<AlchemyApp />} />
       <Route path="/sumo" element={<SumoApp />} />
+      <Route path="/rts" element={<RtsApp />} />
+      <Route path="/nexus" element={<RtsApp />} />
     </Routes>
   );
 }

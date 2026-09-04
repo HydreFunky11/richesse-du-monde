@@ -20,6 +20,20 @@ interface GameTheme {
 
 const GAMES: GameTheme[] = [
   {
+    emoji: '🤖',
+    title: 'Cyber-Grid : Nexus Wars',
+    subtitle: 'RTS Futuriste & Guerre Énergétique',
+    description: 'RTS en temps réel ! 4 factions asymétriques (Essaim Nanite, Ordre Aegis, Syndicat Fantôme, Avant-Garde Stellaire), réseau électrique par pylônes, solaires/éoliennes, centrales bois & charbon et arbre de science.',
+    route: '/rts',
+    fontClass: 'font-display font-black tracking-wide',
+    cardTheme: 'bg-gradient-to-b from-cyan-950/80 via-slate-950 to-blue-950/40',
+    borderTheme: 'border-cyan-500/50 hover:border-cyan-300 hover:shadow-cyan-900/60',
+    titleGradient: 'from-cyan-300 via-sky-300 to-indigo-400',
+    badge: 'NOUVEAU • RTS FUTURISTE ⚡',
+    badgeStyle: 'bg-gradient-to-r from-cyan-950 to-blue-900 text-cyan-300 border-cyan-500/50 animate-pulse',
+    players: '1v1 ou Solo contre IA 🤖',
+  },
+  {
     emoji: '🤼',
     title: 'Sumo Smash',
     subtitle: '1v1 Spam & Réflexes QTE',
