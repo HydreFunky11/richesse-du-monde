@@ -444,8 +444,18 @@ export default function ChaosApp() {
   const activePlayer = gameState.players[gameState.currentPlayerIndex];
   const myCurrentCell = gameState.cells.find(c => c.id === me?.cellId);
 
-  const maxX = gameState.cells.reduce((max, c) => Math.max(max, c.x), 0);
-  const maxY = gameState.cells.reduce((max, c) => Math.max(max, c.y), 0);
+  const maxX = gameState.cells.reduce((max, c) => Math.max(max, c.x), 2);
+  const maxY = gameState.cells.reduce((max, c) => Math.max(max, c.y), 1);
+
+  const occupiedSet = new Set(gameState.cells.map(c => `${c.x},${c.y}`));
+  const emptySlots: Array<{ x: number; y: number }> = [];
+  for (let y = 0; y <= maxY; y++) {
+    for (let x = 0; x <= maxX; x++) {
+      if (!occupiedSet.has(`${x},${y}`)) {
+        emptySlots.push({ x, y });
+      }
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col overflow-hidden font-sans">
@@ -576,13 +586,27 @@ export default function ChaosApp() {
             </div>
 
             {/* Tactical Grid Render */}
-            <div className="flex-1 overflow-auto flex items-center justify-center p-2">
+            <div className="flex-1 overflow-auto flex items-center justify-center p-4">
               <div
-                className="grid gap-3 w-full max-w-2xl"
+                className="grid gap-3 w-full max-w-3xl"
                 style={{
-                  gridTemplateColumns: `repeat(${Math.max(3, maxX + 1)}, minmax(0, 1fr))`
+                  gridTemplateColumns: `repeat(${maxX + 1}, minmax(130px, 1fr))`,
+                  gridTemplateRows: `repeat(${maxY + 1}, minmax(140px, auto))`
                 }}
               >
+                {/* Visual empty slot placeholders for topological clarity */}
+                {emptySlots.map(({ x, y }) => (
+                  <div
+                    key={`empty_${x}_${y}`}
+                    style={{ gridColumnStart: x + 1, gridRowStart: y + 1 }}
+                    className="border border-dashed border-slate-800/40 rounded-2xl min-h-[140px] flex flex-col items-center justify-center p-3 text-slate-700/60 select-none bg-slate-950/20"
+                  >
+                    <span className="text-[10px] font-mono opacity-40">({x}, {y})</span>
+                    <span className="text-[11px] text-slate-700 mt-1">Vide</span>
+                  </div>
+                ))}
+
+                {/* Actual cells placed strictly at their cartesian (x, y) coordinates */}
                 {gameState.cells.map(cell => {
                   const playersOnCell = gameState.players.filter(p => p.cellId === cell.id && !p.isEliminated);
                   const isCurrentCell = me?.cellId === cell.id;
@@ -604,6 +628,10 @@ export default function ChaosApp() {
                     <div
                       key={cell.id}
                       onClick={() => isReachable && handleCellClick(cell)}
+                      style={{
+                        gridColumnStart: cell.x + 1,
+                        gridRowStart: cell.y + 1
+                      }}
                       className={`relative p-3 rounded-2xl border transition-all duration-200 flex flex-col justify-between min-h-[140px] select-none ${
                         cell.colorTheme || 'from-slate-900 to-slate-950 border-slate-800 text-slate-300'
                       } bg-gradient-to-b ${

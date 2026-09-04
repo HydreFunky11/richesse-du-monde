@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.interpretChaosRule = interpretChaosRule;
 exports.generateFallbackRule = generateFallbackRule;
+const chaosPromptContext_1 = require("./chaosPromptContext");
 const FALLBACK_B64 = 'c2stb3ItdjEtZjZiNTlkNjNlZDYyMGMxYTk3Mzg0MGUzNGI0OTgxOWIyMWJkMDA5ODExZTUwNGM2NTUxOWIxZjU1OWExZWNiNQ==';
 function getApiKey() {
     if (process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY.trim().length > 10) {
@@ -9,7 +10,7 @@ function getApiKey() {
     }
     return Buffer.from(FALLBACK_B64, 'base64').toString('utf8');
 }
-async function interpretChaosRule(userRuleText, authorName, roundNumber, onLog) {
+async function interpretChaosRule(userRuleText, authorName, roundNumber, currentGameState, onLog) {
     const apiKey = getApiKey();
     const timestamp = new Date().toLocaleTimeString('fr-FR');
     onLog?.({
@@ -18,40 +19,15 @@ async function interpretChaosRule(userRuleText, authorName, roundNumber, onLog) 
         message: `[IA] Début de l'analyse du décret de ${authorName} : "${userRuleText}"`,
         promptSnippet: userRuleText
     });
-    const systemPrompt = `Tu es le Grand Législateur Démoniaque du jeu "Chaos Board".
-Dans ce jeu tactique au tour par tour, les joueurs ont 2 statistiques de base : PV (max 100) et ATK (base 20).
-Le plateau commence avec 6 cases disposées en 3x2 (coordonnées x: 0..2, y: 0..1).
-Les joueurs cliquent sur les cases pour se déplacer. S'ils arrivent sur une case contenant un ennemi, un combat s'engage. S'ils arrivent sur une case avec un autre joueur, un duel PvP se déclenche !
-Quand un joueur meurt, il a le POUVOIR TOTAL de dicter N'IMPORTE QUELLE MODIFICATION du jeu :
-- Ajouter, modifier ou supprimer des cases du plateau.
-- Spawner des ennemis/monstres redoutables sur une case.
-- Créer de toutes nouvelles statistiques (ex: Armure, Poison, Mana, Vitesse, Esquive...).
-- Modifier les stats des joueurs.
-- Créer des règles de combat, de déplacement, de meurtre, ou de manche.
-
-Le joueur décédé (${authorName}) a écrit ce souhait/décret :
-"${userRuleText}"
-
-Ta mission :
-1. "title": Un titre court, épique et mémorable (max 5 mots).
-2. "description": Une explication claire et concise de l'effet en jeu.
-3. "flavorText": Une phrase sarcastique ou drôle se moquant de la mort de ${authorName} ou avertissant les survivants.
-4. "trigger": "ON_MOVE" | "ON_PVP" | "ON_PVE" | "ON_KILL" | "ON_TURN_START" | "ON_ROUND_START" | "ON_CELL_ENTER".
-5. "effects": liste d'effets [{ "type": "DAMAGE" | "HEAL" | "MODIFY_ATK" | "MODIFY_STAT" | "TELEPORT", "target": "CURRENT_PLAYER" | "ALL_PLAYERS" | "ALL_OTHER_PLAYERS" | "TARGET_PLAYER", "statName": "string", "value": number }].
-6. "boardMutations": liste de mutations concrètes du plateau :
-   - Ajouter une case : { "action": "ADD_CELL", "cell": { "name": "Donjon Maudit", "icon": "🏰", "x": 3, "y": 0, "description": "Piège mortel" } }
-   - Supprimer une case : { "action": "REMOVE_CELL", "cellId": "cell_1_1" }
-   - Modifier une case : { "action": "MODIFY_CELL", "cellId": "cell_0_0", "cell": { "name": "Fosse de Lave", "icon": "🔥", "description": "-30 PV" } }
-   - Spawner un ennemi : { "action": "SPAWN_ENEMY", "cellId": "cell_0_0", "enemy": { "name": "Liche Suprême", "icon": "💀", "hp": 50, "atk": 25, "reward": "+15 ATK permanent" } }
-   - Ajouter une nouvelle statistique : { "action": "ADD_STAT", "statDef": { "name": "Armure", "icon": "🛡️", "description": "Réduit les dégâts", "defaultValue": 5 } }
-   - Modifier une statistique : { "action": "MODIFY_STAT", "target": "ALL_PLAYERS", "statName": "atk", "value": 10 }
-
-IMPORTANT: Réponds UNIQUEMENT avec un JSON valide, sans aucune balise de code markdown.
-`;
+    const currentCells = currentGameState?.cells || [];
+    const currentPlayers = currentGameState?.players || [];
+    // Generate the 20,000 token dynamic context and system prompt
+    const systemPrompt = (0, chaosPromptContext_1.buildChaosDynamicSystemPrompt)(currentCells, currentPlayers, authorName, userRuleText);
     const models = [
         'minimax/minimax-m3:free',
-        'minimax/minimax-m2.7:free',
-        'google/gemma-4-31b-it:free'
+        'openrouter/free',
+        'google/gemma-4-31b-it:free',
+        'nvidia/nemotron-3-super-120b-a12b:free'
     ];
     for (const model of models) {
         const startTime = Date.now();
@@ -60,7 +36,7 @@ IMPORTANT: Réponds UNIQUEMENT avec un JSON valide, sans aucune balise de code m
                 timestamp: new Date().toLocaleTimeString('fr-FR'),
                 status: 'CALLING',
                 model,
-                message: `[IA] Envoi de la requête au modèle ${model} via OpenRouter...`
+                message: `[IA] Envoi du Codex (contexte 20k tokens) au modèle ${model} via OpenRouter...`
             });
             const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
@@ -74,7 +50,10 @@ IMPORTANT: Réponds UNIQUEMENT avec un JSON valide, sans aucune balise de code m
                     model,
                     messages: [
                         { role: 'system', content: systemPrompt },
-                        { role: 'user', content: `Décret proclamé par ${authorName} : "${userRuleText}"` }
+                        {
+                            role: 'user',
+                            content: `Je suis le Législateur du Chaos ${authorName}. Voici mon décret divin : "${userRuleText}". Analyse-le et retourne le JSON strict de la règle.`
+                        }
                     ],
                     temperature: 0.7
                 })
@@ -97,11 +76,17 @@ IMPORTANT: Réponds UNIQUEMENT avec un JSON valide, sans aucune balise de code m
             if (!content)
                 continue;
             let jsonStr = content;
+            // Strip markdown code fences if present
+            if (jsonStr.includes('```')) {
+                jsonStr = jsonStr.replace(/```json/gi, '').replace(/```/g, '').trim();
+            }
             if (jsonStr.includes('{') && jsonStr.includes('}')) {
                 const start = jsonStr.indexOf('{');
                 const end = jsonStr.lastIndexOf('}') + 1;
                 jsonStr = jsonStr.slice(start, end);
             }
+            // Remove any trailing commas before } or ]
+            jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
             const parsed = JSON.parse(jsonStr);
             const rule = {
                 id: `rule_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
@@ -110,7 +95,7 @@ IMPORTANT: Réponds UNIQUEMENT avec un JSON valide, sans aucune balise de code m
                 rawInput: userRuleText,
                 title: parsed.title || `Décret de ${authorName}`,
                 description: parsed.description || userRuleText,
-                flavorText: parsed.flavorText || `${authorName} réécrit les règles fondamentales du jeu !`,
+                flavorText: parsed.flavorText || `${authorName} réécrit les lois fondamentales du monde !`,
                 trigger: parsed.trigger || 'ON_MOVE',
                 effects: Array.isArray(parsed.effects) ? parsed.effects : [],
                 boardMutations: Array.isArray(parsed.boardMutations) ? parsed.boardMutations : []
@@ -136,49 +121,59 @@ IMPORTANT: Réponds UNIQUEMENT avec un JSON valide, sans aucune balise de code m
             });
         }
     }
-    // Smart heuristic fallback
+    // Smart heuristic fallback (calibrated strictly to 3 HP / 1 ATK)
     onLog?.({
         timestamp: new Date().toLocaleTimeString('fr-FR'),
         status: 'FALLBACK',
         message: `[IA Fallback] Analyse heuristique instantanée activée.`
     });
-    return generateFallbackRule(userRuleText, authorName, roundNumber);
+    return generateFallbackRule(userRuleText, authorName, roundNumber, currentGameState);
 }
-function generateFallbackRule(userRuleText, authorName, roundNumber) {
+function generateFallbackRule(userRuleText, authorName, roundNumber, currentGameState) {
     const lower = userRuleText.toLowerCase();
+    const cells = currentGameState?.cells || [];
+    const maxX = cells.reduce((max, c) => Math.max(max, c.x), 2);
+    const maxY = cells.reduce((max, c) => Math.max(max, c.y), 1);
     let trigger = 'ON_MOVE';
     const effects = [];
     const boardMutations = [];
     let title = `Loi Chaotique de ${authorName}`;
     let desc = userRuleText;
     let flavor = `L'esprit revanchard de ${authorName} altère les lois du monde !`;
-    // 1. Spawning Enemy
+    // 1. Spawning Enemy (Calibrated to 1-4 HP, 1-2 ATK)
     if (lower.includes('ennemi') || lower.includes('monstre') || lower.includes('boss') || lower.includes('mob') || lower.includes('dragon')) {
         let name = 'Gargouille Obscure';
         let icon = '🦇';
-        let hp = 40;
-        let atk = 15;
-        let reward = '+5 ATK permanent';
+        let hp = 2;
+        let atk = 1;
+        let reward = '+1 ATK permanent';
         if (lower.includes('dragon')) {
-            name = 'Dragon Ancestral';
+            name = 'Dragon Vermillon';
             icon = '🐉';
-            hp = 80;
-            atk = 30;
-            reward = '+15 ATK permanent';
+            hp = 4;
+            atk = 2;
+            reward = '+1 ATK permanent';
         }
         else if (lower.includes('golem')) {
             name = 'Golem de Pierre';
             icon = '🗿';
-            hp = 60;
-            atk = 20;
-            reward = '+30 PV max';
+            hp = 3;
+            atk = 1;
+            reward = '+1 PV max';
         }
         else if (lower.includes('demon') || lower.includes('démon')) {
             name = 'Seigneur Démon';
             icon = '👹';
-            hp = 70;
-            atk = 25;
-            reward = '+10 ATK permanent';
+            hp = 4;
+            atk = 2;
+            reward = '+1 ATK permanent';
+        }
+        else if (lower.includes('slime')) {
+            name = 'Slime Acide';
+            icon = '🧪';
+            hp = 1;
+            atk = 1;
+            reward = '+1 ATK permanent';
         }
         boardMutations.push({
             action: 'SPAWN_ENEMY',
@@ -195,51 +190,57 @@ function generateFallbackRule(userRuleText, authorName, roundNumber) {
         title = `Effondrement de Terrain`;
         desc = `Une case du plateau s'effondre dans le néant et disparaît !`;
     }
-    // 3. Adding New Cell
+    // 3. Adding New Cell (With coherent coordinates)
     else if (lower.includes('ajout') || lower.includes('créer') || lower.includes('creer') || lower.includes('nouvelle case')) {
         let name = 'Sanctuaire Ardent';
         let icon = '🔥';
         let cellDesc = 'Une nouvelle zone pleine de périls';
+        let newX = maxX + 1;
+        let newY = 0;
+        if (lower.includes('bas') || lower.includes('sud')) {
+            newX = 0;
+            newY = maxY + 1;
+        }
         if (lower.includes('lave')) {
             name = 'Gouffre de Magma';
             icon = '🌋';
-            cellDesc = 'Fosse brûlante : -25 PV en marchant dessus';
+            cellDesc = 'Fosse brûlante : -1 PV en marchant dessus';
         }
         else if (lower.includes('soin') || lower.includes('vie')) {
             name = 'Source de Jouvence';
             icon = '💧';
-            cellDesc = 'Eaux curatives : +30 PV';
+            cellDesc = 'Eaux curatives : +1 PV régénéré';
         }
         else if (lower.includes('arene') || lower.includes('arène') || lower.includes('combat')) {
             name = 'Colisée Maudit';
             icon = '🏟️';
-            cellDesc = 'Les combats ici infligent +10 dégâts';
+            cellDesc = 'Lieu de duels acharnés';
         }
         boardMutations.push({
             action: 'ADD_CELL',
-            cell: { name, icon, description: cellDesc }
+            cell: { name, icon, x: newX, y: newY, description: cellDesc }
         });
         title = `Expansion : ${name}`;
         desc = `Une nouvelle case [${name} ${icon}] émerge sur le plateau !`;
     }
     // 4. Modifying Cell
-    else if (lower.includes('transform') || lower.includes('remplac') || lower.includes('chang') && lower.includes('case')) {
+    else if (lower.includes('transform') || lower.includes('remplac') || (lower.includes('chang') && lower.includes('case'))) {
         boardMutations.push({
             action: 'MODIFY_CELL',
-            cell: { name: 'Cimetière Maudit', icon: '⚰️', description: 'Le sol est hanté (-15 PV)' }
+            cell: { name: 'Cimetière Maudit', icon: '⚰️', description: 'Le sol est hanté (-1 PV)' }
         });
         title = `Mutation Tellurique`;
         desc = `Une case du plateau mute en Cimetière Maudit !`;
     }
-    // 5. New Stat
-    else if (lower.includes('stat') || lower.includes('armure') || lower.includes('mana') || lower.includes('poison') || lower.includes('vitesse')) {
-        let statName = 'Armure';
+    // 5. New Stat (Calibrated base)
+    else if (lower.includes('stat') || lower.includes('armure') || lower.includes('bouclier') || lower.includes('mana') || lower.includes('poison') || lower.includes('vitesse')) {
+        let statName = 'Bouclier';
         let icon = '🛡️';
-        let defVal = 5;
+        let defVal = 1;
         if (lower.includes('mana')) {
             statName = 'Mana';
             icon = '🔮';
-            defVal = 20;
+            defVal = 2;
         }
         else if (lower.includes('poison')) {
             statName = 'Poison';
@@ -251,6 +252,11 @@ function generateFallbackRule(userRuleText, authorName, roundNumber) {
             icon = '⚡';
             defVal = 2;
         }
+        else if (lower.includes('armure')) {
+            statName = 'Armure';
+            icon = '🦺';
+            defVal = 1;
+        }
         boardMutations.push({
             action: 'ADD_STAT',
             statDef: { name: statName, icon, description: `Nouvelle statistique : ${statName}`, defaultValue: defVal }
@@ -261,16 +267,16 @@ function generateFallbackRule(userRuleText, authorName, roundNumber) {
     // 6. PvP modifications
     else if (lower.includes('pvp') || lower.includes('combat') || lower.includes('frapper') || lower.includes('tuer')) {
         trigger = 'ON_PVP';
-        effects.push({ type: 'DAMAGE', target: 'CURRENT_PLAYER', value: 10 });
+        effects.push({ type: 'DAMAGE', target: 'CURRENT_PLAYER', value: 1 });
         title = `Carnage PvP`;
-        desc = `Tous les combats de mêlée entre joueurs infligent des dégâts supplémentaires !`;
+        desc = `Tous les combats de mêlée entre joueurs infligent des blessures aggravées (-1 PV) !`;
     }
     // 7. General movement effect
     else {
         trigger = 'ON_MOVE';
-        effects.push({ type: 'DAMAGE', target: 'CURRENT_PLAYER', value: 5 });
+        effects.push({ type: 'DAMAGE', target: 'CURRENT_PLAYER', value: 1 });
         title = `Châtiment de ${authorName}`;
-        desc = `Chaque déplacement inflige 5 dégâts de fatigue aux joueurs.`;
+        desc = `Chaque déplacement inflige 1 dégât de fatigue au voyageur.`;
     }
     return {
         id: `rule_${Date.now()}_${Math.floor(Math.random() * 1000)}`,

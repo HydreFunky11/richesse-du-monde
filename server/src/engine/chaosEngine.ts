@@ -415,6 +415,7 @@ export class ChaosEngine {
         ruleText,
         author,
         this.state.roundNumber,
+        this.state,
         (aiLog) => {
           this.state.aiLogs.push(aiLog);
           this.state.log.push(aiLog.message);
@@ -451,13 +452,70 @@ export class ChaosEngine {
     }
   }
 
+  public getCoherentPlacement(requestedX?: number, requestedY?: number): { x: number; y: number } {
+    const cells = this.state.cells;
+    const occupied = new Set(cells.map(c => `${c.x},${c.y}`));
+
+    // 1. If requested coordinates are provided, non-negative, and unoccupied:
+    if (
+      typeof requestedX === 'number' &&
+      typeof requestedY === 'number' &&
+      requestedX >= 0 &&
+      requestedY >= 0 &&
+      !occupied.has(`${requestedX},${requestedY}`)
+    ) {
+      // Must be adjacent (distance <= 1) to at least one existing cell
+      const isAdjacent = cells.length === 0 || cells.some(c =>
+        Math.abs(c.x - requestedX) <= 1 && Math.abs(c.y - requestedY) <= 1
+      );
+      if (isAdjacent) {
+        return { x: requestedX, y: requestedY };
+      }
+    }
+
+    const maxX = cells.reduce((max, c) => Math.max(max, c.x), 2);
+    const maxY = cells.reduce((max, c) => Math.max(max, c.y), 1);
+
+    // 2. Check for holes inside existing bounding box [0..maxX, 0..maxY]
+    for (let y = 0; y <= maxY; y++) {
+      for (let x = 0; x <= maxX; x++) {
+        if (!occupied.has(`${x},${y}`)) {
+          const isAdj = cells.some(c => Math.abs(c.x - x) <= 1 && Math.abs(c.y - y) <= 1);
+          if (isAdj) {
+            return { x, y };
+          }
+        }
+      }
+    }
+
+    // 3. Expand naturally: maintain aspect ratio
+    const width = maxX + 1;
+    const height = maxY + 1;
+
+    if (width <= height * 1.5) {
+      // Expand to the right (x = maxX + 1)
+      for (let y = 0; y <= maxY; y++) {
+        if (!occupied.has(`${maxX + 1},${y}`)) {
+          return { x: maxX + 1, y };
+        }
+      }
+    } else {
+      // Expand downwards (y = maxY + 1)
+      for (let x = 0; x <= maxX; x++) {
+        if (!occupied.has(`${x},${maxY + 1}`)) {
+          return { x, y: maxY + 1 };
+        }
+      }
+    }
+
+    // Fallback: next slot to the right
+    return { x: maxX + 1, y: 0 };
+  }
+
   private applyMutation(mut: any) {
     switch (mut.action) {
       case 'ADD_CELL': {
-        const maxX = this.state.cells.reduce((max, c) => Math.max(max, c.x), 0);
-        const maxY = this.state.cells.reduce((max, c) => Math.max(max, c.y), 0);
-        const newX = mut.cell?.x ?? (maxX >= 3 ? 0 : maxX + 1);
-        const newY = mut.cell?.y ?? (maxX >= 3 ? maxY + 1 : 0);
+        const { x: newX, y: newY } = this.getCoherentPlacement(mut.cell?.x, mut.cell?.y);
         const newId = `cell_${newX}_${newY}_${Date.now() % 1000}`;
 
         const newCell: ChaosCell = {
@@ -518,14 +576,16 @@ export class ChaosEngine {
           || this.state.cells[Math.floor(Math.random() * this.state.cells.length)];
 
         if (targetCell) {
+          const enemyHp = Math.min(5, Math.max(1, mut.enemy?.hp ?? 2));
+          const enemyAtk = Math.min(3, Math.max(1, mut.enemy?.atk ?? 1));
           const enemy: ChaosEnemy = {
             id: `enemy_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
             name: mut.enemy?.name || 'Ombre Rampante',
             icon: mut.enemy?.icon || '👹',
-            hp: mut.enemy?.hp || 40,
-            maxHp: mut.enemy?.hp || 40,
-            atk: mut.enemy?.atk || 15,
-            reward: mut.enemy?.reward || '+5 ATK permanent'
+            hp: enemyHp,
+            maxHp: enemyHp,
+            atk: enemyAtk,
+            reward: mut.enemy?.reward || '+1 ATK permanent'
           };
           targetCell.enemies.push(enemy);
           this.state.log.push(`👾 ENNEMI INVOQUÉ : [${enemy.name} ${enemy.icon}] (PV: ${enemy.hp}, ATK: ${enemy.atk}) apparaît sur [${targetCell.name}] !`);
