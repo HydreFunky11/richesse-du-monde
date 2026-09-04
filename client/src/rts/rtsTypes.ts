@@ -29,7 +29,8 @@ export type BuildingType =
   | 'barracks'
   | 'factory'
   | 'science_lab'
-  | 'plasma_turret';
+  | 'plasma_turret'
+  | 'satellite_uplink';
 
 export type UnitOrder = 'idle' | 'move' | 'attack' | 'gather' | 'return_cargo' | 'build' | 'repair' | 'hold';
 
@@ -104,6 +105,7 @@ export type TechId =
   | 'reinforced_shields'
   | 'heavy_vehicles'
   | 'plasma_turrets'
+  | 'orbital_satellite'
   | 'ultimate_protocol';
 
 export interface TechNode {
@@ -142,6 +144,7 @@ export interface RtsPlayer {
     efficiency: number;
   };
   tech: PlayerTechState;
+  hasSatelliteVision: boolean;
   ultimateCooldown: number;
   maxUltimateCooldown: number;
   activeShieldDomes: {
@@ -227,6 +230,14 @@ export const TECH_TREE: Record<TechId, TechNode> = {
     scienceCost: 140,
     researchTimeTicks: 400,
     prerequisites: ['reinforced_shields']
+  },
+  orbital_satellite: {
+    id: 'orbital_satellite',
+    name: 'Surveillance Orbitale & Satellites',
+    description: 'Débloque la Station Uplink Satellite. Une fois alimentée, elle déploie un satellite orbital levant le brouillard de guerre sur toute la planète !',
+    scienceCost: 160,
+    researchTimeTicks: 400,
+    prerequisites: ['heavy_vehicles']
   },
   ultimate_protocol: {
     id: 'ultimate_protocol',
@@ -446,5 +457,16 @@ export const BUILDING_CONFIGS: Record<BuildingType, {
     damage: 32,
     range: 190,
     rate: 22
+  },
+  satellite_uplink: {
+    name: 'Station Uplink Satellite',
+    cost: { metal: 280, wood: 0, coal: 70 },
+    hp: 950,
+    shield: 150,
+    width: 48,
+    height: 48,
+    powerProd: 0,
+    powerCons: 50,
+    constructionTicks: 280
   }
 };

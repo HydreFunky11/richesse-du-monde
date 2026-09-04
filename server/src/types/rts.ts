@@ -29,7 +29,8 @@ export type BuildingType =
   | 'barracks'
   | 'factory'
   | 'science_lab'
-  | 'plasma_turret';
+  | 'plasma_turret'
+  | 'satellite_uplink';
 
 export type UnitOrder = 'idle' | 'move' | 'attack' | 'gather' | 'return_cargo' | 'build' | 'repair' | 'hold';
 
@@ -105,6 +106,7 @@ export type TechId =
   | 'reinforced_shields'
   | 'heavy_vehicles'
   | 'plasma_turrets'
+  | 'orbital_satellite'
   | 'ultimate_protocol';
 
 export interface TechNode {
@@ -153,6 +155,7 @@ export interface RtsPlayer {
     remainingTicks: number;
   }[];
   empRemainingTicks: number; // affected by enemy EMP blackout
+  hasSatelliteVision: boolean; // active when satellite uplink is powered
 }
 
 export interface RtsProjectile {

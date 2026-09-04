@@ -42,18 +42,88 @@ export const FACTION_COLORS: Record<RtsFaction, { primary: string; secondary: st
   }
 };
 
+export function getUnitSightRadius(type: string): number {
+  switch (type) {
+    case 'scout': return 420;
+    case 'dropship': return 360;
+    case 'assault': return 280;
+    case 'hover_tank': return 300;
+    case 'heavy_mecha': return 300;
+    case 'harvester': return 220;
+    default: return 240;
+  }
+}
+
+export function getBuildingSightRadius(type: string): number {
+  switch (type) {
+    case 'nexus': return 440;
+    case 'plasma_turret': return 380;
+    case 'satellite_uplink': return 360;
+    case 'pylon': return 260;
+    case 'science_lab': return 260;
+    case 'barracks': return 240;
+    case 'factory': return 240;
+    default: return 220;
+  }
+}
+
 export class RtsRenderer {
   private ctx: CanvasRenderingContext2D;
   private animTime: number = 0;
   private smokeParticles: { x: number; y: number; vx: number; vy: number; radius: number; life: number; maxLife: number }[] = [];
   private sparks: { x: number; y: number; vx: number; vy: number; life: number; color: string }[] = [];
 
+  // Fog of War offscreen buffers & explored grid
+  private exploredCanvas: HTMLCanvasElement | null = null;
+  private exploredCtx: CanvasRenderingContext2D | null = null;
+  private fogCanvas: HTMLCanvasElement | null = null;
+  private fogCtx: CanvasRenderingContext2D | null = null;
+  private exploredGrid: Uint8Array | null = null;
+  private gridCols: number = 0;
+  private gridRows: number = 0;
+  private readonly TILE_SIZE: number = 32;
+
+  // Active sight tracking
+  private activeSightCenters: { x: number; y: number; radius: number }[] = [];
+  private hasGlobalSatellite: boolean = false;
+  private satelliteWorldPos: { x: number; y: number } = { x: 100, y: 300 };
+
   constructor(ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
   }
 
+  public isPointInActiveSight(wx: number, wy: number): boolean {
+    if (this.hasGlobalSatellite) return true;
+    for (let i = 0; i < this.activeSightCenters.length; i++) {
+      const s = this.activeSightCenters[i];
+      const dx = wx - s.x;
+      const dy = wy - s.y;
+      if (dx * dx + dy * dy <= s.radius * s.radius) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public isPointExplored(wx: number, wy: number): boolean {
+    if (this.hasGlobalSatellite) return true;
+    if (!this.exploredGrid) return false;
+    const c = Math.floor(wx / this.TILE_SIZE);
+    const r = Math.floor(wy / this.TILE_SIZE);
+    if (c < 0 || c >= this.gridCols || r < 0 || r >= this.gridRows) return false;
+    return this.exploredGrid[r * this.gridCols + c] === 1;
+  }
+
   public update(dt: number) {
     this.animTime += dt;
+
+    // Advance orbital satellite across the sky
+    this.satelliteWorldPos.x += dt * 55;
+    this.satelliteWorldPos.y += dt * 20;
+    if (this.satelliteWorldPos.x > 3600) {
+      this.satelliteWorldPos.x = -400;
+      this.satelliteWorldPos.y = (this.satelliteWorldPos.y + 450) % 2200;
+    }
 
     // Update smoke
     for (let i = this.smokeParticles.length - 1; i >= 0; i--) {
@@ -76,6 +146,37 @@ export class RtsRenderer {
       if (s.life <= 0) {
         this.sparks.splice(i, 1);
       }
+    }
+  }
+
+  private markExplored(wx: number, wy: number, radius: number) {
+    if (!this.exploredGrid) return;
+    const minCol = Math.max(0, Math.floor((wx - radius) / this.TILE_SIZE));
+    const maxCol = Math.min(this.gridCols - 1, Math.floor((wx + radius) / this.TILE_SIZE));
+    const minRow = Math.max(0, Math.floor((wy - radius) / this.TILE_SIZE));
+    const maxRow = Math.min(this.gridRows - 1, Math.floor((wy + radius) / this.TILE_SIZE));
+    const rSq = radius * radius;
+
+    for (let r = minRow; r <= maxRow; r++) {
+      const centerY = (r + 0.5) * this.TILE_SIZE;
+      const dy = wy - centerY;
+      const dySq = dy * dy;
+      const rowOffset = r * this.gridCols;
+      for (let c = minCol; c <= maxCol; c++) {
+        const centerX = (c + 0.5) * this.TILE_SIZE;
+        const dx = wx - centerX;
+        if (dx * dx + dySq <= rSq) {
+          this.exploredGrid[rowOffset + c] = 1;
+        }
+      }
+    }
+
+    if (this.exploredCtx) {
+      const scale = 0.25;
+      this.exploredCtx.fillStyle = '#ffffff';
+      this.exploredCtx.beginPath();
+      this.exploredCtx.arc(wx * scale, wy * scale, radius * scale, 0, Math.PI * 2);
+      this.exploredCtx.fill();
     }
   }
 
@@ -105,6 +206,61 @@ export class RtsRenderer {
     ctx.translate(canvasW / 2, canvasH / 2);
     ctx.scale(camera.zoom, camera.zoom);
     ctx.translate(-camera.x, -camera.y);
+
+    // 0. Update Vision & Exploration
+    const myPlayer = players.find(p => p.id === myPlayerId);
+    this.hasGlobalSatellite = !!myPlayer?.hasSatelliteVision;
+
+    const cols = Math.ceil(mapW / this.TILE_SIZE);
+    const rows = Math.ceil(mapH / this.TILE_SIZE);
+    if (!this.exploredGrid || this.gridCols !== cols || this.gridRows !== rows) {
+      this.gridCols = cols;
+      this.gridRows = rows;
+      this.exploredGrid = new Uint8Array(cols * rows);
+
+      this.exploredCanvas = document.createElement('canvas');
+      this.exploredCanvas.width = Math.ceil(mapW / 4);
+      this.exploredCanvas.height = Math.ceil(mapH / 4);
+      this.exploredCtx = this.exploredCanvas.getContext('2d');
+      if (this.exploredCtx) {
+        this.exploredCtx.fillStyle = '#000000';
+        this.exploredCtx.fillRect(0, 0, this.exploredCanvas.width, this.exploredCanvas.height);
+      }
+
+      this.fogCanvas = document.createElement('canvas');
+      this.fogCanvas.width = this.exploredCanvas.width;
+      this.fogCanvas.height = this.exploredCanvas.height;
+      this.fogCtx = this.fogCanvas.getContext('2d');
+    }
+
+    // Collect active sight centers for current frame
+    this.activeSightCenters = [];
+    if (this.hasGlobalSatellite) {
+      if (this.exploredGrid) this.exploredGrid.fill(1);
+      if (this.exploredCtx && this.exploredCanvas) {
+        this.exploredCtx.fillStyle = '#ffffff';
+        this.exploredCtx.fillRect(0, 0, this.exploredCanvas.width, this.exploredCanvas.height);
+      }
+    } else {
+      // My units
+      for (let i = 0; i < units.length; i++) {
+        const u = units[i];
+        if (u.playerId === myPlayerId) {
+          const r = getUnitSightRadius(u.type);
+          this.activeSightCenters.push({ x: u.x, y: u.y, radius: r });
+          this.markExplored(u.x, u.y, r);
+        }
+      }
+      // My buildings
+      for (let i = 0; i < buildings.length; i++) {
+        const b = buildings[i];
+        if (b.playerId === myPlayerId) {
+          const r = getBuildingSightRadius(b.type);
+          this.activeSightCenters.push({ x: b.x, y: b.y, radius: r });
+          this.markExplored(b.x, b.y, r);
+        }
+      }
+    }
 
     // 1. Terrain & Grid
     this.drawTerrain(mapW, mapH);
@@ -136,7 +292,7 @@ export class RtsRenderer {
     }
 
     // 10. Fog of War Mask
-    this.drawFogOfWar(mapW, mapH, units, buildings, myPlayerId);
+    this.drawFogOfWar(mapW, mapH);
 
     ctx.restore();
 
@@ -270,6 +426,7 @@ export class RtsRenderer {
 
     for (const node of nodes) {
       if (node.amount <= 0) continue;
+      if (!this.isPointExplored(node.x, node.y)) continue;
       const ratio = node.amount / node.maxAmount;
       const r = node.radius * Math.max(0.6, ratio);
 
@@ -392,8 +549,19 @@ export class RtsRenderer {
       const isAlly = b.playerId === myPlayerId;
       const colors = FACTION_COLORS[b.faction] || FACTION_COLORS.aegis;
 
+      // Enemy building visibility in fog of war: must be at least explored
+      if (!isAlly && !this.isPointExplored(b.x, b.y)) {
+        continue;
+      }
+      const inActiveSight = isAlly || this.isPointInActiveSight(b.x, b.y);
+
       ctx.save();
       ctx.translate(b.x, b.y);
+
+      // If explored enemy building but currently in shroud (memory):
+      if (!isAlly && !inActiveSight) {
+        ctx.globalAlpha = 0.45;
+      }
 
       // Building footprint shadow
       ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
@@ -434,10 +602,12 @@ export class RtsRenderer {
         ctx.stroke();
 
         // Mini build bar
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.fillRect(-bw / 2, bh / 2 + 5, bw, 4);
-        ctx.fillStyle = '#f59e0b';
-        ctx.fillRect(-bw / 2, bh / 2 + 5, bw * (b.constructionProgress / 100), 4);
+        if (inActiveSight) {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+          ctx.fillRect(-bw / 2, bh / 2 + 5, bw, 4);
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(-bw / 2, bh / 2 + 5, bw * (b.constructionProgress / 100), 4);
+        }
         ctx.restore();
         continue;
       }
@@ -461,16 +631,20 @@ export class RtsRenderer {
         this.drawFactoryGraphics(bw, bh, colors);
       } else if (b.type === 'plasma_turret') {
         this.drawPlasmaTurretGraphics(bw, bh, b.targetUnitId);
+      } else if (b.type === 'satellite_uplink') {
+        this.drawSatelliteUplinkGraphics(bw, bh, b.isPowered);
       }
 
       // Brownout / Powered Status Indicator LED
-      ctx.fillStyle = b.isPowered ? '#10b981' : '#ef4444';
-      ctx.shadowColor = b.isPowered ? '#10b981' : '#ef4444';
-      ctx.shadowBlur = 5;
-      ctx.beginPath();
-      ctx.arc(bw / 2 - 6, -bh / 2 + 6, 3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
+      if (inActiveSight) {
+        ctx.fillStyle = b.isPowered ? '#10b981' : '#ef4444';
+        ctx.shadowColor = b.isPowered ? '#10b981' : '#ef4444';
+        ctx.shadowBlur = 5;
+        ctx.beginPath();
+        ctx.arc(bw / 2 - 6, -bh / 2 + 6, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
 
       // Selection Halo
       if (isSelected) {
@@ -481,24 +655,26 @@ export class RtsRenderer {
         ctx.setLineDash([]);
       }
 
-      // Health Bar
-      const barW = bw;
-      const barH = 4;
-      const barX = -barW / 2;
-      const barY = -bh / 2 - 9;
+      // Health Bar (only if ally or in active sight)
+      if (isAlly || inActiveSight) {
+        const barW = bw;
+        const barH = 4;
+        const barX = -barW / 2;
+        const barY = -bh / 2 - 9;
 
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-      ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
 
-      const hpRatio = Math.max(0, b.hp / b.maxHp);
-      ctx.fillStyle = hpRatio > 0.5 ? '#10b981' : (hpRatio > 0.2 ? '#f59e0b' : '#ef4444');
-      ctx.fillRect(barX, barY, barW * hpRatio, barH);
+        const hpRatio = Math.max(0, b.hp / b.maxHp);
+        ctx.fillStyle = hpRatio > 0.5 ? '#10b981' : (hpRatio > 0.2 ? '#f59e0b' : '#ef4444');
+        ctx.fillRect(barX, barY, barW * hpRatio, barH);
 
-      // Shield Bar if present
-      if (b.maxShield > 0) {
-        const shieldRatio = Math.max(0, b.shield / b.maxShield);
-        ctx.fillStyle = '#38bdf8';
-        ctx.fillRect(barX, barY - 3, barW * shieldRatio, 2);
+        // Shield Bar if present
+        if (b.maxShield > 0) {
+          const shieldRatio = Math.max(0, b.shield / b.maxShield);
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(barX, barY - 3, barW * shieldRatio, 2);
+        }
       }
 
       ctx.restore();
@@ -737,6 +913,78 @@ export class RtsRenderer {
     ctx.restore();
   }
 
+  private drawSatelliteUplinkGraphics(w: number, _h: number, isPowered: boolean) {
+    const ctx = this.ctx;
+
+    // Octagonal reinforced foundation
+    const rad = w * 0.42;
+    ctx.fillStyle = '#1e293b';
+    ctx.strokeStyle = isPowered ? '#06b6d4' : '#64748b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4;
+      const px = Math.cos(a) * rad;
+      const py = Math.sin(a) * rad;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Concentric telemetry ring
+    ctx.strokeStyle = isPowered ? 'rgba(6, 182, 212, 0.6)' : 'rgba(100, 116, 139, 0.3)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, rad * 0.7, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Motorized Parabolic Dish
+    const dishAngle = this.animTime * 0.5;
+    ctx.save();
+    ctx.rotate(dishAngle);
+
+    // Dish ellipse
+    ctx.fillStyle = '#0f172a';
+    ctx.strokeStyle = isPowered ? '#38bdf8' : '#94a3b8';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(0, -2, rad * 0.6, rad * 0.35, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Central transmitter horn & antenna
+    ctx.strokeStyle = isPowered ? '#22d3ee' : '#64748b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, -2);
+    ctx.lineTo(0, -rad * 0.7);
+    ctx.stroke();
+
+    // Glowing antenna tip
+    ctx.fillStyle = isPowered ? '#67e8f9' : '#ef4444';
+    ctx.shadowColor = isPowered ? '#06b6d4' : '#ef4444';
+    ctx.shadowBlur = isPowered ? 8 : 2;
+    ctx.beginPath();
+    ctx.arc(0, -rad * 0.7, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Radio transmission pulse waves towards the sky when powered
+    if (isPowered) {
+      const wavePhase = (this.animTime * 2.5) % 1;
+      const waveRadius = rad * 0.5 + wavePhase * (rad * 0.8);
+      ctx.strokeStyle = `rgba(34, 211, 238, ${1 - wavePhase})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, -rad * 0.7, waveRadius, -Math.PI * 0.8, -Math.PI * 0.2);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
   // ─── 5. UNITS ─────────────────────────────────────────────────────────────
 
   private drawUnits(units: RtsUnit[], myPlayerId: string, selectedUnitIds: string[]) {
@@ -746,6 +994,11 @@ export class RtsRenderer {
       const isSelected = selectedUnitIds.includes(u.id);
       const isAlly = u.playerId === myPlayerId;
       const colors = FACTION_COLORS[u.faction] || FACTION_COLORS.aegis;
+
+      // Enemy unit in Fog of War: invisible if not in active sight
+      if (!isAlly && !this.isPointInActiveSight(u.x, u.y)) {
+        continue;
+      }
 
       ctx.save();
       ctx.translate(u.x, u.y);
@@ -1126,14 +1379,183 @@ export class RtsRenderer {
     ctx.restore();
   }
 
-  // ─── 10. FOG OF WAR (Smooth Radial Masking) ───────────────────────────────
+  // ─── 10. FOG OF WAR (3-Tier Real-Time Masking) ────────────────────────────
 
-  private drawFogOfWar(_mapW: number, _mapH: number, _units: RtsUnit[], _buildings: RtsBuilding[], _myPlayerId: string) {
+  public getExploredCanvas(): HTMLCanvasElement | null {
+    return this.exploredCanvas;
+  }
+
+  private drawFogOfWar(mapW: number, mapH: number) {
     const ctx = this.ctx;
-    // We render a soft mask
+
+    // If global satellite surveillance is online:
+    if (this.hasGlobalSatellite) {
+      this.drawOrbitalSatelliteAndHUD(mapW, mapH);
+      return;
+    }
+
+    if (!this.fogCanvas || !this.fogCtx || !this.exploredCanvas) return;
+
+    const fCtx = this.fogCtx;
+    const fw = this.fogCanvas.width;
+    const fh = this.fogCanvas.height;
+    const scale = fw / mapW;
+
+    // 1. Reset composite and fill with pitch-black unexplored fog
+    fCtx.globalCompositeOperation = 'source-over';
+    fCtx.globalAlpha = 1.0;
+    fCtx.fillStyle = '#030712'; // deep sci-fi space void
+    fCtx.fillRect(0, 0, fw, fh);
+
+    // 2. Carve explored regions into shrouded darkness (semi-transparent)
+    fCtx.globalCompositeOperation = 'destination-out';
+    fCtx.globalAlpha = 0.55; // leaves 45% dark shroud over explored terrain
+    fCtx.drawImage(this.exploredCanvas, 0, 0);
+
+    // 3. Punch out active vision circles with radial feathering (100% clear)
+    fCtx.globalAlpha = 1.0;
+    for (let i = 0; i < this.activeSightCenters.length; i++) {
+      const s = this.activeSightCenters[i];
+      const cx = s.x * scale;
+      const cy = s.y * scale;
+      const cr = s.radius * scale;
+
+      const grad = fCtx.createRadialGradient(cx, cy, Math.max(0, cr * 0.72), cx, cy, cr);
+      grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+      fCtx.fillStyle = grad;
+      fCtx.beginPath();
+      fCtx.arc(cx, cy, cr, 0, Math.PI * 2);
+      fCtx.fill();
+    }
+
+    // 4. Render the fog canvas across the entire world
     ctx.save();
-    // Using destination-out or dark overlay
-    // For smooth visual feel: blueprint grid overlay
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(this.fogCanvas, 0, 0, mapW, mapH);
+    ctx.restore();
+  }
+
+  private drawOrbitalSatelliteAndHUD(mapW: number, mapH: number) {
+    const ctx = this.ctx;
+
+    // Atmospheric orbital scan line sweeping across world
+    const scanY = (this.animTime * 180) % mapH;
+    const grad = ctx.createLinearGradient(0, scanY - 60, 0, scanY + 60);
+    grad.addColorStop(0, 'rgba(6, 182, 212, 0)');
+    grad.addColorStop(0.5, 'rgba(6, 182, 212, 0.12)');
+    grad.addColorStop(1, 'rgba(6, 182, 212, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, scanY - 60, mapW, 120);
+
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, scanY);
+    ctx.lineTo(mapW, scanY);
+    ctx.stroke();
+
+    // Draw the Orbital Reconnaissance Satellite flying across space
+    const sat = this.satelliteWorldPos;
+    ctx.save();
+    ctx.translate(sat.x, sat.y);
+
+    // Downward orbital scanning cone projection
+    const coneGrad = ctx.createRadialGradient(0, 0, 10, 0, 140, 260);
+    coneGrad.addColorStop(0, 'rgba(6, 182, 212, 0.35)');
+    coneGrad.addColorStop(1, 'rgba(6, 182, 212, 0)');
+    ctx.fillStyle = coneGrad;
+    ctx.beginPath();
+    ctx.moveTo(-20, 0);
+    ctx.lineTo(-240, 320);
+    ctx.lineTo(240, 320);
+    ctx.lineTo(20, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // Satellite shadow below
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.beginPath();
+    ctx.ellipse(0, 160, 45, 18, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Main Satellite Bus Chassis (Hexagonal gold/titanium)
+    ctx.fillStyle = '#0f172a';
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-18, -12);
+    ctx.lineTo(18, -12);
+    ctx.lineTo(26, 0);
+    ctx.lineTo(18, 12);
+    ctx.lineTo(-18, 12);
+    ctx.lineTo(-26, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Gold foil thermal blanket panels
+    ctx.fillStyle = '#d97706';
+    ctx.fillRect(-12, -8, 24, 16);
+
+    // High-Gain Optical Lens (aperture glow)
+    ctx.fillStyle = '#06b6d4';
+    ctx.shadowColor = '#06b6d4';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.arc(0, 0, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Dual Extended Solar Panels
+    const panelW = 60;
+    const panelH = 22;
+
+    // Left Solar Wing
+    ctx.fillStyle = '#0369a1';
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(-26 - panelW, -panelH / 2, panelW, panelH);
+    ctx.strokeRect(-26 - panelW, -panelH / 2, panelW, panelH);
+
+    // Solar cells grid
+    ctx.strokeStyle = '#0284c7';
+    ctx.lineWidth = 1;
+    for (let i = 1; i <= 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(-26 - (i * panelW) / 4, -panelH / 2);
+      ctx.lineTo(-26 - (i * panelW) / 4, panelH / 2);
+      ctx.stroke();
+    }
+
+    // Right Solar Wing
+    ctx.fillStyle = '#0369a1';
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(26, -panelH / 2, panelW, panelH);
+    ctx.strokeRect(26, -panelH / 2, panelW, panelH);
+
+    for (let i = 1; i <= 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(26 + (i * panelW) / 4, -panelH / 2);
+      ctx.lineTo(26 + (i * panelW) / 4, panelH / 2);
+      ctx.stroke();
+    }
+
+    // Ion Drive Engine Plume
+    const plumePulse = Math.sin(this.animTime * 10) * 4;
+    ctx.fillStyle = '#38bdf8';
+    ctx.shadowColor = '#06b6d4';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.moveTo(-6, -14);
+    ctx.lineTo(6, -14);
+    ctx.lineTo(0, -28 - plumePulse);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
     ctx.restore();
   }
 

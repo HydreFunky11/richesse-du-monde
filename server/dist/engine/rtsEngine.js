@@ -34,6 +34,14 @@ exports.TECH_TREE = {
         researchTimeTicks: 400, // 20s
         prerequisites: ['reinforced_shields']
     },
+    orbital_satellite: {
+        id: 'orbital_satellite',
+        name: 'Surveillance Orbitale & Satellites',
+        description: 'Débloque la Station Satellite. Une fois alimentée, elle déploie un satellite orbital levant le brouillard de guerre sur toute la planète !',
+        scienceCost: 160,
+        researchTimeTicks: 400, // 20s
+        prerequisites: ['heavy_vehicles']
+    },
     ultimate_protocol: {
         id: 'ultimate_protocol',
         name: 'Protocole Ultime de Commandant',
@@ -225,6 +233,17 @@ exports.BUILDING_CONFIGS = {
         damage: 32,
         range: 190,
         rate: 22
+    },
+    satellite_uplink: {
+        name: 'Station Uplink Satellite',
+        cost: { metal: 280, wood: 0, coal: 70 },
+        hp: 950,
+        shield: 150,
+        width: 48,
+        height: 48,
+        powerProd: 0,
+        powerCons: 50,
+        constructionTicks: 280
     }
 };
 class RtsEngine {
@@ -237,8 +256,8 @@ class RtsEngine {
             status: 'LOBBY',
             roomCode: roomCode.toUpperCase(),
             players: [],
-            mapWidth: 1800,
-            mapHeight: 1200,
+            mapWidth: 3200,
+            mapHeight: 2200,
             resourceNodes: [],
             units: [],
             buildings: [],
@@ -279,7 +298,8 @@ class RtsEngine {
             ultimateCooldown: 0,
             maxUltimateCooldown: 900, // 45s at 20tps
             activeShieldDomes: [],
-            empRemainingTicks: 0
+            empRemainingTicks: 0,
+            hasSatelliteVision: false
         };
         this.state.players.push(player);
         this.state.log.push(`👤 ${username} a rejoint les rangs (${assignedFaction.toUpperCase()}).`);
@@ -316,7 +336,8 @@ class RtsEngine {
             ultimateCooldown: 0,
             maxUltimateCooldown: 900,
             activeShieldDomes: [],
-            empRemainingTicks: 0
+            empRemainingTicks: 0,
+            hasSatelliteVision: false
         };
         this.state.players.push(player);
         this.state.log.push(`🤖 IA Synth-Nexus a rejoint le secteur (AEGIS).`);
@@ -347,51 +368,71 @@ class RtsEngine {
         this.state.buildings = [];
         this.state.projectiles = [];
         this.state.powerLines = [];
-        this.generateMap();
-        this.spawnBases();
+        this.spawnBasesAndResources();
         this.state.log.push(`⚔️ Déploiement initial commencé ! Énergie et réseau connectés.`);
         this.startLoop();
         return true;
     }
-    generateMap() {
-        const nodes = [];
+    spawnBasesAndResources() {
         const W = this.state.mapWidth;
         const H = this.state.mapHeight;
-        // Base 1 resources (Left: X=250, Y=600)
-        nodes.push({ id: 'res_m_1', type: 'metal', x: 180, y: 460, amount: 2500, maxAmount: 2500, radius: 25 });
-        nodes.push({ id: 'res_m_2', type: 'metal', x: 180, y: 740, amount: 2500, maxAmount: 2500, radius: 25 });
-        nodes.push({ id: 'res_w_1', type: 'wood', x: 380, y: 440, amount: 1500, maxAmount: 1500, radius: 30 });
-        nodes.push({ id: 'res_w_2', type: 'wood', x: 380, y: 760, amount: 1500, maxAmount: 1500, radius: 30 });
-        nodes.push({ id: 'res_c_1', type: 'coal', x: 440, y: 600, amount: 2000, maxAmount: 2000, radius: 25 });
-        // Base 2 resources (Right: X=1550, Y=600)
-        nodes.push({ id: 'res_m_3', type: 'metal', x: 1620, y: 460, amount: 2500, maxAmount: 2500, radius: 25 });
-        nodes.push({ id: 'res_m_4', type: 'metal', x: 1620, y: 740, amount: 2500, maxAmount: 2500, radius: 25 });
-        nodes.push({ id: 'res_w_3', type: 'wood', x: 1420, y: 440, amount: 1500, maxAmount: 1500, radius: 30 });
-        nodes.push({ id: 'res_w_4', type: 'wood', x: 1420, y: 760, amount: 1500, maxAmount: 1500, radius: 30 });
-        nodes.push({ id: 'res_c_2', type: 'coal', x: 1360, y: 600, amount: 2000, maxAmount: 2000, radius: 25 });
-        // Center high-yield contested resources
-        nodes.push({ id: 'res_center_m1', type: 'metal', x: W / 2, y: 350, amount: 4000, maxAmount: 4000, radius: 32 });
-        nodes.push({ id: 'res_center_m2', type: 'metal', x: W / 2, y: 850, amount: 4000, maxAmount: 4000, radius: 32 });
-        nodes.push({ id: 'res_center_c1', type: 'coal', x: W / 2 - 80, y: 600, amount: 3500, maxAmount: 3500, radius: 28 });
-        nodes.push({ id: 'res_center_c2', type: 'coal', x: W / 2 + 80, y: 600, amount: 3500, maxAmount: 3500, radius: 28 });
-        nodes.push({ id: 'res_center_w1', type: 'wood', x: W / 2, y: 600, amount: 2500, maxAmount: 2500, radius: 35 });
-        this.state.resourceNodes = nodes;
-    }
-    spawnBases() {
         const p1 = this.state.players[0];
         const p2 = this.state.players[1];
+        // Band 1: West (X: 350 to 600, Y: 350 to H - 350)
+        const p1X = 350 + Math.floor(Math.random() * 250);
+        const p1Y = 350 + Math.floor(Math.random() * (H - 700));
+        // Band 2: East (X: W - 600 to W - 350, Y: 350 to H - 350)
+        // Ensure not in horizontal straight line: |p1Y - p2Y| >= 450
+        const p2X = W - 600 + Math.floor(Math.random() * 250);
+        let p2Y = 350 + Math.floor(Math.random() * (H - 700));
+        let attempts = 0;
+        while (Math.abs(p1Y - p2Y) < 450 && attempts < 50) {
+            p2Y = 350 + Math.floor(Math.random() * (H - 700));
+            attempts++;
+        }
+        const nodes = [];
+        // Helper to spawn starter resources around a base
+        const spawnBaseCluster = (baseX, baseY, prefix) => {
+            // 2 Metal patches
+            nodes.push({ id: `${prefix}_m1`, type: 'metal', x: baseX - 120, y: baseY - 70, amount: 3500, maxAmount: 3500, radius: 26 });
+            nodes.push({ id: `${prefix}_m2`, type: 'metal', x: baseX - 120, y: baseY + 70, amount: 3500, maxAmount: 3500, radius: 26 });
+            // 2 Wood groves
+            nodes.push({ id: `${prefix}_w1`, type: 'wood', x: baseX + 130, y: baseY - 80, amount: 2500, maxAmount: 2500, radius: 32 });
+            nodes.push({ id: `${prefix}_w2`, type: 'wood', x: baseX + 130, y: baseY + 80, amount: 2500, maxAmount: 2500, radius: 32 });
+            // 1 Coal deposit
+            nodes.push({ id: `${prefix}_c1`, type: 'coal', x: baseX, y: baseY + (baseY > H / 2 ? -150 : 150), amount: 3000, maxAmount: 3000, radius: 28 });
+        };
         if (p1) {
-            this.createBuilding(p1.id, 'nexus', 250, 600, true);
-            this.createBuilding(p1.id, 'solar_panel', 250, 520, true);
-            this.createUnit(p1.id, 'harvester', 200, 580);
-            this.createUnit(p1.id, 'harvester', 200, 620);
+            this.createBuilding(p1.id, 'nexus', p1X, p1Y, true);
+            this.createBuilding(p1.id, 'solar_panel', p1X, p1Y - 70, true);
+            this.createUnit(p1.id, 'harvester', p1X - 50, p1Y - 20);
+            this.createUnit(p1.id, 'harvester', p1X - 50, p1Y + 20);
+            spawnBaseCluster(p1X, p1Y, 'p1');
         }
         if (p2) {
-            this.createBuilding(p2.id, 'nexus', 1550, 600, true);
-            this.createBuilding(p2.id, 'solar_panel', 1550, 520, true);
-            this.createUnit(p2.id, 'harvester', 1600, 580);
-            this.createUnit(p2.id, 'harvester', 1600, 620);
+            this.createBuilding(p2.id, 'nexus', p2X, p2Y, true);
+            this.createBuilding(p2.id, 'solar_panel', p2X, p2Y - 70, true);
+            this.createUnit(p2.id, 'harvester', p2X + 50, p2Y - 20);
+            this.createUnit(p2.id, 'harvester', p2X + 50, p2Y + 20);
+            spawnBaseCluster(p2X, p2Y, 'p2');
         }
+        // Neutral Strategic Outposts across the 3200x2200 map
+        nodes.push({ id: 'center_m1', type: 'metal', x: W / 2, y: H / 2 - 250, amount: 5000, maxAmount: 5000, radius: 35 });
+        nodes.push({ id: 'center_m2', type: 'metal', x: W / 2, y: H / 2 + 250, amount: 5000, maxAmount: 5000, radius: 35 });
+        nodes.push({ id: 'center_c1', type: 'coal', x: W / 2 - 120, y: H / 2, amount: 4500, maxAmount: 4500, radius: 30 });
+        nodes.push({ id: 'center_c2', type: 'coal', x: W / 2 + 120, y: H / 2, amount: 4500, maxAmount: 4500, radius: 30 });
+        nodes.push({ id: 'center_w1', type: 'wood', x: W / 2, y: H / 2, amount: 3500, maxAmount: 3500, radius: 38 });
+        // North & South contested expansions
+        nodes.push({ id: 'north_m', type: 'metal', x: W / 2 - 400, y: 350, amount: 4000, maxAmount: 4000, radius: 30 });
+        nodes.push({ id: 'north_c', type: 'coal', x: W / 2 + 400, y: 350, amount: 3500, maxAmount: 3500, radius: 28 });
+        nodes.push({ id: 'north_w', type: 'wood', x: W / 2, y: 250, amount: 3000, maxAmount: 3000, radius: 35 });
+        nodes.push({ id: 'south_m', type: 'metal', x: W / 2 + 400, y: H - 350, amount: 4000, maxAmount: 4000, radius: 30 });
+        nodes.push({ id: 'south_c', type: 'coal', x: W / 2 - 400, y: H - 350, amount: 3500, maxAmount: 3500, radius: 28 });
+        nodes.push({ id: 'south_w', type: 'wood', x: W / 2, y: H - 250, amount: 3000, maxAmount: 3000, radius: 35 });
+        // Flank outposts
+        nodes.push({ id: 'west_outpost_m', type: 'metal', x: 1000, y: H / 2, amount: 3500, maxAmount: 3500, radius: 28 });
+        nodes.push({ id: 'east_outpost_m', type: 'metal', x: W - 1000, y: H / 2, amount: 3500, maxAmount: 3500, radius: 28 });
+        this.state.resourceNodes = nodes;
     }
     createBuilding(playerId, type, x, y, instant = false) {
         const player = this.state.players.find(p => p.id === playerId);
@@ -561,6 +602,8 @@ class RtsEngine {
         if (buildingType === 'factory' && !player.tech.researched.includes('heavy_vehicles'))
             return false;
         if (buildingType === 'plasma_turret' && !player.tech.researched.includes('plasma_turrets'))
+            return false;
+        if (buildingType === 'satellite_uplink' && !player.tech.researched.includes('orbital_satellite'))
             return false;
         const conf = exports.BUILDING_CONFIGS[buildingType];
         if (!conf)
@@ -874,6 +917,8 @@ class RtsEngine {
             for (const b of playerBuildings) {
                 b.isPowered = b.isConnectedToPower && efficiency >= 0.5 && player.empRemainingTicks <= 0;
             }
+            // Satellite vision active if player has an operational, powered satellite uplink
+            player.hasSatelliteVision = playerBuildings.some(b => b.type === 'satellite_uplink' && b.isPowered);
         }
         this.state.powerLines = lines;
     }
@@ -1321,7 +1366,7 @@ class RtsEngine {
             }
             // Auto-Research tech order
             if (hasLab && !bot.tech.currentlyResearching) {
-                const order = ['advanced_mining', 'reinforced_shields', 'heavy_vehicles', 'plasma_turrets', 'ultimate_protocol'];
+                const order = ['advanced_mining', 'reinforced_shields', 'heavy_vehicles', 'orbital_satellite', 'plasma_turrets', 'ultimate_protocol'];
                 for (const t of order) {
                     if (!bot.tech.researched.includes(t)) {
                         if (bot.resources.science >= exports.TECH_TREE[t].scienceCost) {
@@ -1330,6 +1375,11 @@ class RtsEngine {
                         break;
                     }
                 }
+            }
+            // Build Satellite Uplink if researched
+            const hasSatellite = myBuildings.some(b => b.type === 'satellite_uplink');
+            if (bot.tech.researched.includes('orbital_satellite') && !hasSatellite && bot.resources.metal >= 280 && bot.resources.coal >= 70) {
+                this.handleBuild(bot.id, 'satellite_uplink', myNexus.x + 100, myNexus.y + 70);
             }
             // 7. Attack enemy base when army >= 6
             const army = myUnits.filter(u => u.type !== 'harvester');

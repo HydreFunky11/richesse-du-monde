@@ -779,6 +779,14 @@ export default function RtsApp() {
         </div>
       )}
 
+      {/* Orbital Satellite Surveillance Banner */}
+      {me && me.hasSatelliteVision && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-cyan-950/90 border border-cyan-400 text-cyan-200 px-5 py-1.5 rounded-full font-bold text-xs shadow-xl flex items-center gap-2 z-20 backdrop-blur-md">
+          <span className="text-base">🛰️</span>
+          <span>SURVEILLANCE ORBITALE ACTIVE • BROUILLARD PLANÉTAIRE LEVÉ</span>
+        </div>
+      )}
+
       {/* 3. Bottom Tactical Cyber HUD */}
       <div className="absolute bottom-0 left-0 right-0 h-48 bg-slate-950/95 border-t border-cyan-900/40 backdrop-blur-xl flex items-stretch p-3 gap-3 z-20">
         {/* Left: Selected Unit(s) or Building Info */}
@@ -911,7 +919,7 @@ export default function RtsApp() {
               </button>
             </div>
 
-            <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+            <div className="grid grid-cols-3 md:grid-cols-9 gap-2">
               {/* Solar Panel */}
               <button
                 onClick={() => setPlacementMode('solar_panel')}
@@ -1025,6 +1033,21 @@ export default function RtsApp() {
                 <div className="text-xs font-bold text-slate-200">Tourelle</div>
                 <div className="text-[10px] text-cyan-400 font-mono">140🔩 10🪵</div>
               </button>
+
+              {/* Satellite Uplink */}
+              <button
+                onClick={() => setPlacementMode('satellite_uplink')}
+                disabled={!me?.tech.researched.includes('orbital_satellite')}
+                className={`p-2 rounded-lg border text-left flex flex-col justify-between transition disabled:opacity-40 ${
+                  placementMode === 'satellite_uplink'
+                    ? 'bg-cyan-950 border-cyan-400 shadow-lg'
+                    : 'bg-slate-950/80 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div className="text-lg">📡</div>
+                <div className="text-xs font-bold text-slate-200">Satellite</div>
+                <div className="text-[10px] text-cyan-400 font-mono">280🔩 70🪨</div>
+              </button>
             </div>
           </div>
 
@@ -1070,31 +1093,46 @@ export default function RtsApp() {
             onClick={handleMinimapClick}
             className="w-full h-full relative bg-slate-900/60 rounded border border-slate-800 cursor-pointer"
           >
-            {/* Live Units blips on Minimap */}
-            {gameState?.units.map(u => (
-              <div
-                key={u.id}
-                className="absolute w-1.5 h-1.5 rounded-full -translate-x-1/2 -translate-y-1/2"
-                style={{
-                  left: `${(u.x / gameState.mapWidth) * 100}%`,
-                  top: `${(u.y / gameState.mapHeight) * 100}%`,
-                  backgroundColor: u.playerId === socket?.id ? '#10b981' : '#ef4444'
-                }}
-              />
-            ))}
+            {/* Live Units blips on Minimap (filtered by Fog of War) */}
+            {gameState?.units.map(u => {
+              const isAlly = u.playerId === socket?.id;
+              if (!isAlly && !rendererRef.current?.isPointInActiveSight(u.x, u.y)) {
+                return null;
+              }
+              return (
+                <div
+                  key={u.id}
+                  className="absolute w-1.5 h-1.5 rounded-full -translate-x-1/2 -translate-y-1/2 shadow-sm"
+                  style={{
+                    left: `${(u.x / gameState.mapWidth) * 100}%`,
+                    top: `${(u.y / gameState.mapHeight) * 100}%`,
+                    backgroundColor: isAlly ? '#10b981' : '#ef4444'
+                  }}
+                />
+              );
+            })}
 
-            {/* Buildings on Minimap */}
-            {gameState?.buildings.map(b => (
-              <div
-                key={b.id}
-                className="absolute w-2.5 h-2.5 rounded-sm -translate-x-1/2 -translate-y-1/2"
-                style={{
-                  left: `${(b.x / gameState.mapWidth) * 100}%`,
-                  top: `${(b.y / gameState.mapHeight) * 100}%`,
-                  backgroundColor: b.playerId === socket?.id ? '#38bdf8' : '#dc2626'
-                }}
-              />
-            ))}
+            {/* Buildings on Minimap (filtered by Fog of War) */}
+            {gameState?.buildings.map(b => {
+              const isAlly = b.playerId === socket?.id;
+              if (!isAlly && !rendererRef.current?.isPointExplored(b.x, b.y)) {
+                return null;
+              }
+              const inSight = isAlly || rendererRef.current?.isPointInActiveSight(b.x, b.y);
+              return (
+                <div
+                  key={b.id}
+                  className={`absolute w-2.5 h-2.5 rounded-sm -translate-x-1/2 -translate-y-1/2 transition-opacity ${
+                    inSight ? 'opacity-100' : 'opacity-40'
+                  }`}
+                  style={{
+                    left: `${(b.x / gameState.mapWidth) * 100}%`,
+                    top: `${(b.y / gameState.mapHeight) * 100}%`,
+                    backgroundColor: isAlly ? '#38bdf8' : '#dc2626'
+                  }}
+                />
+              );
+            })}
 
             {/* Camera Viewport Indicator */}
             {gameState && (
