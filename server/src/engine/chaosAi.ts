@@ -29,11 +29,15 @@ export async function interpretChaosRule(
 
   const currentCells = currentGameState?.cells || [];
   const currentPlayers = currentGameState?.players || [];
+  const activeRules = currentGameState?.activeRules || [];
+  const definedStats = currentGameState?.definedStats || [];
 
-  // Generate the 20,000 token dynamic context and system prompt
+  // Generate the compact dynamic system prompt (< 2,000 tokens) with active previous rules
   const systemPrompt = buildChaosDynamicSystemPrompt(
     currentCells,
     currentPlayers,
+    activeRules,
+    definedStats,
     authorName,
     userRuleText
   );
@@ -52,7 +56,7 @@ export async function interpretChaosRule(
         timestamp: new Date().toLocaleTimeString('fr-FR'),
         status: 'CALLING',
         model,
-        message: `[IA] Envoi du Codex (contexte 20k tokens) au modèle ${model} via OpenRouter...`
+        message: `[IA] Envoi du décret (< 2k tokens) au modèle ${model} via OpenRouter...`
       });
 
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
