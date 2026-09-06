@@ -13,11 +13,13 @@ import AlchemyApp from './AlchemyApp';
 import SumoApp from './SumoApp';
 import RtsApp from './RtsApp';
 import MobaApp from './MobaApp';
+import SurvivorApp from './survivor/SurvivorApp';
 
 export default function Router() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/survivor" element={<SurvivorApp />} />
       <Route path="/richesse" element={<App />} />
       <Route path="/uno" element={<UnoApp />} />
       <Route path="/chaos" element={<ChaosApp />} />

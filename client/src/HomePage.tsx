@@ -20,6 +20,20 @@ interface GameTheme {
 
 const GAMES: GameTheme[] = [
   {
+    emoji: '⛏️',
+    title: 'Minecraft Survivor',
+    subtitle: 'Horde Roguelite • 50 Vagues & 5 Boss',
+    description: 'Survivez aux hordes de mobs Minecraft à 60 FPS ! 6 Classes & Armes uniques (Épée, Arc, Arbalète, Lance de Vitesse, Trident, Masse), système de niveaux avec raretés d\'améliorations, multiplicateur d\'EXP et déblocage au palier 30.',
+    route: '/survivor',
+    fontClass: 'font-display font-black tracking-wide',
+    cardTheme: 'bg-gradient-to-b from-emerald-950/80 via-slate-950 to-green-950/40',
+    borderTheme: 'border-emerald-500/50 hover:border-emerald-300 hover:shadow-emerald-900/60',
+    titleGradient: 'from-emerald-300 via-yellow-300 to-green-400',
+    badge: 'NOUVEAU • ROGUELITE ⛏️',
+    badgeStyle: 'bg-gradient-to-r from-emerald-950 to-green-900 text-emerald-300 border-emerald-500/50 animate-pulse',
+    players: '1 Joueur • Solo Action',
+  },
+  {
     emoji: '⚔️',
     title: 'Nexus Clash : MOBA Arena',
     subtitle: 'Arène Action & Contrôles LoL / ZQSD',
