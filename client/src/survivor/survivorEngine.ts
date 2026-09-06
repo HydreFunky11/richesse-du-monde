@@ -42,6 +42,13 @@ export class SurvivorEngine {
   public timeAlive: number = 0;
   public gameState: GameState = 'SELECT_CLASS';
 
+  // Aiming Mode: mouse crosshair tracking or automatic nearest enemy
+  public aimMode: 'mouse' | 'auto' = 'mouse';
+  public mouseScreenX: number = 400;
+  public mouseScreenY: number = 300;
+  public viewportWidth: number = 800;
+  public viewportHeight: number = 600;
+
   public unlockedWeapons: Record<WeaponId, boolean>;
   public weaponMasteryLevels: Record<WeaponId, number>;
   public levelUpChoices: UpgradeOption[] = [];
@@ -61,6 +68,34 @@ export class SurvivorEngine {
     this.unlockedWeapons = this.loadUnlockedWeapons();
     this.weaponMasteryLevels = this.loadWeaponLevels();
     this.player = this.createDefaultPlayer('sword');
+
+    const savedAim = localStorage.getItem('minecraft_survivor_aim_mode');
+    if (savedAim === 'auto' || savedAim === 'mouse') {
+      this.aimMode = savedAim;
+    } else {
+      this.aimMode = 'mouse';
+    }
+  }
+
+  public setAimMode(mode: 'mouse' | 'auto') {
+    this.aimMode = mode;
+    localStorage.setItem('minecraft_survivor_aim_mode', mode);
+  }
+
+  public toggleAimMode(): 'mouse' | 'auto' {
+    const next = this.aimMode === 'mouse' ? 'auto' : 'mouse';
+    this.setAimMode(next);
+    return next;
+  }
+
+  public setMousePos(x: number, y: number) {
+    this.mouseScreenX = x;
+    this.mouseScreenY = y;
+  }
+
+  public setViewportSize(w: number, h: number) {
+    this.viewportWidth = w;
+    this.viewportHeight = h;
   }
 
   // --- PERSISTENCE ---
@@ -227,7 +262,13 @@ export class SurvivorEngine {
     this.player.x += this.player.vx * dt;
     this.player.y += this.player.vy * dt;
 
-    if (dx !== 0 || dy !== 0) {
+    if (this.aimMode === 'mouse') {
+      const mdx = this.mouseScreenX - this.viewportWidth / 2;
+      const mdy = this.mouseScreenY - this.viewportHeight / 2;
+      if (Math.hypot(mdx, mdy) > 5) {
+        this.player.facingAngle = Math.atan2(mdy, mdx);
+      }
+    } else if (dx !== 0 || dy !== 0) {
       this.player.facingAngle = Math.atan2(dy, dx);
     }
 
@@ -532,14 +573,25 @@ export class SurvivorEngine {
     this.player.lastAttackTime = now;
     const def = WEAPONS[this.player.weaponId];
 
-    // Find nearest enemy for smart targeting
-    const nearestEnemy = this.findNearestEnemy();
+    // Target Angle based on Aiming Mode
     let targetAngle = this.player.facingAngle;
 
-    if (nearestEnemy) {
-      const edx = nearestEnemy.x - this.player.x;
-      const edy = nearestEnemy.y - this.player.y;
-      targetAngle = Math.atan2(edy, edx);
+    if (this.aimMode === 'mouse') {
+      const mdx = this.mouseScreenX - this.viewportWidth / 2;
+      const mdy = this.mouseScreenY - this.viewportHeight / 2;
+      if (Math.hypot(mdx, mdy) > 5) {
+        targetAngle = Math.atan2(mdy, mdx);
+        this.player.facingAngle = targetAngle;
+      }
+    } else {
+      // Auto targeting: nearest enemy
+      const nearestEnemy = this.findNearestEnemy();
+      if (nearestEnemy) {
+        const edx = nearestEnemy.x - this.player.x;
+        const edy = nearestEnemy.y - this.player.y;
+        targetAngle = Math.atan2(edy, edx);
+        this.player.facingAngle = targetAngle;
+      }
     }
 
     const count = this.player.weaponProjectiles;

@@ -17,6 +17,7 @@ export default function SurvivorApp() {
   const [selectedWeapon, setSelectedWeapon] = useState<WeaponId>('sword');
   const [levelUpChoices, setLevelUpChoices] = useState<UpgradeOption[]>([]);
   const [isMuted, setIsMuted] = useState(survivorSound.isMuted());
+  const [aimMode, setAimMode] = useState<'mouse' | 'auto'>(engine.aimMode);
 
   // Input keys tracking
   const keysRef = useRef({ up: false, down: false, left: false, right: false });
@@ -36,10 +37,20 @@ export default function SurvivorApp() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
       renderer.setSize(canvas.width, canvas.height);
+      engine.setViewportSize(canvas.width, canvas.height);
     };
 
     handleResize();
     window.addEventListener('resize', handleResize);
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      engine.setMousePos(x, y);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
 
     let animId: number;
 
@@ -63,6 +74,7 @@ export default function SurvivorApp() {
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('mousemove', handleMouseMove);
     };
   }, [engine, gameState]);
 
@@ -74,6 +86,18 @@ export default function SurvivorApp() {
       if (code === 'KeyS' || code === 'ArrowDown') keysRef.current.down = true;
       if (code === 'KeyA' || code === 'KeyQ' || code === 'ArrowLeft') keysRef.current.left = true;
       if (code === 'KeyD' || code === 'ArrowRight') keysRef.current.right = true;
+
+      // Toggle Aiming Mode: [V]
+      if (code === 'KeyV') {
+        const next = engine.toggleAimMode();
+        setAimMode(next);
+        engine.notification = {
+          text: next === 'mouse' ? '🎯 VISÉE SOURIS ACTIVÉE' : '🤖 VISÉE AUTO ACTIVÉE',
+          color: next === 'mouse' ? '#38bdf8' : '#f59e0b',
+          timer: 1.8
+        };
+        survivorSound.uiClick();
+      }
 
       // Level up shortcuts: [1], [2], [3]
       if (engine.gameState === 'LEVEL_UP') {
@@ -130,10 +154,24 @@ export default function SurvivorApp() {
     setIsMuted(muted);
   };
 
+  const handleToggleAimMode = () => {
+    const next = engine.toggleAimMode();
+    setAimMode(next);
+    engine.notification = {
+      text: next === 'mouse' ? '🎯 VISÉE SOURIS ACTIVÉE' : '🤖 VISÉE AUTO ACTIVÉE',
+      color: next === 'mouse' ? '#38bdf8' : '#f59e0b',
+      timer: 1.8
+    };
+    survivorSound.uiClick();
+  };
+
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-slate-950 font-sans select-none text-slate-100">
       {/* 1. Main 60 FPS Canvas Viewport */}
-      <canvas ref={canvasRef} className="absolute inset-0 block w-full h-full cursor-crosshair" />
+      <canvas
+        ref={canvasRef}
+        className={`absolute inset-0 block w-full h-full ${aimMode === 'mouse' ? 'cursor-none' : 'cursor-crosshair'}`}
+      />
 
       {/* 2. Top Header Navigation Controls */}
       <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none z-30">
@@ -145,6 +183,20 @@ export default function SurvivorApp() {
         </button>
 
         <div className="flex items-center gap-2 pointer-events-auto">
+          {/* Aim Mode Toggle Button */}
+          <button
+            onClick={handleToggleAimMode}
+            title="Basculer le mode de visée : Souris ou Automatique (Touche V)"
+            className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition shadow-lg cursor-pointer ${
+              aimMode === 'mouse'
+                ? 'bg-emerald-950/90 border-emerald-500/80 text-emerald-300 hover:bg-emerald-900/90'
+                : 'bg-slate-900/90 border-slate-700/80 text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            <span>{aimMode === 'mouse' ? '🎯 Visée : Souris' : '🤖 Visée : Auto'}</span>
+            <span className="text-[10px] text-slate-400 font-mono bg-slate-800/80 px-1 py-0.5 rounded border border-slate-700/60">[V]</span>
+          </button>
+
           <button
             onClick={handleToggleSound}
             className="w-9 h-9 rounded-xl bg-slate-900/90 border border-slate-700/80 text-sm flex items-center justify-center hover:bg-slate-800 transition cursor-pointer shadow-lg"
@@ -253,6 +305,19 @@ export default function SurvivorApp() {
             >
               LANCER LA PARTIE ⛏️
             </button>
+
+            {/* Controls hints */}
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs font-mono text-slate-400">
+              <span className="flex items-center gap-1.5 bg-slate-900/80 px-3 py-1 rounded-lg border border-slate-800">
+                ⌨️ Déplacement : <strong className="text-white">ZQSD / WASD / Flèches</strong>
+              </span>
+              <span className="flex items-center gap-1.5 bg-slate-900/80 px-3 py-1 rounded-lg border border-slate-800">
+                🎯 Visée : <strong className="text-emerald-300">Souris</strong> (Touche <kbd className="px-1.5 py-0.5 bg-slate-800 text-white rounded border border-slate-700">V</kbd> pour Auto)
+              </span>
+              <span className="flex items-center gap-1.5 bg-slate-900/80 px-3 py-1 rounded-lg border border-slate-800">
+                ⏸️ Pause : <strong className="text-white">Échap</strong>
+              </span>
+            </div>
           </div>
         </div>
       )}

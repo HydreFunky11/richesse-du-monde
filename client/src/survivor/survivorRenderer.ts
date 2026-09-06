@@ -57,6 +57,11 @@ export class SurvivorRenderer {
 
     // 8. Minecraft HUD (Screen space)
     this.drawHUD(engine);
+
+    // 9. Minecraft Crosshair (When Mouse Aiming Mode is Active)
+    if (engine.aimMode === 'mouse') {
+      this.drawCrosshair(engine.mouseScreenX, engine.mouseScreenY);
+    }
   }
 
   // --- MINECRAFT TERRAIN (Procedural Grass Blocks & Flowers) ---
@@ -962,6 +967,30 @@ export class SurvivorRenderer {
       ctx.fillText(engine.notification.text, this.width / 2, notifY + 22);
       ctx.restore();
     }
+
+    ctx.restore();
+  }
+
+  // --- MINECRAFT PIXEL CROSSHAIR ---
+
+  private drawCrosshair(mx: number, my: number) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(mx, my);
+
+    // Dark drop shadow / outline
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    ctx.fillRect(-8, -2.5, 16, 5);
+    ctx.fillRect(-2.5, -8, 5, 16);
+
+    // Crisp white crosshair plus sign
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(-7, -1.5, 14, 3);
+    ctx.fillRect(-1.5, -7, 3, 14);
+
+    // Cyan diamond center dot
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillRect(-1, -1, 2, 2);
 
     ctx.restore();
   }
