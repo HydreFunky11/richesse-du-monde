@@ -317,6 +317,11 @@ export class MobaEngine {
       this.state.log.push(`${p.username} a quitté la partie.`);
       this.state.players.splice(idx, 1);
     }
+    const humanPlayers = this.state.players.filter(p => !p.isBot);
+    if (humanPlayers.length === 0) {
+      this.stop();
+      this.state.status = "FINISHED";
+    }
   }
 
   public switchTeam(playerId: string) {
@@ -726,7 +731,13 @@ export class MobaEngine {
     this.checkNexusDestroyed();
 
     if (this.onUpdateCallback) {
-      this.onUpdateCallback(this.state);
+      if (this.state.status === "PLAYING") {
+        if (this.state.gameTicks % 2 === 0) {
+          this.onUpdateCallback(this.state);
+        }
+      } else if (this.state.status === "FINISHED") {
+        this.onUpdateCallback(this.state);
+      }
     }
   }
 

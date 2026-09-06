@@ -79,8 +79,10 @@ class SumoEngine {
         this.state.players = this.state.players.filter(p => p.id !== socketId);
         this.state.spectators = this.state.spectators.filter(s => s.id !== socketId);
         delete this.pushTimestamps[socketId];
-        if (this.state.players.length < 2 && this.state.status === 'PLAYING') {
-            this.state.status = 'LOBBY';
+        if (this.state.players.length === 0 || (this.state.players.length < 2 && this.state.status === 'PLAYING')) {
+            if (this.state.status !== 'MATCH_FINISHED') {
+                this.state.status = 'LOBBY';
+            }
             this.stopLoop();
         }
         this.notify();
@@ -227,6 +229,7 @@ class SumoEngine {
             this.state.status = 'MATCH_FINISHED';
             this.state.matchWinner = winnerSide;
             this.state.lastEventNotice = `🏆 VICTOIRE SUPRÊME ! ${winner.username} EST LE YOKOZUNA !`;
+            this.stopLoop();
             this.notify();
             return;
         }
@@ -245,7 +248,7 @@ class SumoEngine {
         if (this.tickInterval)
             clearInterval(this.tickInterval);
         this.tickInterval = setInterval(() => {
-            const dt = 0.05; // 50ms tick
+            const dt = 0.1; // 100ms tick
             const now = Date.now();
             // Update CPS for each player (pushes in last 1000ms)
             for (const p of this.state.players) {
@@ -315,7 +318,7 @@ class SumoEngine {
                 }
                 this.notify();
             }
-        }, 50);
+        }, 100);
     }
     resetMatch() {
         this.state.status = 'LOBBY';

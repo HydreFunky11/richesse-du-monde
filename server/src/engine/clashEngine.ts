@@ -121,6 +121,7 @@ export class ClashEngine {
   private onStateUpdateCallback: ((state: ClashGameState) => void) | null = null;
   private lastTickTime: number = 0;
   private botLastPlayTime: number = 0;
+  private tickCount: number = 0;
 
   constructor(roomCode: string) {
     this.roomCode = roomCode;
@@ -224,7 +225,8 @@ export class ClashEngine {
   public removePlayer(id: string) {
     this.state.players = this.state.players.filter(p => p.id !== id);
     this.state.spectators = this.state.spectators.filter(s => s.id !== id);
-    if (this.state.players.length === 0) {
+    const humanPlayers = this.state.players.filter(p => !p.isBot);
+    if (humanPlayers.length === 0) {
       this.stopLoop();
       this.state.status = 'FINISHED';
     }
@@ -586,10 +588,12 @@ export class ClashEngine {
     this.onStateUpdateCallback = callback;
     this.lastTickTime = Date.now();
     this.botLastPlayTime = Date.now();
+    this.tickCount = 0;
 
     this.loopInterval = setInterval(() => {
       this.tick();
-      if (this.onStateUpdateCallback) {
+      this.tickCount++;
+      if (this.onStateUpdateCallback && this.state.status === 'PLAYING' && this.tickCount % 2 === 0) {
         this.onStateUpdateCallback(this.state);
       }
     }, 50); // 20 FPS simulation
@@ -1027,6 +1031,10 @@ export class ClashEngine {
     if (winnerTeam !== 'DRAW') {
       const winnerPlayer = this.state.players.find(p => p.team === winnerTeam);
       this.state.winnerUsername = winnerPlayer ? winnerPlayer.username : `Équipe ${winnerTeam}`;
+    }
+
+    if (this.onStateUpdateCallback) {
+      this.onStateUpdateCallback(this.state);
     }
   }
 

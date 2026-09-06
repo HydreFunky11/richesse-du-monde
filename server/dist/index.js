@@ -59,6 +59,9 @@ const io = new socket_io_1.Server(httpServer, {
     cors: {
         origin: '*',
         methods: ['GET', 'POST']
+    },
+    perMessageDeflate: {
+        threshold: 1024
     }
 });
 const PORT = process.env.PORT || 3001;
@@ -1177,9 +1180,19 @@ io.on('connection', (socket) => {
             game.removePlayer(socket.id);
             io.to(roomCode).emit('clashStateUpdate', game.getState());
             console.log(`[CLASH] Déconnexion de ${username} du salon ${roomCode}`);
-            if (game.getPlayers().length === 0) {
+            if (game.getPlayers().filter(p => !p.isBot).length === 0) {
                 game.stopLoop();
                 delete clashGames[roomCode];
+            }
+        }
+        else if (gameType === 'sumo' && roomCode && sumoGames[roomCode]) {
+            const game = sumoGames[roomCode];
+            game.removePlayer(socket.id);
+            io.to(roomCode).emit('sumoStateUpdate', game.getState());
+            console.log(`[SUMO] Déconnexion de ${username} du salon ${roomCode}`);
+            if (game.getPlayers().length === 0) {
+                game.stopLoop();
+                delete sumoGames[roomCode];
             }
         }
         else if (gameType === 'moba' && roomCode && mobaGames[roomCode]) {
@@ -1197,7 +1210,7 @@ io.on('connection', (socket) => {
             game.removePlayer(socket.id);
             io.to(roomCode).emit('rtsStateUpdate', game.getState());
             console.log(`[RTS] Déconnexion de ${username} du salon ${roomCode}`);
-            if (game.getPlayers().length === 0) {
+            if (game.getPlayers().filter(p => !p.isBot).length === 0) {
                 game.stopLoop();
                 delete rtsGames[roomCode];
             }
@@ -1245,6 +1258,54 @@ io.on('connection', (socket) => {
         }
     });
 });
+// ─── BACKGROUND CLEANUP JANITOR (Runs every 60s) ─────────────────────────────
+setInterval(() => {
+    try {
+        // 1. Clash
+        for (const [code, game] of Object.entries(clashGames)) {
+            const room = io.sockets.adapter.rooms.get(code);
+            const humanCount = game.getPlayers().filter(p => !p.isBot).length;
+            if (!room || room.size === 0 || humanCount === 0) {
+                console.log(`[JANITOR] Nettoyage salon Clash orphelin: ${code}`);
+                game.stopLoop();
+                delete clashGames[code];
+            }
+        }
+        // 2. RTS
+        for (const [code, game] of Object.entries(rtsGames)) {
+            const room = io.sockets.adapter.rooms.get(code);
+            const humanCount = game.getPlayers().filter(p => !p.isBot).length;
+            if (!room || room.size === 0 || humanCount === 0) {
+                console.log(`[JANITOR] Nettoyage salon RTS orphelin: ${code}`);
+                game.stopLoop();
+                delete rtsGames[code];
+            }
+        }
+        // 3. MOBA
+        for (const [code, game] of Object.entries(mobaGames)) {
+            const room = io.sockets.adapter.rooms.get(code);
+            const humanCount = game.getState().players.filter(p => !p.isBot).length;
+            if (!room || room.size === 0 || humanCount === 0) {
+                console.log(`[JANITOR] Nettoyage salon MOBA orphelin: ${code}`);
+                game.stop();
+                delete mobaGames[code];
+            }
+        }
+        // 4. Sumo
+        for (const [code, game] of Object.entries(sumoGames)) {
+            const room = io.sockets.adapter.rooms.get(code);
+            const humanCount = game.getPlayers().length;
+            if (!room || room.size === 0 || humanCount === 0) {
+                console.log(`[JANITOR] Nettoyage salon Sumo orphelin: ${code}`);
+                game.stopLoop();
+                delete sumoGames[code];
+            }
+        }
+    }
+    catch (err) {
+        console.error('[JANITOR] Erreur lors du nettoyage périodique:', err);
+    }
+}, 60000);
 httpServer.listen(PORT, () => {
     console.log(`Serveur démarré sur le port ${PORT}`);
 });

@@ -401,6 +401,13 @@ export class RtsEngine {
       const p = this.state.players.find(pl => pl.id === playerId);
       if (p) {
         p.isAlive = false;
+      }
+      this.state.players = this.state.players.filter(pl => pl.id !== playerId);
+      const humanPlayers = this.state.players.filter(pl => !pl.isBot);
+      if (humanPlayers.length === 0) {
+        this.stopLoop();
+        this.state.status = 'FINISHED';
+      } else {
         this.checkVictory();
       }
     }
@@ -840,7 +847,7 @@ export class RtsEngine {
     if (this.intervalId) clearInterval(this.intervalId);
     this.intervalId = setInterval(() => {
       this.tick();
-      if (this.onUpdateCallback) {
+      if (this.onUpdateCallback && this.state.status === 'PLAYING' && this.state.gameTicks % 2 === 0) {
         this.onUpdateCallback(this.state);
       }
     }, 50);
@@ -1562,11 +1569,14 @@ export class RtsEngine {
     }
 
     const alivePlayers = this.state.players.filter(p => p.isAlive);
-    if (alivePlayers.length === 1 && this.state.players.length >= 2) {
+    if (alivePlayers.length <= 1 && this.state.players.length >= 2) {
       this.state.status = 'FINISHED';
-      this.state.winner = alivePlayers[0];
-      this.state.log.push(`🏆 VICTOIRE ÉCLATANTE de ${alivePlayers[0].username} (${alivePlayers[0].faction.toUpperCase()}) !`);
+      this.state.winner = alivePlayers[0] || null;
+      this.state.log.push(alivePlayers[0] ? `🏆 VICTOIRE ÉCLATANTE de ${alivePlayers[0].username} (${alivePlayers[0].faction.toUpperCase()}) !` : 'Match terminé.');
       this.stopLoop();
+      if (this.onUpdateCallback) {
+        this.onUpdateCallback(this.state);
+      }
     }
   }
 
