@@ -64,6 +64,7 @@ export interface PlayerStats {
   critChance: number; // 0.05 = 5%
   critMultiplier: number; // 2.0 = +100% damage
   regenPerSec: number; // Health regenerated per second
+  luck: number; // Base 1.0 (100%), increases rarity of upgrades and pickup drop rate
   
   // Weapon stats (dynamic per run)
   weaponId: WeaponId;

@@ -290,7 +290,7 @@ export default function SurvivorApp() {
                       </div>
                     ) : (
                       <div className="pt-2 border-t border-slate-800/80 text-[10px] text-rose-300 font-semibold">
-                        Débloquez au <strong>Palier 30</strong> de {WEAPONS[def.unlockReq!.weaponId].name}
+                        Débloquez au <strong>Palier 30</strong> ou en <strong>terminant le jeu</strong> avec {WEAPONS[def.unlockReq!.weaponId].name}
                       </div>
                     )}
                   </div>
@@ -333,7 +333,7 @@ export default function SurvivorApp() {
               NIVEAU {engine.player.level} ATTEINT
             </h2>
             <p className="text-xs text-slate-400 mb-6">
-              Choisissez une amélioration pour affronter les prochaines vagues :
+              Choisissez une amélioration pour affronter les prochaines vagues • <span className="text-emerald-400 font-mono font-bold">🍀 Chance: +{Math.round((engine.player.luck - 1) * 100)}%</span>
             </p>
 
             {/* Upgrades Cards */}
@@ -445,6 +445,7 @@ export default function SurvivorApp() {
               </button>
               <button
                 onClick={() => {
+                  engine.checkRetroactiveUnlocks();
                   engine.gameState = 'SELECT_CLASS';
                   setGameState('SELECT_CLASS');
                 }}
@@ -476,12 +477,19 @@ export default function SurvivorApp() {
               <div>Temps total : <strong className="text-cyan-400">{Math.floor(engine.timeAlive)}s</strong></div>
             </div>
 
+            {engine.newUnlockAnnounced && (
+              <div className="mb-6 p-4 rounded-2xl bg-amber-500/20 border-2 border-amber-400 text-amber-200 text-xs font-bold animate-bounce shadow-xl">
+                🎉 {engine.newUnlockAnnounced}
+              </div>
+            )}
+
             <button
               onClick={() => {
+                engine.checkRetroactiveUnlocks();
                 engine.gameState = 'SELECT_CLASS';
                 setGameState('SELECT_CLASS');
               }}
-              className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-black rounded-xl text-sm transition cursor-pointer shadow-lg"
+              className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-black rounded-xl text-sm transition cursor-pointer shadow-lg hover:scale-102"
             >
               Retour aux Classes & Succès
             </button>

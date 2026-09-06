@@ -884,19 +884,21 @@ export class SurvivorRenderer {
     ctx.fillStyle = def.color;
     ctx.fillText(`${def.icon} ${def.name}`, 32, 85);
 
-    // 5. TOP-RIGHT: STATS OVERVIEW (EXP MULTIPLIER, SPEED, ARMOR)
+    // 5. TOP-RIGHT: STATS OVERVIEW (EXP MULTIPLIER, SPEED, ARMOR, LUCK)
     ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-    ctx.fillRect(this.width - 200, 48, 180, 56);
-    ctx.strokeRect(this.width - 200, 48, 180, 56);
+    ctx.fillRect(this.width - 200, 44, 185, 72);
+    ctx.strokeRect(this.width - 200, 44, 185, 72);
 
     ctx.font = '11px monospace';
     ctx.textAlign = 'left';
     ctx.fillStyle = '#4ade80';
-    ctx.fillText(`🧪 Multiplicateur EXP: x${p.expMultiplier.toFixed(2)}`, this.width - 190, 66);
+    ctx.fillText(`🧪 Multiplicateur EXP: x${p.expMultiplier.toFixed(2)}`, this.width - 190, 60);
     ctx.fillStyle = '#60a5fa';
-    ctx.fillText(`🛡️ Armure: +${p.armor}  🥾 Vit: ${p.moveSpeed}`, this.width - 190, 82);
+    ctx.fillText(`🛡️ Armure: +${p.armor}  🥾 Vit: ${p.moveSpeed}`, this.width - 190, 76);
     ctx.fillStyle = '#f59e0b';
-    ctx.fillText(`💪 Bonus Dégâts: +${Math.round((p.damageMultiplier - 1) * 100)}%`, this.width - 190, 96);
+    ctx.fillText(`💪 Dégâts: +${Math.round((p.damageMultiplier - 1) * 100)}%`, this.width - 190, 92);
+    ctx.fillStyle = '#a7f3d0';
+    ctx.fillText(`🍀 Chance: +${Math.round((p.luck - 1) * 100)}%`, this.width - 190, 106);
 
     // 6. BOSS BAR (When Boss is Active)
     if (engine.activeBoss) {

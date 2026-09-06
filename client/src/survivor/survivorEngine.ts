@@ -68,6 +68,7 @@ export class SurvivorEngine {
     this.unlockedWeapons = this.loadUnlockedWeapons();
     this.weaponMasteryLevels = this.loadWeaponLevels();
     this.player = this.createDefaultPlayer('sword');
+    this.checkRetroactiveUnlocks();
 
     const savedAim = localStorage.getItem('minecraft_survivor_aim_mode');
     if (savedAim === 'auto' || savedAim === 'mouse') {
@@ -212,6 +213,7 @@ export class SurvivorEngine {
       critChance: 0.05,
       critMultiplier: 2.0,
       regenPerSec: 0,
+      luck: 1.0,
 
       weaponId,
       weaponCooldown: def.baseCooldownMs,
@@ -336,11 +338,22 @@ export class SurvivorEngine {
     if (this.currentWave >= 50) {
       // Victory! Finished all 50 waves!
       this.gameState = 'VICTORY';
+      this.weaponMasteryLevels[this.player.weaponId] = Math.max(this.weaponMasteryLevels[this.player.weaponId] || 1, 30);
+      this.saveWeaponLevels();
+      this.unlockNextWeapon('VICTOIRE TOTALE (50 vagues réussies)');
       survivorSound.levelUp();
       return;
     }
 
     this.currentWave++;
+
+    // Palier 30 reached by waves
+    if (this.currentWave >= 30) {
+      this.weaponMasteryLevels[this.player.weaponId] = Math.max(this.weaponMasteryLevels[this.player.weaponId] || 1, 30);
+      this.saveWeaponLevels();
+      this.unlockNextWeapon('Palier Vague 30 atteint');
+    }
+
     const cfg = WAVES_CONFIG[this.currentWave - 1];
     this.waveDuration = cfg?.durationSec || 30;
     this.waveTimer = this.waveDuration;
@@ -957,8 +970,9 @@ export class SurvivorEngine {
       this.spawnSparks(enemy.x, enemy.y, '#86efac', 10);
     }
 
-    // Rare drop roll
-    const dropChance = enemy.isBoss ? 1.0 : 0.025; // 100% on boss, 2.5% on regular mobs
+    // Rare drop roll boosted by luck!
+    const baseDropChance = enemy.isBoss ? 1.0 : 0.025; // 100% on boss, 2.5% on regular mobs
+    const dropChance = enemy.isBoss ? 1.0 : Math.min(0.15, baseDropChance * (this.player.luck || 1.0));
     if (Math.random() < dropChance) {
       const dropTypes: PickupType[] = ['magnet', 'freeze', 'nuke'];
       const chosen = dropTypes[Math.floor(Math.random() * dropTypes.length)];
@@ -983,6 +997,14 @@ export class SurvivorEngine {
 
     if (enemy.isBoss) {
       this.activeBoss = null;
+
+      // Warden / Final Boss defeat unlock trigger!
+      if (enemy.bossType === 'warden' || this.currentWave === 50) {
+        this.weaponMasteryLevels[this.player.weaponId] = Math.max(this.weaponMasteryLevels[this.player.weaponId] || 1, 30);
+        this.saveWeaponLevels();
+        this.unlockNextWeapon('The Warden terrassé');
+      }
+
       // Extra rare drop from boss!
       const bonusTypes: PickupType[] = ['magnet', 'freeze', 'nuke'];
       this.spawnPickup(enemy.x + 20, enemy.y + 20, bonusTypes[Math.floor(Math.random() * bonusTypes.length)]);
@@ -1275,7 +1297,7 @@ export class SurvivorEngine {
     this.gameState = 'LEVEL_UP';
   }
 
-  private checkWeaponMastery() {
+  public checkWeaponMastery() {
     const currentWeapon = this.player.weaponId;
     const currentMastery = this.weaponMasteryLevels[currentWeapon] || 1;
 
@@ -1284,25 +1306,63 @@ export class SurvivorEngine {
       this.saveWeaponLevels();
     }
 
-    // Check if reaching 30 unlocks next weapon!
-    if (this.player.level >= 30) {
-      const unlockChain: Record<WeaponId, WeaponId | null> = {
-        sword: 'bow',
-        bow: 'crossbow',
-        crossbow: 'spear',
-        spear: 'trident',
-        trident: 'mace',
-        mace: null
-      };
+    // Check if reaching level 30 or wave 30 unlocks next weapon!
+    if (this.player.level >= 30 || this.currentWave >= 30) {
+      this.unlockNextWeapon('Palier 30 atteint');
+    }
+  }
 
-      const nextWeapon = unlockChain[currentWeapon];
-      if (nextWeapon && !this.unlockedWeapons[nextWeapon]) {
-        this.unlockedWeapons[nextWeapon] = true;
-        this.saveUnlockedWeapons();
-        const nextDef = WEAPONS[nextWeapon];
-        this.newUnlockAnnounced = `FÉLICITATIONS ! Palier 30 atteint : [${nextDef.name} ${nextDef.icon}] débloquée pour vos prochaines parties !`;
+  public unlockNextWeapon(reason?: string): string | null {
+    const currentWeapon = this.player.weaponId;
+    const unlockChain: Record<WeaponId, WeaponId | null> = {
+      sword: 'bow',
+      bow: 'crossbow',
+      crossbow: 'spear',
+      spear: 'trident',
+      trident: 'mace',
+      mace: null
+    };
+
+    const nextWeapon = unlockChain[currentWeapon];
+    if (nextWeapon && !this.unlockedWeapons[nextWeapon]) {
+      this.unlockedWeapons[nextWeapon] = true;
+      this.saveUnlockedWeapons();
+      const nextDef = WEAPONS[nextWeapon];
+      const msg = `FÉLICITATIONS ! ${reason ? reason + ' : ' : ''}[${nextDef.name} ${nextDef.icon}] débloquée pour vos prochaines parties !`;
+      this.newUnlockAnnounced = msg;
+      return msg;
+    }
+    return null;
+  }
+
+  public checkRetroactiveUnlocks(): boolean {
+    const unlockChain: Record<WeaponId, WeaponId | null> = {
+      sword: 'bow',
+      bow: 'crossbow',
+      crossbow: 'spear',
+      spear: 'trident',
+      trident: 'mace',
+      mace: null
+    };
+
+    let changed = false;
+    for (const [wid, nextWid] of Object.entries(unlockChain)) {
+      if (nextWid) {
+        const mastery = this.weaponMasteryLevels[wid as WeaponId] || 1;
+        // Palier 25+ or completed run retroactively unlocks next weapon
+        if (mastery >= 25 && !this.unlockedWeapons[nextWid]) {
+          this.unlockedWeapons[nextWid] = true;
+          changed = true;
+          const nextDef = WEAPONS[nextWid];
+          this.newUnlockAnnounced = `Classe [${nextDef.name} ${nextDef.icon}] débloquée grâce à vos précédentes victoires !`;
+        }
       }
     }
+
+    if (changed) {
+      this.saveUnlockedWeapons();
+    }
+    return changed;
   }
 
   public selectUpgrade(upgrade: UpgradeOption) {
@@ -1341,7 +1401,13 @@ export class SurvivorEngine {
 
   private rollUpgradeChoices(count: number): UpgradeOption[] {
     const choices: UpgradeOption[] = [];
-    const pool = [...BASE_UPGRADES];
+    const currentWeapon = this.player.weaponId;
+
+    // Filter out upgrades that are not compatible with the current weapon!
+    const pool = BASE_UPGRADES.filter(u => {
+      if (!u.compatibleWeapons) return true;
+      return u.compatibleWeapons.includes(currentWeapon);
+    });
 
     // Shuffle pool
     for (let i = pool.length - 1; i > 0; i--) {
@@ -1375,12 +1441,23 @@ export class SurvivorEngine {
   }
 
   private rollRarity(): Rarity {
-    const roll = Math.random() * 100;
-    let accumulated = 0;
+    const luck = Math.max(0.5, this.player.luck || 1.0);
+    // Weight scaling by luck: higher tiers get boosted exponentially by luck
+    const weights: Record<Rarity, number> = {
+      legendary: RARITIES.legendary.weight * Math.pow(luck, 1.8),
+      epic: RARITIES.epic.weight * Math.pow(luck, 1.5),
+      rare: RARITIES.rare.weight * Math.pow(luck, 1.25),
+      uncommon: RARITIES.uncommon.weight * luck,
+      common: RARITIES.common.weight
+    };
 
+    const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
+    const roll = Math.random() * totalWeight;
+
+    let accumulated = 0;
     const tiers: Rarity[] = ['legendary', 'epic', 'rare', 'uncommon', 'common'];
     for (const r of tiers) {
-      accumulated += RARITIES[r].weight;
+      accumulated += weights[r];
       if (roll <= accumulated) {
         return r;
       }

@@ -176,6 +176,7 @@ export interface BaseUpgradeTemplate {
   statKey: string;
   baseValue: number;
   isMultiplier?: boolean;
+  compatibleWeapons?: WeaponId[]; // If undefined, compatible with all weapons
   descTemplate: (val: number) => string;
 }
 
@@ -256,6 +257,16 @@ export const BASE_UPGRADES: BaseUpgradeTemplate[] = [
     isMultiplier: true,
     descTemplate: (val) => `+${Math.round(val * 100)}% de chance de Coup Critique (x2 dégâts)`
   },
+  {
+    id: 'player_luck',
+    name: 'Trèfle à Quatre Feuilles',
+    icon: '🍀',
+    category: 'player',
+    statKey: 'luck',
+    baseValue: 0.15,
+    isMultiplier: true,
+    descTemplate: (val) => `+${Math.round(val * 100)}% de Chance (Augmente la rareté des améliorations et drops rares)`
+  },
 
   // --- WEAPON UPGRADES ---
   {
@@ -266,6 +277,7 @@ export const BASE_UPGRADES: BaseUpgradeTemplate[] = [
     statKey: 'weaponCooldown',
     baseValue: 0.08,
     isMultiplier: true,
+    compatibleWeapons: ['sword', 'bow', 'crossbow', 'spear', 'trident', 'mace'],
     descTemplate: (val) => `+${Math.round(val * 100)}% de Cadence d'attaque (recharge plus vite)`
   },
   {
@@ -275,7 +287,8 @@ export const BASE_UPGRADES: BaseUpgradeTemplate[] = [
     category: 'weapon',
     statKey: 'weaponProjectiles',
     baseValue: 1,
-    descTemplate: (val) => `+${Math.round(val)} Projectile / Attaque simultanée`
+    compatibleWeapons: ['bow', 'crossbow'], // Seules les armes à tir de projectiles multiples
+    descTemplate: (val) => `+${Math.round(val)} Projectile tiré simultanément`
   },
   {
     id: 'weapon_pierce',
@@ -284,6 +297,7 @@ export const BASE_UPGRADES: BaseUpgradeTemplate[] = [
     category: 'weapon',
     statKey: 'weaponPierce',
     baseValue: 1,
+    compatibleWeapons: ['bow', 'crossbow', 'spear', 'trident'], // Sword et Mace percent déjà 100% de la zone
     descTemplate: (val) => `+${Math.round(val)} Cible perforée par attaque`
   },
   {
@@ -294,6 +308,7 @@ export const BASE_UPGRADES: BaseUpgradeTemplate[] = [
     statKey: 'weaponRange',
     baseValue: 0.15,
     isMultiplier: true,
+    compatibleWeapons: ['sword', 'bow', 'crossbow', 'spear', 'trident'], // Mace utilise weaponArea
     descTemplate: (val) => `+${Math.round(val * 100)}% de Portée et Allonge d'attaque`
   },
   {
@@ -304,6 +319,7 @@ export const BASE_UPGRADES: BaseUpgradeTemplate[] = [
     statKey: 'weaponArea',
     baseValue: 0.20,
     isMultiplier: true,
+    compatibleWeapons: ['sword', 'crossbow', 'trident', 'mace', 'spear'], // Bow est un tir mono-cible
     descTemplate: (val) => `+${Math.round(val * 100)}% de Rayon de Frappe / Zone d'Impact`
   },
   {
@@ -314,6 +330,7 @@ export const BASE_UPGRADES: BaseUpgradeTemplate[] = [
     statKey: 'weaponProjSpeed',
     baseValue: 0.25,
     isMultiplier: true,
+    compatibleWeapons: ['bow', 'crossbow', 'trident'], // Sword, Spear et Mace sont des attaques au corps à corps
     descTemplate: (val) => `+${Math.round(val * 100)}% de Vélocité des projectiles`
   }
 ];
