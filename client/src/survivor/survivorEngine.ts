@@ -10,7 +10,9 @@ import type {
   Particle,
   GameState,
   UpgradeOption,
-  Rarity
+  Rarity,
+  PickupType,
+  PickupItem
 } from './survivorTypes';
 import { WEAPONS, RARITIES, BASE_UPGRADES, WAVES_CONFIG } from './survivorConfig';
 import { survivorSound } from './survivorSound';
@@ -23,12 +25,20 @@ export class SurvivorEngine {
   public enemies: Enemy[] = [];
   public projectiles: Projectile[] = [];
   public expOrbs: ExpOrb[] = [];
+  public pickups: PickupItem[] = [];
   public damageNumbers: DamageNumber[] = [];
   public particles: Particle[] = [];
 
   public currentWave: number = 1;
   public waveTimer: number = 0; // Countdown in seconds
-  public waveDuration: number = 25;
+  public waveDuration: number = 30;
+  public waveTargetKills: number = 18;
+  public waveCurrentKills: number = 0;
+  public waveSpawnedCount: number = 0;
+  public waveClearCountdown: number | null = null;
+
+  public freezeTimer: number = 0;
+  public notification: { text: string; color: string; timer: number } | null = null;
   public timeAlive: number = 0;
   public gameState: GameState = 'SELECT_CLASS';
 
@@ -124,13 +134,21 @@ export class SurvivorEngine {
     this.enemies = [];
     this.projectiles = [];
     this.expOrbs = [];
+    this.pickups = [];
     this.damageNumbers = [];
     this.particles = [];
 
     this.currentWave = 1;
     const waveCfg = WAVES_CONFIG[0];
-    this.waveDuration = waveCfg?.durationSec || 25;
+    this.waveDuration = waveCfg?.durationSec || 30;
     this.waveTimer = this.waveDuration;
+    this.waveTargetKills = waveCfg?.targetKills || 18;
+    this.waveCurrentKills = 0;
+    this.waveSpawnedCount = 0;
+    this.waveClearCountdown = null;
+    this.freezeTimer = 0;
+    this.notification = null;
+
     this.timeAlive = 0;
     this.activeBoss = null;
     this.newUnlockAnnounced = null;
@@ -213,15 +231,37 @@ export class SurvivorEngine {
       this.player.facingAngle = Math.atan2(dy, dx);
     }
 
-    // Passive regeneration
+    // Passive regeneration (nerfed)
     if (this.player.regenPerSec > 0 && this.player.hp < this.player.maxHp) {
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + this.player.regenPerSec * dt);
     }
 
-    // 2. Wave Progression & Boss Management
-    this.waveTimer -= dt;
-    if (this.waveTimer <= 0) {
-      this.advanceWave();
+    // Freeze timer update
+    if (this.freezeTimer > 0) {
+      this.freezeTimer = Math.max(0, this.freezeTimer - dt);
+    }
+
+    // Toast notification timer
+    if (this.notification) {
+      this.notification.timer -= dt;
+      if (this.notification.timer <= 0) {
+        this.notification = null;
+      }
+    }
+
+    // 2. Wave Progression & 3-second Countdown
+    if (this.waveClearCountdown !== null) {
+      this.waveClearCountdown -= dt;
+      if (this.waveClearCountdown <= 0) {
+        this.waveClearCountdown = null;
+        this.advanceWave();
+      }
+    } else {
+      this.waveTimer -= dt;
+      if (this.waveTimer <= 0) {
+        // Wave time limit elapsed: advance to next wave even if mobs remain!
+        this.advanceWave();
+      }
     }
 
     // 3. Mob Spawning
@@ -242,7 +282,10 @@ export class SurvivorEngine {
     // 8. Update EXP Orbs & Magnet Pull
     this.updateExpOrbs(dt);
 
-    // 9. Update Damage Numbers & Particles
+    // 9. Update Rare Pickups (Magnet, Freeze, Nuke)
+    this.updatePickups(dt);
+
+    // 10. Update Damage Numbers & Particles
     this.updateVFX(dt);
   }
 
@@ -258,8 +301,12 @@ export class SurvivorEngine {
 
     this.currentWave++;
     const cfg = WAVES_CONFIG[this.currentWave - 1];
-    this.waveDuration = cfg?.durationSec || 25;
+    this.waveDuration = cfg?.durationSec || 30;
     this.waveTimer = this.waveDuration;
+    this.waveTargetKills = cfg?.targetKills || (15 + this.currentWave * 3);
+    this.waveCurrentKills = 0;
+    this.waveSpawnedCount = 0;
+    this.waveClearCountdown = null;
 
     // Boss Spawn Check
     if (cfg?.bossType) {
@@ -273,33 +320,33 @@ export class SurvivorEngine {
     const x = this.player.x + Math.cos(angle) * dist;
     const y = this.player.y + Math.sin(angle) * dist;
 
-    let hp = 400 + this.currentWave * 80;
+    let hp = 450 + this.currentWave * 90;
     let speed = 75;
     let radius = 36;
     let color = '#ef4444';
 
     if (bossType === 'iron_golem') {
-      hp = 450;
+      hp = 500;
       speed = 70;
       radius = 40;
       color = '#e2e8f0';
     } else if (bossType === 'guardian') {
-      hp = 850;
+      hp = 950;
       speed = 90;
       radius = 44;
       color = '#06b6d4';
     } else if (bossType === 'wither') {
-      hp = 1400;
+      hp = 1600;
       speed = 110;
       radius = 46;
       color = '#334155';
     } else if (bossType === 'ender_dragon') {
-      hp = 2200;
+      hp = 2500;
       speed = 135;
       radius = 52;
       color = '#a855f7';
     } else if (bossType === 'warden') {
-      hp = 3500;
+      hp = 4000;
       speed = 100;
       radius = 56;
       color = '#0f766e';
@@ -336,25 +383,31 @@ export class SurvivorEngine {
     const cfg = WAVES_CONFIG[this.currentWave - 1] || WAVES_CONFIG[0];
     this.spawnCooldown -= dt;
 
-    if (this.spawnCooldown <= 0 && this.enemies.length < 350) {
+    if (this.spawnCooldown <= 0 && this.waveSpawnedCount < this.waveTargetKills && this.enemies.length < 350) {
       const rate = cfg.spawnRatePerSec;
       this.spawnCooldown = 1.0 / rate;
 
       // Pick random mob type for this wave
       const mobType = cfg.mobTypes[Math.floor(Math.random() * cfg.mobTypes.length)] || 'zombie';
       this.spawnEnemy(mobType);
+      this.waveSpawnedCount++;
     }
   }
 
-  private spawnEnemy(type: EnemyType) {
-    // Spawn in a ring outside screen (dist 500-650 px from player)
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 520 + Math.random() * 120;
-    const x = this.player.x + Math.cos(angle) * dist;
-    const y = this.player.y + Math.sin(angle) * dist;
+  private spawnEnemy(type: EnemyType, customX?: number, customY?: number, slimeSize: 1 | 2 | 3 = 3) {
+    let x = customX;
+    let y = customY;
 
-    // Stat scaling per wave
-    const waveMult = 1 + (this.currentWave - 1) * 0.08;
+    if (x === undefined || y === undefined) {
+      // Spawn in a ring outside screen (dist 500-650 px from player)
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 520 + Math.random() * 120;
+      x = this.player.x + Math.cos(angle) * dist;
+      y = this.player.y + Math.sin(angle) * dist;
+    }
+
+    // Stat scaling per wave (increased slightly from 0.08 to 0.12)
+    const waveMult = 1 + (this.currentWave - 1) * 0.12;
 
     let hp = 10 * waveMult;
     let speed = 90;
@@ -378,14 +431,14 @@ export class SurvivorEngine {
         damage = 3;
         break;
       case 'skeleton':
-        hp = 11 * waveMult;
-        speed = 75;
+        hp = 12 * waveMult;
+        speed = 80;
         radius = 15;
         color = '#e2e8f0';
         expValue += 1;
         break;
       case 'creeper':
-        hp = 12 * waveMult;
+        hp = 13 * waveMult;
         speed = 95;
         radius = 17;
         color = '#16a34a';
@@ -393,7 +446,7 @@ export class SurvivorEngine {
         expValue += 2;
         break;
       case 'enderman':
-        hp = 26 * waveMult;
+        hp = 28 * waveMult;
         speed = 140;
         radius = 18;
         color = '#3b0764';
@@ -401,13 +454,29 @@ export class SurvivorEngine {
         expValue += 4;
         break;
       case 'slime':
-        hp = 18 * waveMult;
-        speed = 70;
-        radius = 20;
+        if (slimeSize === 3) {
+          hp = 22 * waveMult;
+          speed = 65;
+          radius = 24;
+          damage = 4;
+          expValue = 3;
+        } else if (slimeSize === 2) {
+          hp = 11 * waveMult;
+          speed = 80;
+          radius = 16;
+          damage = 2;
+          expValue = 2;
+        } else {
+          hp = 6 * waveMult;
+          speed = 95;
+          radius = 10;
+          damage = 1;
+          expValue = 1;
+        }
         color = '#86efac';
         break;
       case 'blaze':
-        hp = 20 * waveMult;
+        hp = 22 * waveMult;
         speed = 100;
         radius = 16;
         color = '#f97316';
@@ -415,14 +484,14 @@ export class SurvivorEngine {
         expValue += 3;
         break;
       case 'phantom':
-        hp = 14 * waveMult;
+        hp = 15 * waveMult;
         speed = 150;
         radius = 15;
         color = '#4338ca';
         expValue += 3;
         break;
       case 'witch':
-        hp = 28 * waveMult;
+        hp = 30 * waveMult;
         speed = 80;
         radius = 17;
         color = '#7e22ce';
@@ -446,7 +515,8 @@ export class SurvivorEngine {
       isBoss: false,
       color,
       expValue,
-      lastAttackTime: 0
+      lastAttackTime: 0,
+      slimeSize: type === 'slime' ? slimeSize : undefined
     };
 
     this.enemies.push(enemy);
@@ -652,6 +722,11 @@ export class SurvivorEngine {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
 
+      // Frozen time: enemy projectiles are paused
+      if (p.isEnemy && this.freezeTimer > 0) {
+        continue;
+      }
+
       if (p.type === 'slash' || p.type === 'spear' || p.type === 'smash') {
         // Melee/instant active duration projectiles
         p.rangeLeft -= dt;
@@ -804,6 +879,39 @@ export class SurvivorEngine {
     }
 
     this.player.kills++;
+    this.waveCurrentKills++;
+
+    // Check wave clear requirement (quota met and no boss alive)
+    const bossAlive = this.activeBoss !== null;
+    if (this.waveCurrentKills >= this.waveTargetKills && !bossAlive && this.waveClearCountdown === null) {
+      this.waveClearCountdown = 3.0;
+      this.notification = {
+        text: '✨ VAGUE TERMINÉE ! Suivante dans 3s...',
+        color: '#4ade80',
+        timer: 3.0
+      };
+      survivorSound.levelUp();
+    }
+
+    // Slime splitting on death! (Large -> 2 Medium -> 2 Small)
+    if (enemy.type === 'slime' && enemy.slimeSize && enemy.slimeSize > 1) {
+      const nextSize = (enemy.slimeSize - 1) as 1 | 2;
+      for (let s = 0; s < 2; s++) {
+        const offAngle = (Math.PI * 2 * s) / 2 + (Math.random() - 0.5) * 0.7;
+        const sx = enemy.x + Math.cos(offAngle) * 16;
+        const sy = enemy.y + Math.sin(offAngle) * 16;
+        this.spawnEnemy('slime', sx, sy, nextSize);
+      }
+      this.spawnSparks(enemy.x, enemy.y, '#86efac', 10);
+    }
+
+    // Rare drop roll
+    const dropChance = enemy.isBoss ? 1.0 : 0.025; // 100% on boss, 2.5% on regular mobs
+    if (Math.random() < dropChance) {
+      const dropTypes: PickupType[] = ['magnet', 'freeze', 'nuke'];
+      const chosen = dropTypes[Math.floor(Math.random() * dropTypes.length)];
+      this.spawnPickup(enemy.x, enemy.y, chosen);
+    }
 
     // Drop EXP Orb with EXP MULTIPLIER applied!
     const finalExp = Math.max(1, Math.round(enemy.expValue * this.player.expMultiplier));
@@ -823,6 +931,10 @@ export class SurvivorEngine {
 
     if (enemy.isBoss) {
       this.activeBoss = null;
+      // Extra rare drop from boss!
+      const bonusTypes: PickupType[] = ['magnet', 'freeze', 'nuke'];
+      this.spawnPickup(enemy.x + 20, enemy.y + 20, bonusTypes[Math.floor(Math.random() * bonusTypes.length)]);
+
       // Boss drops giant shower of orbs
       for (let k = 0; k < 6; k++) {
         this.expOrbs.push({
@@ -835,6 +947,16 @@ export class SurvivorEngine {
           radius: 9,
           color: '#facc15'
         });
+      }
+
+      if (this.waveCurrentKills >= this.waveTargetKills && this.waveClearCountdown === null) {
+        this.waveClearCountdown = 3.0;
+        this.notification = {
+          text: '👑 BOSS VAINCU ! Vague suivante dans 3s...',
+          color: '#f59e0b',
+          timer: 3.0
+        };
+        survivorSound.levelUp();
       }
     }
   }
@@ -864,6 +986,11 @@ export class SurvivorEngine {
   // --- ENEMIES UPDATE ---
 
   private updateEnemies(dt: number, now: number) {
+    if (this.freezeTimer > 0) {
+      // Time is frozen: mobs do not move, shoot, or attack!
+      return;
+    }
+
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
 
@@ -871,8 +998,22 @@ export class SurvivorEngine {
       const dy = this.player.y - e.y;
       const dist = Math.hypot(dx, dy);
 
-      // Simple pursuit velocity
-      if (dist > 5) {
+      // SKELETON SPECIAL AI: Stops in bow range instead of rushing the player!
+      if (e.type === 'skeleton') {
+        if (dist <= 300 && dist >= 130) {
+          // Sweet spot: stand ground and shoot!
+          e.vx = 0;
+          e.vy = 0;
+        } else if (dist < 130) {
+          // Too close: backpedal away from player!
+          e.vx = -(dx / dist) * (e.speed * 0.7);
+          e.vy = -(dy / dist) * (e.speed * 0.7);
+        } else {
+          // Approach towards player
+          e.vx = (dx / dist) * e.speed;
+          e.vy = (dy / dist) * e.speed;
+        }
+      } else if (dist > 5) {
         e.vx = (dx / dist) * e.speed;
         e.vy = (dy / dist) * e.speed;
       } else {
@@ -902,24 +1043,24 @@ export class SurvivorEngine {
       }
 
       // SKELETON / BLAZE SPECIAL AI: Shoot projectiles at player
-      if ((e.type === 'skeleton' || e.type === 'blaze') && dist < 320 && dist > 90) {
+      if ((e.type === 'skeleton' || e.type === 'blaze') && dist < 320 && dist > 70) {
         if (e.shootCooldown === undefined) e.shootCooldown = 2.0;
         e.shootCooldown -= dt;
         if (e.shootCooldown <= 0) {
-          e.shootCooldown = 2.4;
+          e.shootCooldown = e.type === 'skeleton' ? 2.2 : 2.6;
           const a = Math.atan2(this.player.y - e.y, this.player.x - e.x);
           this.projectiles.push({
             id: `enemy_proj_${this.nextEntityId++}`,
             x: e.x,
             y: e.y,
-            vx: Math.cos(a) * 220,
-            vy: Math.sin(a) * 220,
-            radius: 6,
+            vx: Math.cos(a) * (e.type === 'skeleton' ? 260 : 220),
+            vy: Math.sin(a) * (e.type === 'skeleton' ? 260 : 220),
+            radius: e.type === 'skeleton' ? 4 : 6,
             damage: e.damage,
             pierceLeft: 1,
-            rangeLeft: 400,
+            rangeLeft: 420,
             color: e.type === 'blaze' ? '#ea580c' : '#cbd5e1',
-            type: 'fireball',
+            type: e.type === 'skeleton' ? 'arrow' : 'fireball',
             isEnemy: true,
             angle: a,
             hitEnemies: new Set()
@@ -949,15 +1090,17 @@ export class SurvivorEngine {
       const dy = this.player.y - orb.y;
       const dist = Math.hypot(dx, dy);
 
-      // Inside magnet pickup radius
-      if (dist < this.player.pickupRange) {
-        const pullSpeed = 480;
+      const isPulled = (orb as any).isMagnetPulled || dist < this.player.pickupRange;
+
+      // Inside magnet pickup radius or pulled by global magnet
+      if (isPulled && dist > 0.01) {
+        const pullSpeed = (orb as any).isMagnetPulled ? 950 : 480;
         orb.vx = (dx / dist) * pullSpeed;
         orb.vy = (dy / dist) * pullSpeed;
         orb.x += orb.vx * dt;
         orb.y += orb.vy * dt;
 
-        if (dist < this.player.radius + orb.radius) {
+        if (dist < this.player.radius + orb.radius + 15) {
           // Collect orb
           this.collectExp(orb.value);
           this.expOrbs.splice(i, 1);
@@ -972,6 +1115,96 @@ export class SurvivorEngine {
 
     if (this.player.currentExp >= this.player.nextLevelExp) {
       this.triggerLevelUp();
+    }
+  }
+
+  // --- RARE DROPS & PICKUPS ---
+
+  private spawnPickup(x: number, y: number, type: PickupType) {
+    this.pickups.push({
+      id: `pickup_${this.nextEntityId++}`,
+      x,
+      y,
+      type,
+      radius: 16,
+      life: 30,
+      maxLife: 30,
+      pulseAngle: Math.random() * Math.PI * 2
+    });
+  }
+
+  private updatePickups(dt: number) {
+    for (let i = this.pickups.length - 1; i >= 0; i--) {
+      const p = this.pickups[i];
+      p.life -= dt;
+      p.pulseAngle += dt * 4;
+
+      if (p.life <= 0) {
+        this.pickups.splice(i, 1);
+        continue;
+      }
+
+      const dx = this.player.x - p.x;
+      const dy = this.player.y - p.y;
+      const dist = Math.hypot(dx, dy);
+
+      // Light attraction if inside player magnet range
+      if (dist < this.player.pickupRange) {
+        p.x += (dx / dist) * 350 * dt;
+        p.y += (dy / dist) * 350 * dt;
+      }
+
+      // Collect when close
+      if (dist < this.player.radius + p.radius + 10) {
+        this.collectPickup(p.type);
+        this.pickups.splice(i, 1);
+      }
+    }
+  }
+
+  private collectPickup(type: PickupType) {
+    survivorSound.pickupItem();
+
+    if (type === 'magnet') {
+      // Attract all existing EXP orbs on map!
+      for (const orb of this.expOrbs) {
+        (orb as any).isMagnetPulled = true;
+      }
+      this.notification = {
+        text: '🧲 AIMANT D\'EXP ACTIVÉ !',
+        color: '#38bdf8',
+        timer: 2.5
+      };
+      this.spawnSparks(this.player.x, this.player.y, '#38bdf8', 25);
+    } else if (type === 'freeze') {
+      // Freeze all enemies for 5 seconds!
+      this.freezeTimer = 5.0;
+      survivorSound.freezeTime();
+      this.notification = {
+        text: '⏱️ GEL DU TEMPS (5s) !',
+        color: '#06b6d4',
+        timer: 2.5
+      };
+      this.spawnSparks(this.player.x, this.player.y, '#06b6d4', 25);
+    } else if (type === 'nuke') {
+      // Wipe all active non-boss mobs and damage bosses!
+      survivorSound.nukeExplosion();
+      this.notification = {
+        text: '💣 DESTRUCTION TOTALE !',
+        color: '#ef4444',
+        timer: 2.5
+      };
+
+      const regularMobs = this.enemies.filter(e => !e.isBoss);
+      for (const mob of regularMobs) {
+        this.killEnemy(mob);
+      }
+
+      if (this.activeBoss) {
+        this.damageEnemy(this.activeBoss, Math.round(this.activeBoss.maxHp * 0.3), true);
+      }
+
+      this.spawnSparks(this.player.x, this.player.y, '#f59e0b', 40);
     }
   }
 

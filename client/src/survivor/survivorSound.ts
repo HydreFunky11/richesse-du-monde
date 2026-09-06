@@ -322,6 +322,93 @@ class SurvivorAudio {
     osc.stop(ctx.currentTime + 0.15);
   }
 
+  public pickupItem() {
+    const ctx = this.getCtx();
+    if (!ctx) return;
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc1.type = 'triangle';
+    osc1.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+    osc1.frequency.setValueAtTime(659.25, ctx.currentTime + 0.08); // E5
+    osc1.frequency.setValueAtTime(783.99, ctx.currentTime + 0.16); // G5
+    osc1.frequency.setValueAtTime(1046.5, ctx.currentTime + 0.24); // C6
+
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(1046.5, ctx.currentTime + 0.24);
+
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc1.start();
+    osc2.start(ctx.currentTime + 0.24);
+    osc1.stop(ctx.currentTime + 0.45);
+    osc2.stop(ctx.currentTime + 0.45);
+  }
+
+  public freezeTime() {
+    const ctx = this.getCtx();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1200, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.5);
+
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.5);
+  }
+
+  public nukeExplosion() {
+    const ctx = this.getCtx();
+    if (!ctx) return;
+
+    // Heavy low frequency boom
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(140, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + 0.8);
+
+    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.8);
+
+    // Noise rumble layer
+    const bufferSize = ctx.sampleRate * 0.8;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.25));
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    const nGain = ctx.createGain();
+    nGain.gain.setValueAtTime(0.35, ctx.currentTime);
+    nGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+
+    noise.connect(nGain);
+    nGain.connect(ctx.destination);
+    noise.start();
+  }
+
   public uiClick() {
     const ctx = this.getCtx();
     if (!ctx) return;

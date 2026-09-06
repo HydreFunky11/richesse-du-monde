@@ -1,5 +1,5 @@
 import { SurvivorEngine } from './survivorEngine';
-import type { Enemy, Projectile, ExpOrb, DamageNumber, Particle, PlayerStats } from './survivorTypes';
+import type { Enemy, Projectile, ExpOrb, DamageNumber, Particle, PlayerStats, PickupItem } from './survivorTypes';
 import { WEAPONS } from './survivorConfig';
 
 export class SurvivorRenderer {
@@ -35,7 +35,10 @@ export class SurvivorRenderer {
     // 2. EXP Orbs
     this.drawExpOrbs(engine.expOrbs);
 
-    // 3. Projectiles (Under mobs/player or over)
+    // 3. Rare Drops / Pickups (Magnet, Freeze, Nuke)
+    this.drawPickups(engine.pickups);
+
+    // 4. Projectiles (Under mobs/player or over)
     this.drawProjectiles(engine.projectiles);
 
     // 4. Enemies & Bosses
@@ -667,6 +670,79 @@ export class SurvivorRenderer {
     }
   }
 
+  // --- RARE DROPS & PICKUPS (Magnet, Freeze, Nuke) ---
+
+  private drawPickups(pickups: PickupItem[]) {
+    const ctx = this.ctx;
+    const now = Date.now();
+
+    for (const p of pickups) {
+      ctx.save();
+      const bob = Math.sin(now * 0.006 + p.pulseAngle) * 4;
+      ctx.translate(p.x, p.y + bob);
+
+      // Glowing aura circle on ground
+      const pulseRadius = p.radius + 6 + Math.sin(now * 0.008) * 3;
+      ctx.fillStyle = p.type === 'magnet' ? 'rgba(56, 189, 248, 0.25)' :
+                      p.type === 'freeze' ? 'rgba(6, 182, 212, 0.3)' :
+                      'rgba(239, 68, 68, 0.3)';
+      ctx.beginPath();
+      ctx.arc(0, 0, pulseRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw specific icon/sprite
+      if (p.type === 'magnet') {
+        // Red U-shape Magnet
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(-10, -12, 6, 18);
+        ctx.fillRect(4, -12, 6, 18);
+        ctx.fillRect(-10, 2, 20, 6);
+        // Silver tips
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillRect(-10, -12, 6, 5);
+        ctx.fillRect(4, -12, 6, 5);
+        // Spark
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(-2, -8, 4, 4);
+      } else if (p.type === 'freeze') {
+        // Cyan Pocket Watch / Clock
+        ctx.fillStyle = '#06b6d4';
+        ctx.beginPath();
+        ctx.arc(0, 0, 11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // Clock hands
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, -6);
+        ctx.moveTo(0, 0);
+        ctx.lineTo(5, 0);
+        ctx.stroke();
+      } else if (p.type === 'nuke') {
+        // TNT Block
+        ctx.fillStyle = '#dc2626';
+        ctx.fillRect(-10, -10, 20, 20);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-10, -3, 20, 6);
+        ctx.font = 'bold 7px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#000000';
+        ctx.fillText('TNT', 0, 2);
+        // Fuse spark
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(-1, -14, 3, 4);
+        ctx.fillStyle = '#facc15';
+        ctx.fillRect(Math.sin(now * 0.02) * 2, -16, 2, 2);
+      }
+
+      ctx.restore();
+    }
+  }
+
   // --- PARTICLES & DAMAGE NUMBERS ---
 
   private drawParticles(particles: Particle[]) {
@@ -766,21 +842,29 @@ export class SurvivorRenderer {
     ctx.fillStyle = '#ffffff';
     ctx.fillText(`${Math.ceil(p.hp)} / ${p.maxHp} PV`, heartStartX, heartStartY - 6);
 
-    // 3. TOP-CENTER: WAVE & TIMER
+    // 3. TOP-CENTER: WAVE & TIMER & TARGET QUOTA
     const mins = Math.floor(engine.waveTimer / 60);
     const secs = Math.floor(engine.waveTimer % 60);
     const timeStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-    ctx.strokeStyle = '#475569';
-    ctx.lineWidth = 2;
-    ctx.fillRect(this.width / 2 - 120, 48, 240, 36);
-    ctx.strokeRect(this.width / 2 - 120, 48, 240, 36);
+    const isClearCountdown = engine.waveClearCountdown !== null;
+    const boxW = isClearCountdown ? 340 : 300;
 
-    ctx.font = 'bold 14px monospace';
+    ctx.fillStyle = isClearCountdown ? 'rgba(6, 78, 59, 0.95)' : 'rgba(15, 23, 42, 0.88)';
+    ctx.strokeStyle = isClearCountdown ? '#22c55e' : '#475569';
+    ctx.lineWidth = 2;
+    ctx.fillRect(this.width / 2 - boxW / 2, 48, boxW, 36);
+    ctx.strokeRect(this.width / 2 - boxW / 2, 48, boxW, 36);
+
+    ctx.font = 'bold 13px monospace';
     ctx.textAlign = 'center';
-    ctx.fillStyle = engine.currentWave % 10 === 0 ? '#f43f5e' : '#facc15';
-    ctx.fillText(`VAGUE ${engine.currentWave} / 50   ⏱️ ${timeStr}`, this.width / 2, 71);
+    if (isClearCountdown) {
+      ctx.fillStyle = '#4ade80';
+      ctx.fillText(`✨ VAGUE NETTOYÉE ! Suivante dans ${Math.ceil(engine.waveClearCountdown!)}s`, this.width / 2, 71);
+    } else {
+      ctx.fillStyle = engine.currentWave % 10 === 0 ? '#f43f5e' : '#facc15';
+      ctx.fillText(`VAGUE ${engine.currentWave}/50   🎯 ${engine.waveCurrentKills}/${engine.waveTargetKills}   ⏱️ ${timeStr}`, this.width / 2, 71);
+    }
 
     // 4. TOP-LEFT: KILLS & WEAPON
     const def = WEAPONS[p.weaponId];
@@ -833,6 +917,50 @@ export class SurvivorRenderer {
       ctx.textAlign = 'center';
       ctx.fillStyle = '#ffffff';
       ctx.fillText(`👑 ${boss.bossName || 'GRAND BOSS'} (${Math.ceil(boss.hp)} / ${boss.maxHp} PV)`, this.width / 2, bBarY - 6);
+    }
+
+    // 7. FROZEN TIME OVERLAY & INDICATOR
+    if (engine.freezeTimer > 0) {
+      ctx.save();
+      // Icy screen vignette border
+      ctx.strokeStyle = 'rgba(6, 182, 212, 0.65)';
+      ctx.lineWidth = 10;
+      ctx.strokeRect(0, 0, this.width, this.height);
+
+      // Freeze indicator tag
+      const fW = 180;
+      ctx.fillStyle = 'rgba(6, 182, 212, 0.9)';
+      ctx.fillRect(this.width / 2 - fW / 2, 14, fW, 24);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(this.width / 2 - fW / 2, 14, fW, 24);
+
+      ctx.font = 'bold 12px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(`❄️ TEMPS GELÉ : ${engine.freezeTimer.toFixed(1)}s`, this.width / 2, 30);
+      ctx.restore();
+    }
+
+    // 8. TOAST NOTIFICATION BANNER
+    if (engine.notification) {
+      ctx.save();
+      const notifY = engine.activeBoss ? 122 : 94;
+      const notifW = 340;
+      const notifH = 34;
+      const notifX = (this.width - notifW) / 2;
+
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+      ctx.fillRect(notifX, notifY, notifW, notifH);
+      ctx.strokeStyle = engine.notification.color;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(notifX, notifY, notifW, notifH);
+
+      ctx.font = 'bold 13px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = engine.notification.color;
+      ctx.fillText(engine.notification.text, this.width / 2, notifY + 22);
+      ctx.restore();
     }
 
     ctx.restore();

@@ -195,8 +195,22 @@ export interface WaveConfig {
   durationSec: number;
   mobTypes: EnemyType[];
   spawnRatePerSec: number;
+  targetKills: number;
   bossType?: BossType;
   bossName?: string;
+}
+
+export type PickupType = 'magnet' | 'freeze' | 'nuke';
+
+export interface PickupItem {
+  id: string;
+  x: number;
+  y: number;
+  type: PickupType;
+  radius: number;
+  life: number;
+  maxLife: number;
+  pulseAngle: number;
 }
 
 export type GameState =

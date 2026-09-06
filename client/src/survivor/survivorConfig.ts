@@ -243,8 +243,8 @@ export const BASE_UPGRADES: BaseUpgradeTemplate[] = [
     icon: '🍏',
     category: 'player',
     statKey: 'regenPerSec',
-    baseValue: 0.4,
-    descTemplate: (val) => `+${val.toFixed(1)} PV régénéré chaque seconde`
+    baseValue: 0.05,
+    descTemplate: (val) => `+${val.toFixed(2)} PV/s régénéré (1 PV toutes les ${Math.round(1 / val)}s)`
   },
   {
     id: 'player_crit',
@@ -326,8 +326,9 @@ export function generateWaves(): WaveConfig[] {
   const waves: WaveConfig[] = [];
 
   for (let w = 1; w <= 50; w++) {
-    let duration = 25; // 25s per wave
-    let spawnRate = 1.2 + w * 0.18; // Increasing density
+    let duration = 30; // Max duration before wave auto-advances
+    let spawnRate = 2.2 + w * 0.22; // Faster spawn rate to deliver wave quota quickly
+    let targetKills = 15 + w * 3; // Wave quota: killing all advances in 3s
     let mobTypes: WaveConfig['mobTypes'] = ['zombie'];
 
     // Mob variety unlocks as waves advance
@@ -347,23 +348,23 @@ export function generateWaves(): WaveConfig[] {
     if (w === 10) {
       bossType = 'iron_golem';
       bossName = 'Golem de Fer Enragé';
-      duration = 40;
+      duration = 45;
     } else if (w === 20) {
       bossType = 'guardian';
       bossName = 'Grand Gardien des Mers (Elder Guardian)';
-      duration = 45;
+      duration = 50;
     } else if (w === 30) {
       bossType = 'wither';
       bossName = 'Le Wither Déchaîné';
-      duration = 50;
+      duration = 55;
     } else if (w === 40) {
       bossType = 'ender_dragon';
       bossName = 'Ender Dragon du Néant';
-      duration = 55;
+      duration = 60;
     } else if (w === 50) {
       bossType = 'warden';
       bossName = 'The Warden (Le Gardien des Tréfonds)';
-      duration = 60;
+      duration = 65;
     }
 
     waves.push({
@@ -371,6 +372,7 @@ export function generateWaves(): WaveConfig[] {
       durationSec: duration,
       mobTypes,
       spawnRatePerSec: spawnRate,
+      targetKills,
       bossType,
       bossName
     });
