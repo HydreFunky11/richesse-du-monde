@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { TargetDummy, FloatingText, ParticleVoxel, BulletTracer, JumpPad, GameStats } from './pixelGunTypes';
+import type { TargetDummy, FloatingText, ParticleVoxel, BulletTracer, JumpPad, GameStats, RampCollider } from './pixelGunTypes';
 import { pixelGunSound } from './pixelGunSound';
 
 export class PixelGunEngine {
@@ -24,6 +24,11 @@ export class PixelGunEngine {
   public isGrounded = false;
   public isLocked = false;
   public sensitivity = 0.0022;
+
+  // Character dimensions & collision
+  private readonly playerHeight = 1.75;
+  private readonly playerRadius = 0.42;
+  private readonly stepHeight = 0.6;
 
   public keys = {
     forward: false,
@@ -53,6 +58,7 @@ export class PixelGunEngine {
 
   // World objects
   private colliders: THREE.Box3[] = [];
+  private ramps: RampCollider[] = [];
   public dummies: TargetDummy[] = [];
   private jumpPads: JumpPad[] = [];
   private particles: ParticleVoxel[] = [];
@@ -282,27 +288,64 @@ export class PixelGunEngine {
     this.scene.add(pillar);
     this.colliders.push(new THREE.Box3().setFromObject(pillar));
 
-    // Guard rails
+    // Guard rails on North, West, East sides of the platform
     const railMat = new THREE.MeshLambertMaterial({ color: 0x37474f });
+    
+    // North rail
     const railNorth = new THREE.Mesh(new THREE.BoxGeometry(8, 1.2, 0.6), railMat);
     railNorth.position.set(x, towerH + 0.6, z - 3.7);
     this.scene.add(railNorth);
     this.colliders.push(new THREE.Box3().setFromObject(railNorth));
 
-    // Ramp to climb up
+    // West rail
+    const railWest = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.2, 8), railMat);
+    railWest.position.set(x - 3.7, towerH + 0.6, z);
+    this.scene.add(railWest);
+    this.colliders.push(new THREE.Box3().setFromObject(railWest));
+
+    // East rail
+    const railEast = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.2, 8), railMat);
+    railEast.position.set(x + 3.7, towerH + 0.6, z);
+    this.scene.add(railEast);
+    this.colliders.push(new THREE.Box3().setFromObject(railEast));
+
+    // South side: Ramp to climb up
     const rampLen = 14;
-    const rampGeo = new THREE.BoxGeometry(3.5, 0.6, rampLen);
+    const rampWidth = 3.6;
+    const rampGeo = new THREE.BoxGeometry(rampWidth, 0.5, rampLen);
     const ramp = new THREE.Mesh(rampGeo, mat);
-    ramp.position.set(x, towerH / 2, z + 4 + rampLen / 2 - 1);
-    ramp.rotation.x = Math.atan2(towerH, rampLen);
+    ramp.position.set(x, towerH / 2, z + 4 + rampLen / 2);
+    // Correct tilt: North end (z+4) is at y=towerH, South end (z+18) is at y=0
+    ramp.rotation.x = -Math.atan2(towerH, rampLen);
     ramp.castShadow = true;
     ramp.receiveShadow = true;
     this.scene.add(ramp);
-    this.colliders.push(new THREE.Box3().setFromObject(ramp));
+
+    // Ramp handrails
+    const railGeo = new THREE.BoxGeometry(0.2, 0.8, rampLen);
+    const railL = new THREE.Mesh(railGeo, railMat);
+    railL.position.set(x - rampWidth / 2 + 0.1, towerH / 2 + 0.45, z + 4 + rampLen / 2);
+    railL.rotation.x = -Math.atan2(towerH, rampLen);
+    this.scene.add(railL);
+
+    const railR = new THREE.Mesh(railGeo, railMat);
+    railR.position.set(x + rampWidth / 2 - 0.1, towerH / 2 + 0.45, z + 4 + rampLen / 2);
+    railR.rotation.x = -Math.atan2(towerH, rampLen);
+    this.scene.add(railR);
+
+    // Register ramp slope collider
+    this.ramps.push({
+      xMin: x - rampWidth / 2,
+      xMax: x + rampWidth / 2,
+      zStart: z + 4 + rampLen, // y = 0
+      zEnd: z + 4,             // y = towerH
+      yStart: 0,
+      yEnd: towerH
+    });
   }
 
   private createCrateCluster(x: number, z: number, mat1: THREE.Material, mat2: THREE.Material) {
-    const size = 2.4;
+    const size = 2.2;
     const crateGeo = new THREE.BoxGeometry(size, size, size);
 
     const addCrate = (cx: number, cy: number, cz: number) => {
@@ -314,10 +357,58 @@ export class PixelGunEngine {
       this.colliders.push(new THREE.Box3().setFromObject(c));
     };
 
+    // Step crate (half-height 1.1m) in front so player can easily step onto the crate cluster
+    const stepGeo = new THREE.BoxGeometry(size, 1.1, size);
+    const step = new THREE.Mesh(stepGeo, mat2);
+    step.position.set(x - size, 0.55, z);
+    step.castShadow = true;
+    step.receiveShadow = true;
+    this.scene.add(step);
+    this.colliders.push(new THREE.Box3().setFromObject(step));
+
     addCrate(x, 0, z);
     addCrate(x + size, 0, z);
     addCrate(x, 0, z + size);
-    addCrate(x + 0.5, size, z + 0.5); // Second layer
+    addCrate(x + 0.3, size, z + 0.3); // Second layer
+  }
+
+  // Calculate highest floor beneath player feet at (x, z)
+  private getFloorHeightAt(x: number, z: number, currentFeetY: number): number {
+    let floorY = 0; // Ground plane
+
+    // 1. Check ramps
+    for (const ramp of this.ramps) {
+      if (x >= ramp.xMin - 0.1 && x <= ramp.xMax + 0.1) {
+        const zMin = Math.min(ramp.zStart, ramp.zEnd);
+        const zMax = Math.max(ramp.zStart, ramp.zEnd);
+        if (z >= zMin - 0.2 && z <= zMax + 0.2) {
+          const clampedZ = Math.max(zMin, Math.min(zMax, z));
+          const t = (ramp.zStart - clampedZ) / (ramp.zStart - ramp.zEnd);
+          const rampY = ramp.yStart + t * (ramp.yEnd - ramp.yStart);
+          if (rampY <= currentFeetY + this.stepHeight + 0.4) {
+            if (rampY > floorY) floorY = rampY;
+          }
+        }
+      }
+    }
+
+    // 2. Check solid box colliders (crates, towers, etc.)
+    for (const box of this.colliders) {
+      if (
+        x >= box.min.x - this.playerRadius * 0.7 &&
+        x <= box.max.x + this.playerRadius * 0.7 &&
+        z >= box.min.z - this.playerRadius * 0.7 &&
+        z <= box.max.z + this.playerRadius * 0.7
+      ) {
+        if (box.max.y <= currentFeetY + this.stepHeight + 0.4) {
+          if (box.max.y > floorY) {
+            floorY = box.max.y;
+          }
+        }
+      }
+    }
+
+    return floorY;
   }
 
   private createJumpPad(x: number, z: number, boostVelocity: number) {
@@ -382,8 +473,8 @@ export class PixelGunEngine {
       { x: 0, z: -10, isPatrol: true, pEnd: { x: 12, z: -10 }, speed: 2.5 },
       { x: -14, z: -4, isPatrol: false },
       { x: 14, z: 0, isPatrol: false },
-      { x: -25, y: 6.2, z: -25, isPatrol: false }, // On sniper tower 1
-      { x: 25, y: 6.2, z: -25, isPatrol: false },  // On sniper tower 2
+      { x: -25, y: 6.0, z: -25, isPatrol: false }, // On sniper tower 1
+      { x: 25, y: 6.0, z: -25, isPatrol: false },  // On sniper tower 2
       { x: -8, z: 20, isPatrol: true, pEnd: { x: 8, z: 20 }, speed: 3.2 }
     ];
 
@@ -403,14 +494,15 @@ export class PixelGunEngine {
   ) {
     const group = new THREE.Group();
 
-    // Voxel body parts
+    // Voxel body parts with independent materials
     const bodyMat = new THREE.MeshLambertMaterial({ color: 0x1e88e5 }); // Blue shirt
+    const headMat = new THREE.MeshLambertMaterial({ color: 0xffcc80 }); // Skin
+    const armMat = new THREE.MeshLambertMaterial({ color: 0xffcc80 });  // Arms skin
     const pantsMat = new THREE.MeshLambertMaterial({ color: 0x3949ab }); // Dark blue pants
-    const skinMat = new THREE.MeshLambertMaterial({ color: 0xffcc80 }); // Voxel skin
 
     // Head (Headshot target zone)
     const headGeo = new THREE.BoxGeometry(0.7, 0.7, 0.7);
-    const headMesh = new THREE.Mesh(headGeo, skinMat);
+    const headMesh = new THREE.Mesh(headGeo, headMat);
     headMesh.position.set(0, 2.05, 0);
     headMesh.castShadow = true;
     (headMesh as any).dummyId = id;
@@ -422,6 +514,8 @@ export class PixelGunEngine {
     const eyeMat = new THREE.MeshBasicMaterial({ color: 0xd32f2f });
     const eye = new THREE.Mesh(eyeGeo, eyeMat);
     eye.position.set(0, 2.05, 0.36);
+    (eye as any).dummyId = id;
+    (eye as any).isHead = true;
     group.add(eye);
 
     // Torso (Body hit zone)
@@ -435,32 +529,51 @@ export class PixelGunEngine {
 
     // Arms
     const armGeo = new THREE.BoxGeometry(0.35, 1.0, 0.35);
-    const leftArm = new THREE.Mesh(armGeo, skinMat);
+    const leftArm = new THREE.Mesh(armGeo, armMat);
     leftArm.position.set(-0.7, 1.2, 0);
+    leftArm.castShadow = true;
+    (leftArm as any).dummyId = id;
+    (leftArm as any).isHead = false;
     group.add(leftArm);
 
-    const rightArm = new THREE.Mesh(armGeo, skinMat);
+    const rightArm = new THREE.Mesh(armGeo, armMat.clone());
     rightArm.position.set(0.7, 1.2, 0);
+    rightArm.castShadow = true;
+    (rightArm as any).dummyId = id;
+    (rightArm as any).isHead = false;
     group.add(rightArm);
 
-    // Legs
+    // Legs (LEGS HITBOX)
     const legGeo = new THREE.BoxGeometry(0.4, 0.8, 0.45);
     const leftLeg = new THREE.Mesh(legGeo, pantsMat);
     leftLeg.position.set(-0.25, 0.4, 0);
+    leftLeg.castShadow = true;
+    (leftLeg as any).dummyId = id;
+    (leftLeg as any).isHead = false;
     group.add(leftLeg);
 
-    const rightLeg = new THREE.Mesh(legGeo, pantsMat);
+    const rightLeg = new THREE.Mesh(legGeo, pantsMat.clone());
     rightLeg.position.set(0.25, 0.4, 0);
+    rightLeg.castShadow = true;
+    (rightLeg as any).dummyId = id;
+    (rightLeg as any).isHead = false;
     group.add(rightLeg);
 
     group.position.set(x, y, z);
     this.scene.add(group);
+
+    const hitMeshes = [headMesh, eye, bodyMesh, leftArm, rightArm, leftLeg, rightLeg];
 
     const dummy: TargetDummy = {
       id,
       group,
       headMesh,
       bodyMesh,
+      leftArmMesh: leftArm,
+      rightArmMesh: rightArm,
+      leftLegMesh: leftLeg,
+      rightLegMesh: rightLeg,
+      hitMeshes,
       hp: 100,
       maxHp: 100,
       isDead: false,
@@ -505,11 +618,11 @@ export class PixelGunEngine {
     // Raycast from center screen
     this.raycaster.setFromCamera(this.centerScreen, this.camera);
 
-    // Intersectable meshes (heads, bodies, environment)
+    // Intersectable meshes (heads, bodies, arms, legs)
     const targetMeshes: THREE.Object3D[] = [];
     for (const d of this.dummies) {
       if (!d.isDead) {
-        targetMeshes.push(d.headMesh, d.bodyMesh);
+        targetMeshes.push(...d.hitMeshes);
       }
     }
 
@@ -795,13 +908,13 @@ export class PixelGunEngine {
     // 1. Reloading logic
     if (this.stats.isReloading) {
       this.reloadTimer -= dt;
-      this.stats.reloadProgress = 1 - Math.max(0, this.reloadTimer / this.reloadDuration);
+      this.stats.reloadProgress = Math.min(1, Math.max(0, 1 - this.reloadTimer / this.reloadDuration));
       if (this.reloadTimer <= 0) {
         this.stats.ammo = this.stats.maxAmmo;
         this.stats.isReloading = false;
         this.stats.reloadProgress = 0;
-        this.notifyStats();
       }
+      this.notifyStats();
     }
 
     // 2. Camera Orientation
@@ -832,28 +945,58 @@ export class PixelGunEngine {
 
     // Jump
     if (this.keys.jump && this.isGrounded) {
-      this.velocity.y = 11;
+      this.velocity.y = 12.5; // Agile jump reaching ~3m
       this.isGrounded = false;
       pixelGunSound.jump();
     }
 
-    // Gravity
-    this.velocity.y -= 26 * dt;
+    // Current feet Y
+    const currentFeetY = this.position.y - this.playerHeight;
 
-    // Update Position
-    const nextPos = this.position.clone().add(this.velocity.clone().multiplyScalar(dt));
+    // Horizontal resolution against walls (ignoring surfaces below stepHeight)
+    const dx = this.velocity.x * dt;
+    const dz = this.velocity.z * dt;
 
-    // Collision with ground
-    if (nextPos.y <= 1.8) {
-      nextPos.y = 1.8;
-      this.velocity.y = 0;
-      this.isGrounded = true;
+    // Move X
+    let nextX = this.position.x + dx;
+    for (const box of this.colliders) {
+      if (box.max.y > currentFeetY + this.stepHeight && box.min.y < currentFeetY + this.playerHeight - 0.1) {
+        if (
+          nextX + this.playerRadius > box.min.x &&
+          nextX - this.playerRadius < box.max.x &&
+          this.position.z + this.playerRadius > box.min.z &&
+          this.position.z - this.playerRadius < box.max.z
+        ) {
+          if (dx > 0) nextX = box.min.x - this.playerRadius;
+          else if (dx < 0) nextX = box.max.x + this.playerRadius;
+          this.velocity.x = 0;
+        }
+      }
     }
+    this.position.x = nextX;
+
+    // Move Z
+    let nextZ = this.position.z + dz;
+    for (const box of this.colliders) {
+      if (box.max.y > currentFeetY + this.stepHeight && box.min.y < currentFeetY + this.playerHeight - 0.1) {
+        if (
+          this.position.x + this.playerRadius > box.min.x &&
+          this.position.x - this.playerRadius < box.max.x &&
+          nextZ + this.playerRadius > box.min.z &&
+          nextZ - this.playerRadius < box.max.z
+        ) {
+          if (dz > 0) nextZ = box.min.z - this.playerRadius;
+          else if (dz < 0) nextZ = box.max.z + this.playerRadius;
+          this.velocity.z = 0;
+        }
+      }
+    }
+    this.position.z = nextZ;
 
     // Jump Pads check
     for (const pad of this.jumpPads) {
-      const dist = Math.hypot(nextPos.x - pad.x, nextPos.z - pad.z);
-      if (dist < pad.radius && nextPos.y <= 2.8) {
+      const dist = Math.hypot(this.position.x - pad.x, this.position.z - pad.z);
+      if (dist < pad.radius && Math.abs(currentFeetY - pad.y) < 1.0) {
         this.velocity.y = pad.boostVelocity;
         this.isGrounded = false;
         pixelGunSound.jumpPad();
@@ -861,33 +1004,42 @@ export class PixelGunEngine {
       }
     }
 
-    // Simple AABB Box Collisions
-    const playerRadius = 0.5;
-    const playerBox = new THREE.Box3(
-      new THREE.Vector3(nextPos.x - playerRadius, nextPos.y - 1.6, nextPos.z - playerRadius),
-      new THREE.Vector3(nextPos.x + playerRadius, nextPos.y + 0.2, nextPos.z + playerRadius)
-    );
+    // Vertical Physics
+    this.velocity.y -= 26 * dt;
+    const nextY = this.position.y + this.velocity.y * dt;
+    const nextFeetY = nextY - this.playerHeight;
 
-    for (const box of this.colliders) {
-      if (playerBox.intersectsBox(box)) {
-        // Push out horizontally
-        const overlapX = Math.min(playerBox.max.x - box.min.x, box.max.x - playerBox.min.x);
-        const overlapZ = Math.min(playerBox.max.z - box.min.z, box.max.z - playerBox.min.z);
+    const floorY = this.getFloorHeightAt(this.position.x, this.position.z, currentFeetY);
 
-        if (overlapX < overlapZ) {
-          if (nextPos.x > (box.min.x + box.max.x) / 2) nextPos.x += overlapX;
-          else nextPos.x -= overlapX;
-        } else {
-          if (nextPos.z > (box.min.z + box.max.z) / 2) nextPos.z += overlapZ;
-          else nextPos.z -= overlapZ;
-        }
+    if (nextFeetY <= floorY) {
+      // Landed on floor (ground, crate, tower platform, ramp)
+      this.position.y = floorY + this.playerHeight;
+      this.velocity.y = 0;
+      this.isGrounded = true;
+    } else {
+      // Airborne or stepping down smoothly
+      if (this.isGrounded && this.velocity.y <= 0 && currentFeetY >= floorY && currentFeetY - floorY <= 0.6) {
+        // Ground snap down stairs / ramps
+        this.position.y = floorY + this.playerHeight;
+        this.velocity.y = 0;
+        this.isGrounded = true;
+      } else {
+        this.position.y = nextY;
+        this.isGrounded = false;
       }
     }
 
-    this.position.copy(nextPos);
+    // Auto-step up if walking forward onto a small step / ramp
+    if (this.isGrounded) {
+      const newFloorY = this.getFloorHeightAt(this.position.x, this.position.z, currentFeetY);
+      if (newFloorY > currentFeetY && newFloorY <= currentFeetY + this.stepHeight + 0.1) {
+        this.position.y = newFloorY + this.playerHeight;
+      }
+    }
+
     this.camera.position.copy(this.position);
 
-    // 4. Viewmodel Sway & Bobbing
+    // 4. Viewmodel Sway, Bobbing & Reload animation
     const bobX = Math.cos(this.walkBobTimer * 0.5) * 0.015;
     const bobY = Math.sin(this.walkBobTimer) * 0.018;
 
@@ -895,12 +1047,21 @@ export class PixelGunEngine {
     this.gunRecoilZ = THREE.MathUtils.lerp(this.gunRecoilZ, 0, dt * 18);
     this.gunRecoilRotX = THREE.MathUtils.lerp(this.gunRecoilRotX, 0, dt * 18);
 
+    let reloadOffsetY = 0;
+    let reloadRotZ = 0;
+    if (this.stats.isReloading) {
+      const p = this.stats.reloadProgress;
+      reloadOffsetY = -Math.sin(p * Math.PI) * 0.12;
+      reloadRotZ = Math.sin(p * Math.PI) * 0.22;
+    }
+
     this.gunGroup.position.set(
       this.gunBasePos.x + bobX,
-      this.gunBasePos.y + bobY,
+      this.gunBasePos.y + bobY + reloadOffsetY,
       this.gunBasePos.z + this.gunRecoilZ
     );
     this.gunGroup.rotation.x = this.gunRecoilRotX;
+    this.gunGroup.rotation.z = reloadRotZ;
 
     // 5. Update Targets / Dummies
     for (const d of this.dummies) {
@@ -917,11 +1078,18 @@ export class PixelGunEngine {
         // Flash recover
         if (d.hitFlashTimer > 0) {
           d.hitFlashTimer -= dt;
-          (d.bodyMesh.material as THREE.MeshLambertMaterial).color.setHex(0xff5252);
-          (d.headMesh.material as THREE.MeshLambertMaterial).color.setHex(0xff5252);
+          for (const m of d.hitMeshes) {
+            if (m.material && (m.material as THREE.MeshLambertMaterial).color) {
+              (m.material as THREE.MeshLambertMaterial).color.setHex(0xff5252);
+            }
+          }
         } else {
-          (d.bodyMesh.material as THREE.MeshLambertMaterial).color.setHex(0x1e88e5);
           (d.headMesh.material as THREE.MeshLambertMaterial).color.setHex(0xffcc80);
+          (d.bodyMesh.material as THREE.MeshLambertMaterial).color.setHex(0x1e88e5);
+          if (d.leftArmMesh) (d.leftArmMesh.material as THREE.MeshLambertMaterial).color.setHex(0xffcc80);
+          if (d.rightArmMesh) (d.rightArmMesh.material as THREE.MeshLambertMaterial).color.setHex(0xffcc80);
+          if (d.leftLegMesh) (d.leftLegMesh.material as THREE.MeshLambertMaterial).color.setHex(0x3949ab);
+          if (d.rightLegMesh) (d.rightLegMesh.material as THREE.MeshLambertMaterial).color.setHex(0x3949ab);
         }
 
         // Patrol movement

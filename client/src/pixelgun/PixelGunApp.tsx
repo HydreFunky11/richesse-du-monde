@@ -243,17 +243,24 @@ export default function PixelGunApp() {
 
         {/* Reload progress bar */}
         {stats.isReloading && (
-          <div className="w-32 h-2 bg-slate-900 border border-amber-500/50 rounded-full overflow-hidden mt-1">
-            <div
-              className="h-full bg-amber-400 transition-all duration-75"
-              style={{ width: `${stats.reloadProgress * 100}%` }}
-            />
+          <div className="flex flex-col items-end gap-1 mt-1">
+            <div className="w-36 h-3 bg-slate-900/90 border-2 border-amber-400 rounded-full overflow-hidden p-0.5 shadow-[0_0_12px_rgba(245,158,11,0.5)]">
+              <div
+                className="h-full bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-300 rounded-full transition-all duration-75 ease-out"
+                style={{ width: `${Math.min(100, Math.max(0, stats.reloadProgress * 100))}%` }}
+              />
+            </div>
+            <span className="text-[11px] font-mono font-black text-amber-300 tracking-wide animate-pulse">
+              Rechargement... {Math.round(stats.reloadProgress * 100)}%
+            </span>
           </div>
         )}
 
-        <span className="text-[10px] font-mono text-slate-400 mt-1">
-          {stats.isReloading ? 'Rechargement...' : '[R] Recharger'}
-        </span>
+        {!stats.isReloading && (
+          <span className="text-[10px] font-mono text-slate-400 mt-1">
+            [R] Recharger
+          </span>
+        )}
       </div>
 
       {/* BOTTOM-CENTER: Controls Legend */}

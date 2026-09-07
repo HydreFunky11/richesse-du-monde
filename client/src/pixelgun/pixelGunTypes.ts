@@ -1,10 +1,24 @@
 import * as THREE from 'three';
 
+export interface RampCollider {
+  xMin: number;
+  xMax: number;
+  zStart: number; // ground level (y = 0)
+  zEnd: number;   // top level (y = towerH)
+  yStart: number;
+  yEnd: number;
+}
+
 export interface TargetDummy {
   id: string;
   group: THREE.Group;
   headMesh: THREE.Mesh;
   bodyMesh: THREE.Mesh;
+  leftArmMesh?: THREE.Mesh;
+  rightArmMesh?: THREE.Mesh;
+  leftLegMesh?: THREE.Mesh;
+  rightLegMesh?: THREE.Mesh;
+  hitMeshes: THREE.Mesh[]; // All shootable meshes (head, body, arms, legs)
   hp: number;
   maxHp: number;
   isDead: boolean;
