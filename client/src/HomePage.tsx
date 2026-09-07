@@ -20,6 +20,20 @@ interface GameTheme {
 
 const GAMES: GameTheme[] = [
   {
+    emoji: '🔫',
+    title: 'Pixel Gun 3D : Battle',
+    subtitle: 'FPS Cubique 3D • Arène & Stand de Tir',
+    description: 'Plongez dans un véritable FPS 3D à 120 FPS ! Vue première personne avec arme cubique animée, contrôles souris Pointer Lock, sauts & trampolines, cibles d\'entraînement avec headshots critiques et explosions en voxels.',
+    route: '/pixelgun',
+    fontClass: 'font-display font-black tracking-wide',
+    cardTheme: 'bg-gradient-to-b from-red-950/80 via-slate-950 to-amber-950/40',
+    borderTheme: 'border-red-500/50 hover:border-amber-400 hover:shadow-red-900/60',
+    titleGradient: 'from-red-400 via-amber-300 to-yellow-400',
+    badge: 'NOUVEAU • FPS 3D CUBIQUE 💥',
+    badgeStyle: 'bg-gradient-to-r from-red-950 to-amber-900 text-amber-300 border-amber-500/50 animate-pulse',
+    players: '1 Joueur • Stand de Tir 3D',
+  },
+  {
     emoji: '⛏️',
     title: 'Minecraft Survivor',
     subtitle: 'Horde Roguelite • 50 Vagues & 5 Boss',

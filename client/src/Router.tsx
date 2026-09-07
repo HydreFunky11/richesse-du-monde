@@ -14,11 +14,14 @@ import SumoApp from './SumoApp';
 import RtsApp from './RtsApp';
 import MobaApp from './MobaApp';
 import SurvivorApp from './survivor/SurvivorApp';
+import PixelGunApp from './pixelgun/PixelGunApp';
 
 export default function Router() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/pixelgun" element={<PixelGunApp />} />
+      <Route path="/fps" element={<PixelGunApp />} />
       <Route path="/survivor" element={<SurvivorApp />} />
       <Route path="/richesse" element={<App />} />
       <Route path="/uno" element={<UnoApp />} />
