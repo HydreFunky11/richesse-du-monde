@@ -169,15 +169,12 @@ export default function PixelGunApp() {
       {/* TOP BAR: Score, Navigation, Audio */}
       <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-auto z-40">
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              if (document.pointerLockElement) document.exitPointerLock();
-              navigate('/');
-            }}
-            className="px-3.5 py-2 bg-slate-900/80 hover:bg-slate-800 text-white font-bold text-xs rounded-xl border border-slate-700 backdrop-blur-md transition flex items-center gap-1.5 shadow-lg cursor-pointer"
-          >
-            ← Accueil
-          </button>
+          <div className="px-3 py-1.5 bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-700 text-xs font-mono text-slate-300 flex items-center gap-2 shadow-lg">
+            <kbd className="px-1.5 py-0.5 bg-amber-500/20 border border-amber-500/50 rounded text-amber-300 font-bold text-[10px]">
+              ÉCHAP
+            </kbd>
+            <span className="text-slate-400">Menu & Accueil</span>
+          </div>
 
           <div className="px-3.5 py-1.5 bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-700 text-xs font-mono text-slate-300 flex items-center gap-3 shadow-lg">
             <span>
@@ -265,10 +262,10 @@ export default function PixelGunApp() {
 
       {/* BOTTOM-CENTER: Controls Legend */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 pointer-events-none z-30 text-[11px] font-mono text-slate-400/80 bg-slate-950/40 px-4 py-1 rounded-full border border-slate-800/40">
-        [Z,Q,S,D] Déplacement • [ESPACE] Saut • [SHIFT] Sprint • [CLIC] Tir • [R] Recharger
+        [Z,Q,S,D] Déplacement • [ESPACE] Saut • [SHIFT] Sprint • [CLIC] Tir • [R] Recharger • [ÉCHAP] Menu
       </div>
 
-      {/* PAUSE / INSTRUCTIONS MODAL WHEN MOUSE IS UNLOCKED */}
+      {/* PAUSE / INSTRUCTIONS MODAL WHEN MOUSE IS UNLOCKED (OR ESCAPE PRESSED) */}
       {!isLocked && (
         <div
           onClick={() => {
@@ -311,6 +308,10 @@ export default function PixelGunApp() {
                 <span>🔄 Recharger</span>
                 <span className="font-mono text-rose-400 font-bold">Touche R</span>
               </div>
+              <div className="flex items-center justify-between">
+                <span>⏸️ Pause / Menu</span>
+                <span className="font-mono text-slate-400 font-bold">Touche Échap</span>
+              </div>
             </div>
 
             {/* Sensitivity Slider */}
@@ -330,17 +331,30 @@ export default function PixelGunApp() {
               />
             </div>
 
-            {/* Play Button */}
-            <button
-              onClick={() => {
-                if (containerRef.current) {
-                  containerRef.current.requestPointerLock();
-                }
-              }}
-              className="w-full py-4 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black rounded-2xl text-base uppercase tracking-wider transition shadow-xl shadow-amber-500/20 cursor-pointer transform hover:scale-102 active:scale-98"
-            >
-              Cliquer pour Jouer 🎯
-            </button>
+            {/* Action Buttons */}
+            <div className="flex flex-col gap-2.5">
+              <button
+                onClick={() => {
+                  if (containerRef.current) {
+                    containerRef.current.requestPointerLock();
+                  }
+                }}
+                className="w-full py-3.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black rounded-2xl text-base uppercase tracking-wider transition shadow-xl shadow-amber-500/20 cursor-pointer transform hover:scale-[1.02] active:scale-[0.98]"
+              >
+                {stats.shotsFired > 0 ? '▶ Reprendre la partie' : 'Cliquer pour Jouer 🎯'}
+              </button>
+
+              <button
+                onClick={() => {
+                  if (document.pointerLockElement) document.exitPointerLock();
+                  navigate('/');
+                }}
+                className="w-full py-3 bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white font-bold rounded-2xl text-sm border border-slate-700 transition flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-[0.98]"
+              >
+                <span>🏠</span>
+                <span>Retourner à l'accueil</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

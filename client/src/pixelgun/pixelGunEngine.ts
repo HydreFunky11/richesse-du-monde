@@ -312,26 +312,26 @@ export class PixelGunEngine {
     // South side: Ramp to climb up
     const rampLen = 14;
     const rampWidth = 3.6;
-    const rampGeo = new THREE.BoxGeometry(rampWidth, 0.5, rampLen);
+    const slopeLen = Math.hypot(rampLen, towerH);
+    const rampGeo = new THREE.BoxGeometry(rampWidth, 0.5, slopeLen);
     const ramp = new THREE.Mesh(rampGeo, mat);
     ramp.position.set(x, towerH / 2, z + 4 + rampLen / 2);
-    // Correct tilt: North end (z+4) is at y=towerH, South end (z+18) is at y=0
-    ramp.rotation.x = -Math.atan2(towerH, rampLen);
+    // Positive rotation around X tilts North end (tower) UP and South end (ground) DOWN
+    ramp.rotation.x = Math.atan2(towerH, rampLen);
     ramp.castShadow = true;
     ramp.receiveShadow = true;
-    this.scene.add(ramp);
 
-    // Ramp handrails
-    const railGeo = new THREE.BoxGeometry(0.2, 0.8, rampLen);
+    // Ramp handrails attached directly to ramp so they perfectly match the slope
+    const railGeo = new THREE.BoxGeometry(0.2, 0.8, slopeLen);
     const railL = new THREE.Mesh(railGeo, railMat);
-    railL.position.set(x - rampWidth / 2 + 0.1, towerH / 2 + 0.45, z + 4 + rampLen / 2);
-    railL.rotation.x = -Math.atan2(towerH, rampLen);
-    this.scene.add(railL);
+    railL.position.set(-rampWidth / 2 + 0.1, 0.45, 0);
+    ramp.add(railL);
 
     const railR = new THREE.Mesh(railGeo, railMat);
-    railR.position.set(x + rampWidth / 2 - 0.1, towerH / 2 + 0.45, z + 4 + rampLen / 2);
-    railR.rotation.x = -Math.atan2(towerH, rampLen);
-    this.scene.add(railR);
+    railR.position.set(rampWidth / 2 - 0.1, 0.45, 0);
+    ramp.add(railR);
+
+    this.scene.add(ramp);
 
     // Register ramp slope collider
     this.ramps.push({
