@@ -11,6 +11,8 @@ import {
 } from './propHuntTypes';
 import { propAudio } from './propHuntAudio';
 
+const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+
 export default function PropHuntApp() {
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -35,8 +37,7 @@ export default function PropHuntApp() {
 
   // Socket setup
   useEffect(() => {
-    const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
-    const s = io(serverUrl);
+    const s = io(SERVER_URL);
     socketRef.current = s;
 
     s.on('connect', () => {
@@ -46,9 +47,15 @@ export default function PropHuntApp() {
       }
     });
 
+    s.on('connect_error', (err) => {
+      console.error('[PropHunt] Erreur de connexion:', err);
+      setErrorMsg(`Connexion au serveur impossible : ${err.message}`);
+    });
+
     s.on('prophuntStateUpdate', (st: PropHuntGameState) => {
       setGameState(st);
       setJoined(true);
+      setErrorMsg('');
       if (engineRef.current) {
         engineRef.current.updateGameState(st);
       }
@@ -138,22 +145,6 @@ export default function PropHuntApp() {
     }
   }, [gameState?.logs]);
 
-  const handleCreateRoom = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const cleanUser = username.trim();
-    if (!cleanUser) {
-      setErrorMsg('Veuillez entrer votre pseudo avant de créer un salon');
-      return;
-    }
-    const randomCode = 'PROP' + Math.floor(100 + Math.random() * 900);
-    localStorage.setItem('prophunt_username', cleanUser);
-    socketRef.current?.emit('joinGame', {
-      username: cleanUser,
-      roomCode: randomCode,
-      gameType: 'prophunt'
-    });
-  };
-
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanUser = username.trim();
@@ -164,7 +155,7 @@ export default function PropHuntApp() {
       return;
     }
     if (!cleanRoom) {
-      handleCreateRoom();
+      setErrorMsg('Veuillez entrer un code de salon');
       return;
     }
 
@@ -286,7 +277,7 @@ export default function PropHuntApp() {
               Cache-Cache en 3D dans la Supérette & Entrepôt
             </p>
 
-            <div className="space-y-4 text-left">
+            <form onSubmit={handleJoin} className="space-y-4 text-left">
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
                   Votre Pseudo
@@ -294,6 +285,7 @@ export default function PropHuntApp() {
                 <input
                   type="text"
                   maxLength={16}
+                  required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Ex: Ghost"
@@ -301,45 +293,28 @@ export default function PropHuntApp() {
                 />
               </div>
 
-              <button
-                type="button"
-                onClick={handleCreateRoom}
-                className="w-full py-3.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black rounded-xl text-sm uppercase tracking-wider transition shadow-xl shadow-amber-500/20 cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
-              >
-                <span>✨</span>
-                <span>Créer un Nouveau Salon</span>
-              </button>
-
-              <div className="flex items-center gap-3 py-1">
-                <div className="flex-1 border-t border-slate-800"></div>
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">OU REJOINDRE</span>
-                <div className="flex-1 border-t border-slate-800"></div>
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Code du Salon
+                </label>
+                <input
+                  type="text"
+                  maxLength={10}
+                  required
+                  value={roomCodeInput}
+                  onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
+                  placeholder="Ex: SALON1"
+                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono uppercase focus:border-amber-400 focus:outline-none transition"
+                />
               </div>
 
-              <form onSubmit={handleJoin} className="space-y-2">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Code du Salon
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={10}
-                    value={roomCodeInput}
-                    onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
-                    placeholder="Ex: PROP492"
-                    className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono uppercase focus:border-amber-400 focus:outline-none transition text-sm"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 hover:border-amber-400 text-white font-bold rounded-xl text-sm transition cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <span>🚀</span>
-                  <span>Rejoindre le Salon</span>
-                </button>
-              </form>
-            </div>
+              <button
+                type="submit"
+                className="w-full py-4 mt-2 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black rounded-xl text-base uppercase tracking-wider transition shadow-xl shadow-amber-500/20 cursor-pointer transform hover:scale-[1.02] active:scale-[0.98]"
+              >
+                Rejoindre ou Créer le Salon 🚀
+              </button>
+            </form>
           </div>
         </div>
       ) : gameState.phase === 'LOBBY' ? (
