@@ -20,6 +20,20 @@ interface GameTheme {
 
 const GAMES: GameTheme[] = [
   {
+    emoji: '🛒',
+    title: 'Prop Hunt 3D',
+    subtitle: 'Cache-Cache 3D • Supérette, Entrepôt & Bureaux',
+    description: 'Incarnez un objet du décor (boîte de céréales, canette, caddie, chaise...) avec dash, métamorphose et freeze, ou traquez les faux objets avec un fusil de chasse à 1 seule balle dans le chargeur ! Vote de map, taunts obligatoires et mode spectateur.',
+    route: '/prophunt',
+    fontClass: 'font-display font-black tracking-wide',
+    cardTheme: 'bg-gradient-to-b from-orange-950/80 via-slate-950 to-amber-950/40',
+    borderTheme: 'border-orange-500/50 hover:border-yellow-300 hover:shadow-orange-900/60',
+    titleGradient: 'from-orange-400 via-amber-300 to-yellow-400',
+    badge: 'HIDE & SEEK 3D 🛒',
+    badgeStyle: 'bg-orange-950 text-amber-300 border-amber-500/50',
+    players: '2 à 10 Joueurs (Multijoueur En Ligne)',
+  },
+  {
     emoji: '🔟',
     title: 'Le Jeu de la Note',
     subtitle: 'Devinez Votre Note Secrète • 0 à 10',

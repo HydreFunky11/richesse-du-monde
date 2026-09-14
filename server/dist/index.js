@@ -20,6 +20,7 @@ const sumoEngine_1 = require("./engine/sumoEngine");
 const rtsEngine_1 = require("./engine/rtsEngine");
 const mobaEngine_1 = require("./engine/mobaEngine");
 const noteEngine_1 = require("./engine/noteEngine");
+const propHuntEngine_1 = require("./engine/propHuntEngine");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 // Load .env locally if present
@@ -79,6 +80,7 @@ const sumoGames = {};
 const rtsGames = {};
 const mobaGames = {};
 const noteGames = {};
+const prophuntGames = {};
 const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
 function broadcastNoteState(roomCode, game) {
     const roomSockets = io.sockets.adapter.rooms.get(roomCode);
@@ -98,10 +100,12 @@ io.on('connection', (socket) => {
     console.log(`Un joueur s'est connecté : ${socket.id}`);
     socket.on('joinGame', ({ username, roomCode, gameType }) => {
         const formattedRoomCode = roomCode.toUpperCase().trim();
-        const validTypes = ['uno', 'chaos', 'loveletter', 'discretos', 'skyjo', 'kingoftokyo', 'mayhem', 'clash', 'sumo', 'rts', 'moba', 'note'];
+        const validTypes = ['uno', 'chaos', 'loveletter', 'discretos', 'skyjo', 'kingoftokyo', 'mayhem', 'clash', 'sumo', 'rts', 'moba', 'note', 'prophunt'];
         let type = 'richesse';
         if (gameType === 'dungeonmayhem')
             type = 'mayhem';
+        else if (gameType === 'hideseek')
+            type = 'prophunt';
         else if (gameType && validTypes.includes(gameType))
             type = gameType;
         socket.gameType = type;
@@ -297,6 +301,7 @@ io.on('connection', (socket) => {
             socket.join(formattedRoomCode);
             socket.roomCode = formattedRoomCode;
             socket.username = username;
+            socket.emit('noteStateUpdate', game.getState(socket.id));
             broadcastNoteState(formattedRoomCode, game);
             console.log(`[NOTE LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
         }
@@ -319,6 +324,26 @@ io.on('connection', (socket) => {
             }
             else {
                 socket.emit('error', 'Impossible de rejoindre le salon RTS (partie commencée ou salon plein).');
+            }
+        }
+        else if (type === 'prophunt') {
+            if (!prophuntGames[formattedRoomCode] || prophuntGames[formattedRoomCode].getState().phase === 'FINISHED' || prophuntGames[formattedRoomCode].getPlayers().length === 0) {
+                prophuntGames[formattedRoomCode] = new propHuntEngine_1.PropHuntEngine(formattedRoomCode, (state) => {
+                    io.to(formattedRoomCode).emit('prophuntStateUpdate', state);
+                });
+            }
+            const game = prophuntGames[formattedRoomCode];
+            const success = game.addPlayer(socket.id, username);
+            if (success) {
+                socket.join(formattedRoomCode);
+                socket.roomCode = formattedRoomCode;
+                socket.username = username;
+                socket.emit('prophuntStateUpdate', game.getState());
+                io.to(formattedRoomCode).emit('prophuntStateUpdate', game.getState());
+                console.log(`[PROPHUNT LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+            }
+            else {
+                socket.emit('error', 'Impossible de rejoindre le salon Prop Hunt (salon plein).');
             }
         }
         else {
@@ -1238,6 +1263,71 @@ io.on('connection', (socket) => {
         game.resetGame();
         broadcastNoteState(roomCode, game);
     });
+    // ─── Prop Hunt 3D (Hide & Seek) Event Listeners ───────────────────────────
+    socket.on('prophunt:voteMap', ({ mapId }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !prophuntGames[roomCode])
+            return;
+        prophuntGames[roomCode].voteMap(socket.id, mapId);
+    });
+    socket.on('prophunt:startGame', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !prophuntGames[roomCode])
+            return;
+        const res = prophuntGames[roomCode].startGame(socket.id);
+        if (!res.success && res.error) {
+            socket.emit('error', res.error);
+        }
+    });
+    socket.on('prophunt:playerMove', ({ position, rotation }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !prophuntGames[roomCode])
+            return;
+        prophuntGames[roomCode].updatePlayerMovement(socket.id, position, rotation);
+    });
+    socket.on('prophunt:dash', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !prophuntGames[roomCode])
+            return;
+        const res = prophuntGames[roomCode].dash(socket.id);
+        if (!res.success && res.cooldownRemaining) {
+            socket.emit('prophunt:dashCooldown', res.cooldownRemaining);
+        }
+    });
+    socket.on('prophunt:changeProp', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !prophuntGames[roomCode])
+            return;
+        const res = prophuntGames[roomCode].changeProp(socket.id);
+        if (!res.success && res.cooldownRemaining) {
+            socket.emit('prophunt:changePropCooldown', res.cooldownRemaining);
+        }
+    });
+    socket.on('prophunt:freeze', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !prophuntGames[roomCode])
+            return;
+        prophuntGames[roomCode].toggleFreeze(socket.id);
+    });
+    socket.on('prophunt:taunt', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !prophuntGames[roomCode])
+            return;
+        prophuntGames[roomCode].triggerManualTaunt(socket.id);
+    });
+    socket.on('prophunt:shoot', ({ hitPlayerId }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !prophuntGames[roomCode])
+            return;
+        const result = prophuntGames[roomCode].hunterShoot(socket.id, hitPlayerId);
+        socket.emit('prophunt:shootResult', result);
+    });
+    socket.on('prophunt:resetGame', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !prophuntGames[roomCode])
+            return;
+        prophuntGames[roomCode].resetGame();
+    });
     // ─── Disconnect ────────────────────────────────────────────────────────────
     socket.on('disconnect', () => {
         const roomCode = socket.roomCode;
@@ -1345,6 +1435,14 @@ io.on('connection', (socket) => {
             console.log(`[NOTE] Déconnexion de ${username} du salon ${roomCode}`);
             if (game.getPlayers().length === 0) {
                 delete noteGames[roomCode];
+            }
+        }
+        else if (gameType === 'prophunt' && roomCode && prophuntGames[roomCode]) {
+            const game = prophuntGames[roomCode];
+            game.removePlayer(socket.id);
+            console.log(`[PROPHUNT] Déconnexion de ${username} du salon ${roomCode}`);
+            if (game.getPlayers().length === 0) {
+                delete prophuntGames[roomCode];
             }
         }
         else if (gameType === 'chaos' && roomCode && chaosGames[roomCode]) {
