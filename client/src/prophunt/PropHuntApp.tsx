@@ -34,6 +34,15 @@ export default function PropHuntApp() {
   const [hitmarker, setHitmarker] = useState(false);
   const [screenLog, setScreenLog] = useState<string[]>([]);
   const [isMuted, setIsMuted] = useState(propAudio.isMuted());
+  const [isLocked, setIsLocked] = useState(false);
+
+  useEffect(() => {
+    const onLock = () => {
+      setIsLocked(document.pointerLockElement === containerRef.current);
+    };
+    document.addEventListener('pointerlockchange', onLock);
+    return () => document.removeEventListener('pointerlockchange', onLock);
+  }, []);
 
   // Socket setup
   useEffect(() => {
@@ -209,8 +218,8 @@ export default function PropHuntApp() {
       <div ref={containerRef} className="absolute inset-0 w-full h-full z-0 cursor-crosshair" />
 
       {/* TOP HEADER BAR */}
-      <header className="absolute top-0 left-0 right-0 px-4 py-3 bg-slate-900/80 backdrop-blur-md border-b border-slate-800/80 flex items-center justify-between z-30 pointer-events-auto">
-        <div className="flex items-center gap-3">
+      <header className="absolute top-0 left-0 right-0 px-4 py-3 bg-slate-900/80 backdrop-blur-md border-b border-slate-800/80 flex items-center justify-between z-30 pointer-events-none">
+        <div className="flex items-center gap-3 pointer-events-auto">
           <button
             onClick={() => navigate('/')}
             className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition flex items-center gap-1.5 cursor-pointer"
@@ -226,7 +235,7 @@ export default function PropHuntApp() {
         </div>
 
         {joined && gameState && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 pointer-events-auto">
             {/* Map badge */}
             <div className="px-3 py-1 bg-slate-800/90 border border-slate-700 rounded-xl text-xs flex items-center gap-1.5">
               <span>{MAP_METADATA[gameState.selectedMap]?.icon}</span>
@@ -443,6 +452,35 @@ export default function PropHuntApp() {
           {gameState.phase === 'HIDING' && isHider && (
             <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 bg-amber-500/90 text-slate-950 px-6 py-2 rounded-2xl font-black text-sm shadow-2xl animate-pulse">
               🏃 COUREZ VOUS CACHER ! Libération du chercheur dans {gameState.hidingTimeRemaining}s
+            </div>
+          )}
+
+          {/* CLICK TO LOCK PROMPT WHEN NOT LOCKED IN GAME */}
+          {!isLocked && gameState.phase !== 'FINISHED' && !(gameState.phase === 'HIDING' && isHunter) && (
+            <div
+              onClick={() => containerRef.current?.requestPointerLock()}
+              className="absolute inset-0 z-25 flex items-center justify-center bg-black/40 backdrop-blur-[2px] cursor-pointer"
+            >
+              <div className="bg-slate-900/95 border-2 border-amber-500/60 text-white px-8 py-5 rounded-3xl text-center shadow-2xl animate-pulse space-y-2 max-w-sm">
+                <div className="text-4xl">🖱️</div>
+                <div className="text-lg font-black text-amber-400">Cliquez pour jouer</div>
+                <div className="text-xs text-slate-300 leading-relaxed">
+                  {isHunter ? (
+                    <>
+                      <p className="font-bold text-red-400">🕵️ Rôle : Chasseur (Vue FPS 1ère personne)</p>
+                      <p>• ZQSD / WASD pour marcher • [Espace] Sauter</p>
+                      <p>• Clic gauche : Tirer (1 balle) • [R] Recharger</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-bold text-amber-400">🎭 Rôle : Caché (Vue 3ème personne)</p>
+                      <p>• ZQSD / WASD pour marcher • [Espace] Sauter sur les décors</p>
+                      <p>• Molette de la souris : Zoomer / Dézoomer</p>
+                      <p>• [F] Figer la position • [E] Métamorphose • [Shift] Dash</p>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
