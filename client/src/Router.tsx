@@ -15,11 +15,14 @@ import RtsApp from './RtsApp';
 import MobaApp from './MobaApp';
 import SurvivorApp from './survivor/SurvivorApp';
 import PixelGunApp from './pixelgun/PixelGunApp';
+import NoteApp from './note/NoteApp';
 
 export default function Router() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/note" element={<NoteApp />} />
+      <Route path="/jeudelanote" element={<NoteApp />} />
       <Route path="/pixelgun" element={<PixelGunApp />} />
       <Route path="/fps" element={<PixelGunApp />} />
       <Route path="/survivor" element={<SurvivorApp />} />

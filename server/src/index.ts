@@ -14,6 +14,7 @@ import { ClashEngine } from './engine/clashEngine';
 import { SumoEngine } from './engine/sumoEngine';
 import { RtsEngine } from './engine/rtsEngine';
 import { MobaEngine } from './engine/mobaEngine';
+import { NoteEngine } from './engine/noteEngine';
 import { ChampionId, SpellKey } from './types/moba';
 import fs from 'fs';
 import path from 'path';
@@ -77,7 +78,19 @@ const clashGames: { [roomCode: string]: ClashEngine } = {};
 const sumoGames: { [roomCode: string]: SumoEngine } = {};
 const rtsGames: { [roomCode: string]: RtsEngine } = {};
 const mobaGames: { [roomCode: string]: MobaEngine } = {};
-const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
+const noteGames: { [roomCode: string]: NoteEngine } = {};
+const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
+
+function broadcastNoteState(roomCode: string, game: NoteEngine) {
+  const roomSockets = io.sockets.adapter.rooms.get(roomCode);
+  if (roomSockets) {
+    for (const sid of roomSockets) {
+      io.to(sid).emit('noteStateUpdate', game.getState(sid));
+    }
+  } else {
+    io.to(roomCode).emit('noteStateUpdate', game.getState());
+  }
+}
 
 
 
@@ -90,7 +103,7 @@ io.on('connection', (socket) => {
 
   socket.on('joinGame', ({ username, roomCode, gameType }: { username: string, roomCode: string, gameType?: string }) => {
     const formattedRoomCode = roomCode.toUpperCase().trim();
-    const validTypes = ['uno', 'chaos', 'loveletter', 'discretos', 'skyjo', 'kingoftokyo', 'mayhem', 'clash', 'sumo', 'rts', 'moba'];
+    const validTypes = ['uno', 'chaos', 'loveletter', 'discretos', 'skyjo', 'kingoftokyo', 'mayhem', 'clash', 'sumo', 'rts', 'moba', 'note'];
     let type = 'richesse';
     if (gameType === 'dungeonmayhem') type = 'mayhem';
     else if (gameType && validTypes.includes(gameType)) type = gameType;
@@ -270,7 +283,18 @@ io.on('connection', (socket) => {
       (socket as any).username = username;
       socket.emit('mobaStateUpdate', game.getState());
       io.to(formattedRoomCode).emit('mobaStateUpdate', game.getState());
-      console.log(`[MOBA LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+    } else if (type === 'note') {
+      if (!noteGames[formattedRoomCode] || noteGames[formattedRoomCode].getState().phase === 'FINISHED' || noteGames[formattedRoomCode].getPlayers().length === 0) {
+        noteGames[formattedRoomCode] = new NoteEngine(formattedRoomCode);
+      }
+      const game = noteGames[formattedRoomCode];
+      game.addPlayer(socket.id, username);
+
+      socket.join(formattedRoomCode);
+      (socket as any).roomCode = formattedRoomCode;
+      (socket as any).username = username;
+      broadcastNoteState(formattedRoomCode, game);
+      console.log(`[NOTE LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
     } else if (type === 'rts') {
       if (!rtsGames[formattedRoomCode] || rtsGames[formattedRoomCode].getState().status === 'FINISHED' || rtsGames[formattedRoomCode].getPlayers().length === 0) {
         rtsGames[formattedRoomCode] = new RtsEngine(formattedRoomCode, (state) => {
@@ -1124,12 +1148,114 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('mobaStateUpdate', game.getState());
   });
 
-  socket.on('moba:resetGame', () => {
+  // ─── LE JEU DE LA NOTE ───────────────────────────────────────────────────
+
+  socket.on('note:startGame', () => {
     const roomCode = (socket as any).roomCode;
-    if (!roomCode || !mobaGames[roomCode]) return;
-    const game = mobaGames[roomCode];
+    if (!roomCode || !noteGames[roomCode]) return;
+    const game = noteGames[roomCode];
+    if (game.startGame()) {
+      broadcastNoteState(roomCode, game);
+      console.log(`[NOTE] Partie lancée dans ${roomCode}`);
+    }
+  });
+
+  socket.on('note:addBot', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !noteGames[roomCode]) return;
+    const game = noteGames[roomCode];
+    if (game.addBot()) {
+      broadcastNoteState(roomCode, game);
+    }
+  });
+
+  socket.on('note:removeBot', ({ botId }: { botId: string }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !noteGames[roomCode]) return;
+    const game = noteGames[roomCode];
+    game.removeBot(botId);
+    broadcastNoteState(roomCode, game);
+  });
+
+  socket.on('note:chooseQuestion', ({ question }: { question: string }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !noteGames[roomCode]) return;
+    const game = noteGames[roomCode];
+    if (game.chooseQuestion(socket.id, question)) {
+      broadcastNoteState(roomCode, game);
+
+      // Interval to update UI as bots respond
+      let ticks = 0;
+      const interval = setInterval(() => {
+        if (!noteGames[roomCode]) {
+          clearInterval(interval);
+          return;
+        }
+        broadcastNoteState(roomCode, game);
+        ticks++;
+        if (game.getState().phase !== 'ANSWERING' || ticks > 10) {
+          clearInterval(interval);
+        }
+      }, 700);
+    }
+  });
+
+  socket.on('note:submitAnswer', ({ text }: { text: string }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !noteGames[roomCode]) return;
+    const game = noteGames[roomCode];
+    if (game.submitAnswer(socket.id, text)) {
+      broadcastNoteState(roomCode, game);
+
+      // In case bot was active and auto guesses
+      let ticks = 0;
+      const interval = setInterval(() => {
+        if (!noteGames[roomCode]) {
+          clearInterval(interval);
+          return;
+        }
+        broadcastNoteState(roomCode, game);
+        ticks++;
+        if (game.getState().phase !== 'GUESSING' || ticks > 8) {
+          clearInterval(interval);
+        }
+      }, 700);
+    }
+  });
+
+  socket.on('note:forceGuessing', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !noteGames[roomCode]) return;
+    const game = noteGames[roomCode];
+    if (game.forceGuessingPhase(socket.id)) {
+      broadcastNoteState(roomCode, game);
+    }
+  });
+
+  socket.on('note:submitGuess', ({ guess }: { guess: number }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !noteGames[roomCode]) return;
+    const game = noteGames[roomCode];
+    if (game.submitGuess(socket.id, guess)) {
+      broadcastNoteState(roomCode, game);
+    }
+  });
+
+  socket.on('note:nextTurn', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !noteGames[roomCode]) return;
+    const game = noteGames[roomCode];
+    if (game.nextTurn()) {
+      broadcastNoteState(roomCode, game);
+    }
+  });
+
+  socket.on('note:resetGame', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !noteGames[roomCode]) return;
+    const game = noteGames[roomCode];
     game.resetGame();
-    io.to(roomCode).emit('mobaStateUpdate', game.getState());
+    broadcastNoteState(roomCode, game);
   });
 
   // ─── Disconnect ────────────────────────────────────────────────────────────
@@ -1224,6 +1350,14 @@ io.on('connection', (socket) => {
       if (game.getPlayers().filter(p => !p.isBot).length === 0) {
         game.stopLoop();
         delete rtsGames[roomCode];
+      }
+    } else if (gameType === 'note' && roomCode && noteGames[roomCode]) {
+      const game = noteGames[roomCode];
+      game.removePlayer(socket.id);
+      broadcastNoteState(roomCode, game);
+      console.log(`[NOTE] Déconnexion de ${username} du salon ${roomCode}`);
+      if (game.getPlayers().length === 0) {
+        delete noteGames[roomCode];
       }
     } else if (gameType === 'chaos' && roomCode && chaosGames[roomCode]) {
       const game = chaosGames[roomCode];

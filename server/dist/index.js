@@ -19,6 +19,7 @@ const clashEngine_1 = require("./engine/clashEngine");
 const sumoEngine_1 = require("./engine/sumoEngine");
 const rtsEngine_1 = require("./engine/rtsEngine");
 const mobaEngine_1 = require("./engine/mobaEngine");
+const noteEngine_1 = require("./engine/noteEngine");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 // Load .env locally if present
@@ -77,7 +78,19 @@ const clashGames = {};
 const sumoGames = {};
 const rtsGames = {};
 const mobaGames = {};
-const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
+const noteGames = {};
+const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
+function broadcastNoteState(roomCode, game) {
+    const roomSockets = io.sockets.adapter.rooms.get(roomCode);
+    if (roomSockets) {
+        for (const sid of roomSockets) {
+            io.to(sid).emit('noteStateUpdate', game.getState(sid));
+        }
+    }
+    else {
+        io.to(roomCode).emit('noteStateUpdate', game.getState());
+    }
+}
 app.get('/health', (req, res) => {
     res.send({ status: 'ok', activeGames: Object.keys(games).length });
 });
@@ -85,7 +98,7 @@ io.on('connection', (socket) => {
     console.log(`Un joueur s'est connecté : ${socket.id}`);
     socket.on('joinGame', ({ username, roomCode, gameType }) => {
         const formattedRoomCode = roomCode.toUpperCase().trim();
-        const validTypes = ['uno', 'chaos', 'loveletter', 'discretos', 'skyjo', 'kingoftokyo', 'mayhem', 'clash', 'sumo', 'rts', 'moba'];
+        const validTypes = ['uno', 'chaos', 'loveletter', 'discretos', 'skyjo', 'kingoftokyo', 'mayhem', 'clash', 'sumo', 'rts', 'moba', 'note'];
         let type = 'richesse';
         if (gameType === 'dungeonmayhem')
             type = 'mayhem';
@@ -274,7 +287,18 @@ io.on('connection', (socket) => {
             socket.username = username;
             socket.emit('mobaStateUpdate', game.getState());
             io.to(formattedRoomCode).emit('mobaStateUpdate', game.getState());
-            console.log(`[MOBA LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+        }
+        else if (type === 'note') {
+            if (!noteGames[formattedRoomCode] || noteGames[formattedRoomCode].getState().phase === 'FINISHED' || noteGames[formattedRoomCode].getPlayers().length === 0) {
+                noteGames[formattedRoomCode] = new noteEngine_1.NoteEngine(formattedRoomCode);
+            }
+            const game = noteGames[formattedRoomCode];
+            game.addPlayer(socket.id, username);
+            socket.join(formattedRoomCode);
+            socket.roomCode = formattedRoomCode;
+            socket.username = username;
+            broadcastNoteState(formattedRoomCode, game);
+            console.log(`[NOTE LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
         }
         else if (type === 'rts') {
             if (!rtsGames[formattedRoomCode] || rtsGames[formattedRoomCode].getState().status === 'FINISHED' || rtsGames[formattedRoomCode].getPlayers().length === 0) {
@@ -1107,13 +1131,112 @@ io.on('connection', (socket) => {
         game.handleSellItem(socket.id, itemIndex);
         io.to(roomCode).emit('mobaStateUpdate', game.getState());
     });
-    socket.on('moba:resetGame', () => {
+    // ─── LE JEU DE LA NOTE ───────────────────────────────────────────────────
+    socket.on('note:startGame', () => {
         const roomCode = socket.roomCode;
-        if (!roomCode || !mobaGames[roomCode])
+        if (!roomCode || !noteGames[roomCode])
             return;
-        const game = mobaGames[roomCode];
+        const game = noteGames[roomCode];
+        if (game.startGame()) {
+            broadcastNoteState(roomCode, game);
+            console.log(`[NOTE] Partie lancée dans ${roomCode}`);
+        }
+    });
+    socket.on('note:addBot', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !noteGames[roomCode])
+            return;
+        const game = noteGames[roomCode];
+        if (game.addBot()) {
+            broadcastNoteState(roomCode, game);
+        }
+    });
+    socket.on('note:removeBot', ({ botId }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !noteGames[roomCode])
+            return;
+        const game = noteGames[roomCode];
+        game.removeBot(botId);
+        broadcastNoteState(roomCode, game);
+    });
+    socket.on('note:chooseQuestion', ({ question }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !noteGames[roomCode])
+            return;
+        const game = noteGames[roomCode];
+        if (game.chooseQuestion(socket.id, question)) {
+            broadcastNoteState(roomCode, game);
+            // Interval to update UI as bots respond
+            let ticks = 0;
+            const interval = setInterval(() => {
+                if (!noteGames[roomCode]) {
+                    clearInterval(interval);
+                    return;
+                }
+                broadcastNoteState(roomCode, game);
+                ticks++;
+                if (game.getState().phase !== 'ANSWERING' || ticks > 10) {
+                    clearInterval(interval);
+                }
+            }, 700);
+        }
+    });
+    socket.on('note:submitAnswer', ({ text }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !noteGames[roomCode])
+            return;
+        const game = noteGames[roomCode];
+        if (game.submitAnswer(socket.id, text)) {
+            broadcastNoteState(roomCode, game);
+            // In case bot was active and auto guesses
+            let ticks = 0;
+            const interval = setInterval(() => {
+                if (!noteGames[roomCode]) {
+                    clearInterval(interval);
+                    return;
+                }
+                broadcastNoteState(roomCode, game);
+                ticks++;
+                if (game.getState().phase !== 'GUESSING' || ticks > 8) {
+                    clearInterval(interval);
+                }
+            }, 700);
+        }
+    });
+    socket.on('note:forceGuessing', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !noteGames[roomCode])
+            return;
+        const game = noteGames[roomCode];
+        if (game.forceGuessingPhase(socket.id)) {
+            broadcastNoteState(roomCode, game);
+        }
+    });
+    socket.on('note:submitGuess', ({ guess }) => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !noteGames[roomCode])
+            return;
+        const game = noteGames[roomCode];
+        if (game.submitGuess(socket.id, guess)) {
+            broadcastNoteState(roomCode, game);
+        }
+    });
+    socket.on('note:nextTurn', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !noteGames[roomCode])
+            return;
+        const game = noteGames[roomCode];
+        if (game.nextTurn()) {
+            broadcastNoteState(roomCode, game);
+        }
+    });
+    socket.on('note:resetGame', () => {
+        const roomCode = socket.roomCode;
+        if (!roomCode || !noteGames[roomCode])
+            return;
+        const game = noteGames[roomCode];
         game.resetGame();
-        io.to(roomCode).emit('mobaStateUpdate', game.getState());
+        broadcastNoteState(roomCode, game);
     });
     // ─── Disconnect ────────────────────────────────────────────────────────────
     socket.on('disconnect', () => {
@@ -1213,6 +1336,15 @@ io.on('connection', (socket) => {
             if (game.getPlayers().filter(p => !p.isBot).length === 0) {
                 game.stopLoop();
                 delete rtsGames[roomCode];
+            }
+        }
+        else if (gameType === 'note' && roomCode && noteGames[roomCode]) {
+            const game = noteGames[roomCode];
+            game.removePlayer(socket.id);
+            broadcastNoteState(roomCode, game);
+            console.log(`[NOTE] Déconnexion de ${username} du salon ${roomCode}`);
+            if (game.getPlayers().length === 0) {
+                delete noteGames[roomCode];
             }
         }
         else if (gameType === 'chaos' && roomCode && chaosGames[roomCode]) {
