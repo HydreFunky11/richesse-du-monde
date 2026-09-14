@@ -1205,6 +1205,9 @@ io.on('connection', (socket) => {
                 }
             }, 700);
         }
+        else {
+            socket.emit('error', 'Cette question a déjà été posée dans cette partie ! Veuillez en poser une autre.');
+        }
     });
     socket.on('note:submitAnswer', ({ text }) => {
         const roomCode = socket.roomCode;

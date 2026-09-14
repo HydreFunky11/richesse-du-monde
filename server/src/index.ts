@@ -1220,6 +1220,8 @@ io.on('connection', (socket) => {
           clearInterval(interval);
         }
       }, 700);
+    } else {
+      socket.emit('error', 'Cette question a déjà été posée dans cette partie ! Veuillez en poser une autre.');
     }
   });
 

@@ -304,6 +304,15 @@ class NoteEngine {
             }, 1200);
         }
     }
+    normalizeQuestion(str) {
+        return str
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[?!.,;:()\-'"’]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
     chooseQuestion(playerId, question) {
         const activePlayer = this.state.players[this.state.activePlayerIndex];
         if (!activePlayer || activePlayer.id !== playerId)
@@ -311,10 +320,12 @@ class NoteEngine {
         if (this.state.phase !== 'CHOOSING_QUESTION')
             return false;
         const trimmedQ = question.trim();
-        if (!trimmedQ)
+        if (!trimmedQ || trimmedQ.length < 3)
             return false;
-        // Check uniqueness
-        if (this.state.usedQuestions.includes(trimmedQ)) {
+        // Check uniqueness (case-insensitive, accent-insensitive, ignores punctuation & extra spaces)
+        const norm = this.normalizeQuestion(trimmedQ);
+        const alreadyUsed = this.state.usedQuestions.some(q => this.normalizeQuestion(q) === norm);
+        if (alreadyUsed) {
             this.addLog(`⚠️ La question "${trimmedQ}" a déjà été posée dans cette partie !`);
             return false;
         }
