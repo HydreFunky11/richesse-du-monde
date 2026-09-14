@@ -104,6 +104,7 @@ export default function NoteApp() {
 
     s.on('noteStateUpdate', (st: NoteGameState) => {
       setGameState(st);
+      setJoined(true);
     });
 
     s.on('error', (err: string) => {
@@ -121,13 +122,36 @@ export default function NoteApp() {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [gameState?.log]);
 
+  const handleCreateRoom = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanUser = username.trim();
+    if (!cleanUser) {
+      setErrorMsg('Veuillez entrer votre pseudo avant de créer un salon');
+      return;
+    }
+    const randomCode = 'NOTE' + Math.floor(100 + Math.random() * 900);
+    localStorage.setItem('note_username', cleanUser);
+    setRoomCodeInput(randomCode);
+    socketRef.current?.emit('joinGame', {
+      username: cleanUser,
+      roomCode: randomCode,
+      gameType: 'note'
+    });
+  };
+
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanUser = username.trim();
-    const cleanRoom = (roomCodeInput.trim() || 'SALON').toUpperCase();
+    const cleanRoom = roomCodeInput.trim().toUpperCase();
 
     if (!cleanUser) {
       setErrorMsg('Veuillez entrer un pseudo');
+      return;
+    }
+
+    if (!cleanRoom) {
+      // If no room code provided, auto-create a new room
+      handleCreateRoom();
       return;
     }
 
@@ -137,8 +161,6 @@ export default function NoteApp() {
       roomCode: cleanRoom,
       gameType: 'note'
     });
-
-    setJoined(true);
   };
 
   const handleCopyCode = () => {
@@ -239,7 +261,7 @@ export default function NoteApp() {
               Devinez votre note secrète de 0 à 10 en 5 manches
             </p>
 
-            <form onSubmit={handleJoin} className="space-y-4 text-left">
+            <div className="space-y-4 text-left">
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
                   Votre Pseudo
@@ -254,27 +276,47 @@ export default function NoteApp() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                  Code du Salon (optionnel)
-                </label>
-                <input
-                  type="text"
-                  maxLength={10}
-                  value={roomCodeInput}
-                  onChange={e => setRoomCodeInput(e.target.value)}
-                  placeholder="Ex: NOTE42 (ou laisser vide)"
-                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono uppercase focus:border-amber-400 focus:outline-none transition"
-                />
+              {/* Action 1: Create room directly */}
+              <button
+                type="button"
+                onClick={handleCreateRoom}
+                className="w-full py-3.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black rounded-xl text-sm uppercase tracking-wider transition shadow-xl shadow-amber-500/20 cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
+              >
+                <span>✨</span>
+                <span>Créer un Nouveau Salon</span>
+              </button>
+
+              <div className="flex items-center gap-3 py-1">
+                <div className="flex-1 border-t border-slate-800"></div>
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">OU REJOINDRE</span>
+                <div className="flex-1 border-t border-slate-800"></div>
               </div>
 
-              <button
-                type="submit"
-                className="w-full py-4 mt-2 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black rounded-xl text-base uppercase tracking-wider transition shadow-xl shadow-amber-500/20 cursor-pointer transform hover:scale-[1.02] active:scale-[0.98]"
-              >
-                Rejoindre le Salon 🚀
-              </button>
-            </form>
+              {/* Action 2: Join existing room */}
+              <form onSubmit={handleJoin} className="space-y-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                    Code du Salon d'un ami
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={10}
+                    value={roomCodeInput}
+                    onChange={e => setRoomCodeInput(e.target.value.toUpperCase())}
+                    placeholder="Ex: NOTE492"
+                    className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono uppercase focus:border-amber-400 focus:outline-none transition text-sm"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 hover:border-amber-400 text-white font-bold rounded-xl text-sm transition cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <span>🚀</span>
+                  <span>Rejoindre le Salon</span>
+                </button>
+              </form>
+            </div>
 
             <div className="mt-6 pt-5 border-t border-slate-800/80 text-xs text-slate-400 space-y-1 text-left">
               <p className="font-bold text-slate-300">📖 Règle express :</p>
