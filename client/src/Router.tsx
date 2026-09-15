@@ -17,11 +17,15 @@ import SurvivorApp from './survivor/SurvivorApp';
 import PixelGunApp from './pixelgun/PixelGunApp';
 import NoteApp from './note/NoteApp';
 import PropHuntApp from './prophunt/PropHuntApp';
+import { HellGambleApp } from './hellgamble/HellGambleApp';
 
 export default function Router() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/hellgamble" element={<HellGambleApp />} />
+      <Route path="/caseclash" element={<HellGambleApp />} />
+      <Route path="/gamble" element={<HellGambleApp />} />
       <Route path="/prophunt" element={<PropHuntApp />} />
       <Route path="/hideseek" element={<PropHuntApp />} />
       <Route path="/note" element={<NoteApp />} />

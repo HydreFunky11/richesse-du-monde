@@ -20,6 +20,20 @@ interface GameTheme {
 
 const GAMES: GameTheme[] = [
   {
+    emoji: '🎰',
+    title: 'Hell Gamble : Case Clash',
+    subtitle: 'Simulateur Hellcase & Case Battles • Faux Cash',
+    description: 'Ouvrez des caisses de skins d\'armes légendaires (AK-47 Vulcan, Couteaux Karambit & Butterfly, AWP Dragon Lore), affrontez vos amis en Case Battles simultanés où le vainqueur rafle TOUT le butin, tentez l\'Upgrader et grimpez au sommet du classement des fortunes !',
+    route: '/hellgamble',
+    fontClass: 'font-display font-black tracking-wide',
+    cardTheme: 'bg-gradient-to-b from-amber-950/90 via-slate-950 to-red-950/50',
+    borderTheme: 'border-amber-500/60 hover:border-yellow-300 hover:shadow-amber-900/70',
+    titleGradient: 'from-amber-300 via-yellow-400 to-amber-500',
+    badge: 'CASE OPENING & BATTLES 💎',
+    badgeStyle: 'bg-amber-950 text-amber-300 border-amber-500/50',
+    players: '1 à 10 Joueurs (Solo ou Multijoueur En Ligne)',
+  },
+  {
     emoji: '🛒',
     title: 'Prop Hunt 3D',
     subtitle: 'Cache-Cache 3D • Supérette, Entrepôt & Bureaux',

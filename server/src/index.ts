@@ -16,6 +16,7 @@ import { RtsEngine } from './engine/rtsEngine';
 import { MobaEngine } from './engine/mobaEngine';
 import { NoteEngine } from './engine/noteEngine';
 import { PropHuntEngine } from './engine/propHuntEngine';
+import { HellGambleEngine } from './engine/hellGambleEngine';
 import { ChampionId, SpellKey } from './types/moba';
 import fs from 'fs';
 import path from 'path';
@@ -81,6 +82,7 @@ const rtsGames: { [roomCode: string]: RtsEngine } = {};
 const mobaGames: { [roomCode: string]: MobaEngine } = {};
 const noteGames: { [roomCode: string]: NoteEngine } = {};
 const prophuntGames: { [roomCode: string]: PropHuntEngine } = {};
+const hellgambleGames: { [roomCode: string]: HellGambleEngine } = {};
 const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
 
 function broadcastNoteState(roomCode: string, game: NoteEngine) {
@@ -105,10 +107,11 @@ io.on('connection', (socket) => {
 
   socket.on('joinGame', ({ username, roomCode, gameType }: { username: string, roomCode: string, gameType?: string }) => {
     const formattedRoomCode = roomCode.toUpperCase().trim();
-    const validTypes = ['uno', 'chaos', 'loveletter', 'discretos', 'skyjo', 'kingoftokyo', 'mayhem', 'clash', 'sumo', 'rts', 'moba', 'note', 'prophunt'];
+    const validTypes = ['uno', 'chaos', 'loveletter', 'discretos', 'skyjo', 'kingoftokyo', 'mayhem', 'clash', 'sumo', 'rts', 'moba', 'note', 'prophunt', 'hellgamble'];
     let type = 'richesse';
     if (gameType === 'dungeonmayhem') type = 'mayhem';
     else if (gameType === 'hideseek') type = 'prophunt';
+    else if (gameType === 'caseclash' || gameType === 'gamble') type = 'hellgamble';
     else if (gameType && validTypes.includes(gameType)) type = gameType;
     (socket as any).gameType = type;
 
@@ -338,6 +341,20 @@ io.on('connection', (socket) => {
       } else {
         socket.emit('error', 'Impossible de rejoindre le salon Prop Hunt (salon plein).');
       }
+    } else if (type === 'hellgamble') {
+      if (!hellgambleGames[formattedRoomCode]) {
+        hellgambleGames[formattedRoomCode] = new HellGambleEngine(formattedRoomCode, (state) => {
+          io.to(formattedRoomCode).emit('hellgambleStateUpdate', state);
+        });
+      }
+      const game = hellgambleGames[formattedRoomCode];
+      game.addPlayer(socket.id, username);
+      socket.join(formattedRoomCode);
+      (socket as any).roomCode = formattedRoomCode;
+      (socket as any).username = username;
+      socket.emit('hellgambleStateUpdate', game.getState());
+      io.to(formattedRoomCode).emit('hellgambleStateUpdate', game.getState());
+      console.log(`[HELLGAMBLE LOBBY] ${username} a rejoint le casino ${formattedRoomCode}`);
     } else {
       if (!games[formattedRoomCode] || games[formattedRoomCode].getStatus() === 'FINISHED' || games[formattedRoomCode].getPlayers().length === 0 || games[formattedRoomCode].getPlayers().every(p => p.isBankrupt)) {
         games[formattedRoomCode] = new GameEngine(formattedRoomCode);
@@ -1349,6 +1366,82 @@ io.on('connection', (socket) => {
     prophuntGames[roomCode].resetGame();
   });
 
+  // ─── HELL GAMBLE / CASE CLASH EVENT HANDLERS ──────────────────────────────
+
+  socket.on('hellgamble:openCase', ({ caseId }: { caseId: string }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !hellgambleGames[roomCode]) return;
+    const result = hellgambleGames[roomCode].openCase(socket.id, caseId);
+    socket.emit('hellgamble:openCaseResult', result);
+  });
+
+  socket.on('hellgamble:sellItem', ({ itemId }: { itemId: string }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !hellgambleGames[roomCode]) return;
+    const result = hellgambleGames[roomCode].sellItem(socket.id, itemId);
+    socket.emit('hellgamble:sellItemResult', result);
+  });
+
+  socket.on('hellgamble:sellAll', ({ maxPrice }: { maxPrice?: number }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !hellgambleGames[roomCode]) return;
+    const result = hellgambleGames[roomCode].sellAll(socket.id, maxPrice);
+    socket.emit('hellgamble:sellAllResult', result);
+  });
+
+  socket.on('hellgamble:claimBankrupt', () => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !hellgambleGames[roomCode]) return;
+    const result = hellgambleGames[roomCode].claimBankruptBonus(socket.id);
+    socket.emit('hellgamble:claimBankruptResult', result);
+  });
+
+  socket.on('hellgamble:createBattle', ({ caseIds, maxPlayers }: { caseIds: string[]; maxPlayers: 2 | 3 | 4 }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !hellgambleGames[roomCode]) return;
+    const result = hellgambleGames[roomCode].createBattle(socket.id, caseIds, maxPlayers);
+    socket.emit('hellgamble:createBattleResult', result);
+  });
+
+  socket.on('hellgamble:joinBattle', ({ battleId }: { battleId: string }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !hellgambleGames[roomCode]) return;
+    const result = hellgambleGames[roomCode].joinBattle(socket.id, battleId);
+    socket.emit('hellgamble:joinBattleResult', result);
+  });
+
+  socket.on('hellgamble:leaveBattle', ({ battleId }: { battleId: string }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !hellgambleGames[roomCode]) return;
+    const result = hellgambleGames[roomCode].leaveBattle(socket.id, battleId);
+    socket.emit('hellgamble:leaveBattleResult', result);
+  });
+
+  socket.on('hellgamble:startBattle', ({ battleId }: { battleId: string }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !hellgambleGames[roomCode]) return;
+    const result = hellgambleGames[roomCode].startBattle(socket.id, battleId);
+    if (result.success && result.battleResults) {
+      io.to(roomCode).emit('hellgamble:battleStarted', { battleId, battleResults: result.battleResults });
+    } else {
+      socket.emit('error', result.error || 'Erreur au démarrage de la battle.');
+    }
+  });
+
+  socket.on('hellgamble:upgrade', ({ wagerItemIds, cashWager, targetSkinId }: { wagerItemIds: string[]; cashWager: number; targetSkinId: string }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !hellgambleGames[roomCode]) return;
+    const result = hellgambleGames[roomCode].upgrade(socket.id, wagerItemIds, cashWager, targetSkinId);
+    socket.emit('hellgamble:upgradeResult', result);
+  });
+
+  socket.on('hellgamble:tradeUp', ({ itemIds }: { itemIds: string[] }) => {
+    const roomCode = (socket as any).roomCode;
+    if (!roomCode || !hellgambleGames[roomCode]) return;
+    const result = hellgambleGames[roomCode].tradeUp(socket.id, itemIds);
+    socket.emit('hellgamble:tradeUpResult', result);
+  });
+
   // ─── Disconnect ────────────────────────────────────────────────────────────
 
   socket.on('disconnect', () => {
@@ -1456,6 +1549,13 @@ io.on('connection', (socket) => {
       console.log(`[PROPHUNT] Déconnexion de ${username} du salon ${roomCode}`);
       if (game.getPlayers().length === 0) {
         delete prophuntGames[roomCode];
+      }
+    } else if (gameType === 'hellgamble' && roomCode && hellgambleGames[roomCode]) {
+      const game = hellgambleGames[roomCode];
+      game.removePlayer(socket.id);
+      console.log(`[HELLGAMBLE] Déconnexion de ${username} du casino ${roomCode}`);
+      if (game.getPlayers().length === 0) {
+        delete hellgambleGames[roomCode];
       }
     } else if (gameType === 'chaos' && roomCode && chaosGames[roomCode]) {
       const game = chaosGames[roomCode];

@@ -342,6 +342,101 @@ class SoundEffectsManager {
     osc.start();
     osc.stop(ctx.currentTime + 0.25);
   }
+
+  // 15. CS / Hellcase Roulette Tick (Items scrolling by)
+  public rouletteTick() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(850 + Math.random() * 200, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.025);
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.025);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.025);
+  }
+
+  // 16. Skin Drop Reveal Jingle
+  public skinReveal(rarity: string) {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const isBig = rarity === 'covert' || rarity === 'special' || rarity === 'contraband';
+    const notes = isBig ? [440, 554, 659, 880, 1108] : [523, 659, 784];
+    notes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = isBig ? 'sawtooth' : 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.06);
+      gain.gain.setValueAtTime(isBig ? 0.2 : 0.15, ctx.currentTime + idx * 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.06 + (isBig ? 0.4 : 0.2));
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + idx * 0.06);
+      osc.stop(ctx.currentTime + idx * 0.06 + (isBig ? 0.4 : 0.2));
+    });
+  }
+
+  // 17. Upgrade Success Fanfare
+  public upgradeSuccess() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const notes = [440, 554, 659, 880, 1108, 1320];
+    notes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.07);
+      gain.gain.setValueAtTime(0.22, ctx.currentTime + idx * 0.07);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.07 + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + idx * 0.07);
+      osc.stop(ctx.currentTime + idx * 0.07 + 0.35);
+    });
+  }
+
+  // 18. Upgrade Fail Buzzer
+  public upgradeFail() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.35);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.35);
+  }
+
+  // 19. Cash Register / Coins Clink
+  public coinsCash() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc1.type = 'sine';
+    osc2.type = 'sine';
+    osc1.frequency.setValueAtTime(987.77, ctx.currentTime); // B5
+    osc2.frequency.setValueAtTime(1318.51, ctx.currentTime + 0.06); // E6
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(ctx.destination);
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.15);
+    osc2.start(ctx.currentTime + 0.06);
+    osc2.stop(ctx.currentTime + 0.3);
+  }
 }
 
 export const soundFx = new SoundEffectsManager();
