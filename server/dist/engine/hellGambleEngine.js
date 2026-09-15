@@ -75,77 +75,86 @@ class HellGambleEngine {
         };
     }
     // ─── CASE OPENING ───────────────────────────────────────────────────────────
-    openCase(playerId, caseId) {
+    openCase(playerId, caseId, count = 1) {
         const player = this.players.get(playerId);
         if (!player)
             return { success: false, error: 'Joueur introuvable.' };
         const caseDef = skinsData_1.CASES_DATABASE.find(c => c.id === caseId);
         if (!caseDef)
             return { success: false, error: 'Caisse introuvable.' };
-        if (player.cash < caseDef.price) {
-            return { success: false, error: `Fonds insuffisants ($${player.cash.toFixed(2)} / $${caseDef.price.toFixed(2)} requis).` };
+        const actualCount = Math.max(1, Math.min(5, Math.floor(count || 1)));
+        const totalCost = parseFloat((caseDef.price * actualCount).toFixed(2));
+        if (player.cash < totalCost) {
+            return { success: false, error: `Fonds insuffisants ($${player.cash.toFixed(2)} / $${totalCost.toFixed(2)} requis).` };
         }
-        // Déduire le prix
-        player.cash = parseFloat((player.cash - caseDef.price).toFixed(2));
-        player.totalOpened += 1;
-        // Effectuer le tirage
-        const roll = (0, skinsData_1.rollCaseDrop)(caseDef);
-        const newItem = {
-            id: `${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-            skinId: roll.skin.id,
-            name: roll.skin.name,
-            weapon: roll.skin.weapon,
-            rarity: roll.skin.rarity,
-            value: roll.value,
-            wear: roll.wear,
-            float: roll.float,
-            obtainedAt: Date.now(),
-            obtainedFrom: caseDef.name,
-        };
-        player.inventory.unshift(newItem);
-        // Mettre à jour le bestDrop
-        if (!player.bestDrop || newItem.value > player.bestDrop.value) {
-            player.bestDrop = newItem;
+        // Déduire le prix total
+        player.cash = parseFloat((player.cash - totalCost).toFixed(2));
+        player.totalOpened += actualCount;
+        const drops = [];
+        const createdItems = [];
+        for (let k = 0; k < actualCount; k++) {
+            const roll = (0, skinsData_1.rollCaseDrop)(caseDef);
+            const newItem = {
+                id: `${Date.now()}_${Math.random().toString(36).substr(2, 6)}_${k}`,
+                skinId: roll.skin.id,
+                name: roll.skin.name,
+                weapon: roll.skin.weapon,
+                rarity: roll.skin.rarity,
+                value: roll.value,
+                wear: roll.wear,
+                float: roll.float,
+                obtainedAt: Date.now() + k,
+                obtainedFrom: caseDef.name,
+            };
+            player.inventory.unshift(newItem);
+            createdItems.push(newItem);
+            if (!player.bestDrop || newItem.value > player.bestDrop.value) {
+                player.bestDrop = newItem;
+            }
+            // Générer séquence de roulette de 45 items pour ce slot
+            const winningIndex = 38;
+            const reelItems = [];
+            for (let i = 0; i < 45; i++) {
+                if (i === winningIndex) {
+                    reelItems.push({
+                        skinId: newItem.skinId,
+                        name: newItem.name,
+                        weapon: newItem.weapon,
+                        rarity: newItem.rarity,
+                        value: newItem.value,
+                        accentColor: roll.skin.accentColor,
+                        icon: roll.skin.icon,
+                    });
+                }
+                else {
+                    const randDrop = (0, skinsData_1.rollCaseDrop)(caseDef);
+                    reelItems.push({
+                        skinId: randDrop.skin.id,
+                        name: randDrop.skin.name,
+                        weapon: randDrop.skin.weapon,
+                        rarity: randDrop.skin.rarity,
+                        value: randDrop.value,
+                        accentColor: randDrop.skin.accentColor,
+                        icon: randDrop.skin.icon,
+                    });
+                }
+            }
+            drops.push({
+                item: newItem,
+                reelItems,
+                winningIndex,
+            });
+            this.addLiveFeed(player, newItem, 'CASE');
         }
         this.recalculateNetWorth(player);
-        // Générer une séquence de roulette réaliste de 45 items pour l'animation
-        // L'item gagnant sera à l'index 38
-        const winningIndex = 38;
-        const reelItems = [];
-        for (let i = 0; i < 45; i++) {
-            if (i === winningIndex) {
-                reelItems.push({
-                    skinId: newItem.skinId,
-                    name: newItem.name,
-                    weapon: newItem.weapon,
-                    rarity: newItem.rarity,
-                    value: newItem.value,
-                    accentColor: roll.skin.accentColor,
-                    icon: roll.skin.icon,
-                });
-            }
-            else {
-                // Tirer un skin aléatoire du pool
-                const randDrop = (0, skinsData_1.rollCaseDrop)(caseDef);
-                reelItems.push({
-                    skinId: randDrop.skin.id,
-                    name: randDrop.skin.name,
-                    weapon: randDrop.skin.weapon,
-                    rarity: randDrop.skin.rarity,
-                    value: randDrop.value,
-                    accentColor: randDrop.skin.accentColor,
-                    icon: randDrop.skin.icon,
-                });
-            }
-        }
-        // Ajouter au live feed
-        this.addLiveFeed(player, newItem, 'CASE');
         this.broadcastState();
         return {
             success: true,
-            item: newItem,
-            reelItems,
-            winningIndex,
+            item: drops[0].item,
+            items: createdItems,
+            reelItems: drops[0].reelItems,
+            winningIndex: drops[0].winningIndex,
+            drops,
         };
     }
     // ─── INVENTORY & SELLING ────────────────────────────────────────────────────

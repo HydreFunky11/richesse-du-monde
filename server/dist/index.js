@@ -1351,11 +1351,11 @@ io.on('connection', (socket) => {
         prophuntGames[roomCode].resetGame();
     });
     // ─── HELL GAMBLE / CASE CLASH EVENT HANDLERS ──────────────────────────────
-    socket.on('hellgamble:openCase', ({ caseId }) => {
+    socket.on('hellgamble:openCase', ({ caseId, count }) => {
         const roomCode = socket.roomCode;
         if (!roomCode || !hellgambleGames[roomCode])
             return;
-        const result = hellgambleGames[roomCode].openCase(socket.id, caseId);
+        const result = hellgambleGames[roomCode].openCase(socket.id, caseId, count || 1);
         socket.emit('hellgamble:openCaseResult', result);
     });
     socket.on('hellgamble:sellItem', ({ itemId }) => {

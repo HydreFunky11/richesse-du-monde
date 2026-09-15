@@ -96,11 +96,11 @@ export const HellGambleApp: React.FC = () => {
   const myPlayer: HellPlayer | undefined = gameState?.players.find(p => p.id === socketRef.current?.id);
 
   // Actions API vers le serveur via Socket.IO
-  const handleOpenCase = (caseId: string): Promise<any> => {
+  const handleOpenCase = (caseId: string, count: number = 1): Promise<any> => {
     return new Promise((resolve) => {
       if (!socketRef.current) return resolve({ success: false, error: 'Non connecté' });
 
-      socketRef.current.emit('hellgamble:openCase', { caseId });
+      socketRef.current.emit('hellgamble:openCase', { caseId, count });
       socketRef.current.once('hellgamble:openCaseResult', (res) => {
         resolve(res);
       });

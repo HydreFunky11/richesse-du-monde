@@ -1368,10 +1368,10 @@ io.on('connection', (socket) => {
 
   // ─── HELL GAMBLE / CASE CLASH EVENT HANDLERS ──────────────────────────────
 
-  socket.on('hellgamble:openCase', ({ caseId }: { caseId: string }) => {
+  socket.on('hellgamble:openCase', ({ caseId, count }: { caseId: string; count?: number }) => {
     const roomCode = (socket as any).roomCode;
     if (!roomCode || !hellgambleGames[roomCode]) return;
-    const result = hellgambleGames[roomCode].openCase(socket.id, caseId);
+    const result = hellgambleGames[roomCode].openCase(socket.id, caseId, count || 1);
     socket.emit('hellgamble:openCaseResult', result);
   });
 
