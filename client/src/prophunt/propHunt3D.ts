@@ -26,6 +26,7 @@ export class PropHunt3DScene {
   private currentPhase: string = 'LOBBY';
   private isPointerLocked: boolean = false;
   private isFrozen: boolean = false;
+  private dashUntil: number = 0;
 
   // Camera & Orbit settings
   private pitch: number = 0.2;
@@ -138,6 +139,7 @@ export class PropHunt3DScene {
     const minY = y;
     const maxY = y + height;
 
+    // Check static colliders (walls, environment)
     for (const col of this.colliders) {
       if (
         maxX > col.min.x &&
@@ -150,6 +152,41 @@ export class PropHunt3DScene {
         return true;
       }
     }
+
+    // Check static props (decoy meshes)
+    for (const mesh of this.staticDecoyMeshes) {
+      const box = new THREE.Box3().setFromObject(mesh);
+      if (
+        maxX > box.min.x &&
+        minX < box.max.x &&
+        maxY > box.min.y &&
+        minY < box.max.y &&
+        maxZ > box.min.z &&
+        minZ < box.max.z
+      ) {
+        return true;
+      }
+    }
+
+    // Check other players (acting as props)
+    for (const [playerId, mesh] of this.playerMeshes.entries()) {
+      if (playerId === this.myPlayerId) continue; // Don't collide with self
+      if (!mesh.visible) continue; // Don't collide with invisible hunters
+      const box = new THREE.Box3().setFromObject(mesh);
+      // Give players slightly smaller hitboxes so it's not too janky
+      box.expandByScalar(-0.1);
+      if (
+        maxX > box.min.x &&
+        minX < box.max.x &&
+        maxY > box.min.y &&
+        minY < box.max.y &&
+        maxZ > box.min.z &&
+        minZ < box.max.z
+      ) {
+        return true;
+      }
+    }
+
     return false;
   }
 
@@ -754,6 +791,9 @@ export class PropHunt3DScene {
   // ─── 1-BULLET HUNTER WEAPON (VISIBLE ONLY FOR HUNTER) ──────────────────────
 
   private createWeaponModel() {
+    if (this.weaponMesh) {
+      this.camera.remove(this.weaponMesh);
+    }
     const weaponGroup = new THREE.Group();
 
     const barrel = new THREE.Mesh(
@@ -783,6 +823,7 @@ export class PropHunt3DScene {
     this.scene.add(this.camera);
 
     this.weaponMesh = weaponGroup;
+    this.weaponMesh.visible = false;
   }
 
   public shootWeapon(): { success: boolean; reason?: string } {
@@ -878,6 +919,10 @@ export class PropHunt3DScene {
   }
 
   // ─── STATE SYNC FROM SERVER ────────────────────────────────────────────────
+
+  public triggerDash() {
+    this.dashUntil = Date.now() + 500; // 500ms of dash speed
+  }
 
   public updateGameState(gameState: PropHuntGameState) {
     this.currentPhase = gameState.phase;
@@ -1042,7 +1087,7 @@ export class PropHunt3DScene {
         this.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.pitch));
       } else {
         // 3rd person orbit camera pitch
-        this.pitch = Math.max(-0.5, Math.min(1.1, this.pitch));
+        this.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.pitch));
       }
     });
   }
@@ -1066,7 +1111,10 @@ export class PropHunt3DScene {
     const isSpectator = this.myRole === 'SPECTATOR';
     const playerRadius = isHunter ? 0.45 : 0.35;
     const playerHeight = isHunter ? 1.8 : 0.6;
-    const moveSpeed = isHunter ? 10 : 8;
+    let moveSpeed = isHunter ? 10 : 8;
+    if (Date.now() < this.dashUntil) {
+      moveSpeed = 20; // Dash speed boost
+    }
 
     // ─── 1. MOVEMENT VECTOR COMPUTATION ─────────────────────────────────────
     const inputVector = new THREE.Vector3();
@@ -1197,15 +1245,45 @@ export class PropHunt3DScene {
       );
 
       const hDist = this.cameraDistance * Math.cos(this.pitch);
-      const camX = this.position.x - Math.sin(this.yaw) * hDist;
-      const camY = this.position.y + 0.45 + this.cameraDistance * Math.sin(this.pitch) + 0.5;
-      const camZ = this.position.z - Math.cos(this.yaw) * hDist;
+      const idealCamX = this.position.x - Math.sin(this.yaw) * hDist;
+      const idealCamY = this.position.y + 0.45 + this.cameraDistance * Math.sin(this.pitch);
+      const idealCamZ = this.position.z - Math.cos(this.yaw) * hDist;
+
+      let actualCamX = idealCamX;
+      let actualCamY = idealCamY;
+      let actualCamZ = idealCamZ;
+
+      // Simple Raycast to avoid camera clipping through colliders
+      const origin = targetLookAt.clone();
+      const dest = new THREE.Vector3(idealCamX, idealCamY, idealCamZ);
+      const dir = dest.clone().sub(origin);
+      const dist = dir.length();
+      dir.normalize();
+
+      const camRay = new THREE.Raycaster(origin, dir, 0, dist);
+
+      let hitDistance = dist;
+      for (const col of this.colliders) {
+          const hit = camRay.ray.intersectBox(col, new THREE.Vector3());
+          if (hit) {
+              const d = origin.distanceTo(hit);
+              if (d < hitDistance) {
+                  hitDistance = Math.max(0, d - 0.2); // keep a little distance from wall, clamped to 0
+              }
+          }
+      }
+
+      if (hitDistance < dist) {
+          actualCamX = origin.x + dir.x * hitDistance;
+          actualCamY = origin.y + dir.y * hitDistance;
+          actualCamZ = origin.z + dir.z * hitDistance;
+      }
 
       // Keep camera inside room and above floor
       this.camera.position.set(
-        Math.max(-24.2, Math.min(24.2, camX)),
-        Math.max(0.3, Math.min(7.5, camY)),
-        Math.max(-24.2, Math.min(24.2, camZ))
+        Math.max(-24.2, Math.min(24.2, actualCamX)),
+        Math.max(0.3, Math.min(7.5, actualCamY)),
+        Math.max(-24.2, Math.min(24.2, actualCamZ))
       );
       this.camera.lookAt(targetLookAt);
     }
