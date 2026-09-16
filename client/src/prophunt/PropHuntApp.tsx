@@ -149,6 +149,9 @@ export default function PropHuntApp() {
     if (gameState?.selectedMap) {
       engine.buildMap(gameState.selectedMap);
     }
+    if (gameState) {
+      engine.updateGameState(gameState);
+    }
 
     engineRef.current = engine;
 

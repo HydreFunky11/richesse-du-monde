@@ -40,14 +40,14 @@ const MAP_SPAWN_POINTS = {
     superette: {
         hunter: [0, 1.6, -21],
         hiders: [
-            [-5, 0.5, -12],
-            [5, 0.5, -12],
-            [-5, 0.5, 0],
-            [5, 0.5, 0],
-            [-5, 0.5, 12],
-            [5, 0.5, 12],
-            [-16, 0.5, -12],
-            [16, 0.5, -12]
+            [-5, 0.5, -4],
+            [5, 0.5, -4],
+            [-5, 0.5, 4],
+            [5, 0.5, 4],
+            [0, 0.5, 14],
+            [-6, 0.5, 14],
+            [6, 0.5, 14],
+            [18, 0.5, 0]
         ]
     },
     warehouse: {
@@ -130,7 +130,7 @@ class PropHuntEngine {
             role: 'HIDER',
             health: 100,
             maxHealth: 100,
-            position: [-5, 0.5, -12],
+            position: [0, 0.5, 14],
             rotation: [0, 0, 0],
             currentProp: 'cardboard_box',
             isFrozen: false,

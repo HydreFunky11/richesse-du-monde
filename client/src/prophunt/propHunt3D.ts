@@ -34,7 +34,7 @@ export class PropHunt3DScene {
   private cameraDistance: number = 3.5;
 
   // Physics & Movement
-  private position: THREE.Vector3 = new THREE.Vector3(-5, 0.5, -12);
+  private position: THREE.Vector3 = new THREE.Vector3(0, 0.5, 14);
   private verticalVelocity: number = 0;
   private isGrounded: boolean = true;
   private keys: Record<string, boolean> = {};
@@ -150,21 +150,6 @@ export class PropHunt3DScene {
         minY < col.max.y &&
         maxZ > col.min.z &&
         minZ < col.max.z
-      ) {
-        return true;
-      }
-    }
-
-    // Check static props (decoy meshes)
-    for (const mesh of this.staticDecoyMeshes) {
-      const box = new THREE.Box3().setFromObject(mesh);
-      if (
-        maxX > box.min.x &&
-        minX < box.max.x &&
-        maxY > box.min.y &&
-        minY < box.max.y &&
-        maxZ > box.min.z &&
-        minZ < box.max.z
       ) {
         return true;
       }
@@ -970,6 +955,9 @@ export class PropHunt3DScene {
           this.yaw = me.rotation[1] || 0;
           this.pitch = 0;
         }
+        const r = me.role === 'SEEKER' ? 0.45 : 0.35;
+        const h = me.role === 'SEEKER' ? 1.8 : 0.6;
+        this.resolveCollisionsAndUnstuck(r, h);
       }
 
       // Update weapon visibility: ONLY visible for SEEKER during active hunting!
@@ -1186,14 +1174,16 @@ export class PropHunt3DScene {
         if (!this.checkHorizontalCollision(this.position.x, this.position.y, nextZ, playerRadius, playerHeight)) {
           this.position.z = nextZ;
         }
-
-        // Unstuck resolution in case player was spawned or pushed into collider
-        this.resolveCollisionsAndUnstuck(playerRadius, playerHeight);
       } else {
         // Spectator free noclip fly
         this.position.x += deltaMoveX;
         this.position.z += deltaMoveZ;
       }
+    }
+
+    if (!isSpectator) {
+      // Unstuck resolution run unconditionally EVERY frame so player is NEVER stuck in a collider
+      this.resolveCollisionsAndUnstuck(playerRadius, playerHeight);
     }
 
     // ─── 2. VERTICAL PHYSICS / GRAVITY / JUMPING ────────────────────────────
