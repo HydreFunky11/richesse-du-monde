@@ -13,26 +13,29 @@ const MAP_PROPS = {
     ],
     warehouse: [
         'wooden_crate',
-        'oil_drum',
+        'crate_large',
         'pallet',
+        'oil_drum',
         'cardboard_box',
-        'metal_shelf',
-        'traffic_cone'
+        'dumpster',
+        'metal_shelf'
     ],
     office: [
         'office_chair',
         'pc_monitor',
+        'computer',
         'water_cooler',
         'coffee_mug',
-        'trash_can',
-        'plant'
+        'storage_box',
+        'trash_can'
     ],
     lab: [
         'cryo_tank',
         'server_rack',
         'chemical_canister',
-        'microscope',
-        'hazard_barrel'
+        'control_console',
+        'hazard_barrel',
+        'microscope'
     ]
 };
 const TAUNT_SOUNDS = ['pouet', 'whistle', 'quack', 'bell', 'giggle', 'boing'];
@@ -53,40 +56,40 @@ const MAP_SPAWN_POINTS = {
     warehouse: {
         hunter: [0, 1.6, -22],
         hiders: [
-            [-7, 0.5, -5],
-            [7, 0.5, -5],
-            [-7, 0.5, 10],
-            [7, 0.5, 10],
-            [0, 0.5, 16],
-            [-7, 0.5, -18],
-            [7, 0.5, -18],
-            [-20, 0.5, 0]
+            [-6, 0.2, -8],
+            [6, 0.2, -8],
+            [-6, 0.2, 4],
+            [6, 0.2, 4],
+            [0, 0.2, 14],
+            [-16, 0.2, 0],
+            [16, 0.2, 0],
+            [0, 0.2, -12]
         ]
     },
     office: {
         hunter: [0, 1.6, -21],
         hiders: [
-            [-6, 0.5, -8],
-            [6, 0.5, -8],
-            [-6, 0.5, 4],
-            [6, 0.5, 4],
-            [-6, 0.5, 16],
-            [6, 0.5, 16],
-            [0, 0.5, -2],
-            [0, 0.5, 10]
+            [-6, 0.2, -8],
+            [6, 0.2, -8],
+            [-6, 0.2, 4],
+            [6, 0.2, 4],
+            [0, 0.2, 12],
+            [-14, 0.2, 0],
+            [14, 0.2, 0],
+            [0, 0.2, -4]
         ]
     },
     lab: {
-        hunter: [0, 1.6, -16],
+        hunter: [0, 1.6, -21],
         hiders: [
-            [-5, 0.5, -8],
-            [5, 0.5, -8],
-            [-5, 0.5, 8],
-            [5, 0.5, 8],
-            [-16, 0.5, 0],
-            [16, 0.5, 0],
-            [0, 0.5, 12],
-            [0, 0.5, -8]
+            [-6, 0.2, -8],
+            [6, 0.2, -8],
+            [-6, 0.2, 6],
+            [6, 0.2, 6],
+            [0, 0.2, 14],
+            [-14, 0.2, 0],
+            [14, 0.2, 0],
+            [0, 0.2, -4]
         ]
     }
 };

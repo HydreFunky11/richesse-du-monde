@@ -16,6 +16,7 @@ class PropHuntModelLoader {
 
   // Prop ID to GLB path mapping with realistic physical proportions
   public readonly PROP_MODELS: Record<string, { url: string; scale: number }> = {
+    // 🛒 Supérette props
     soda_can: { url: '/models/props/can.glb', scale: 0.8 }, // ~26cm height
     cereal_box: { url: '/models/props/carton.glb', scale: 0.65 }, // ~38cm height
     milk_carton: { url: '/models/props/carton-small.glb', scale: 0.7 }, // ~27cm height
@@ -23,14 +24,42 @@ class PropHuntModelLoader {
     apple_basket: { url: '/models/props/shopping-basket.glb', scale: 1.4 }, // ~35cm height, 49cm width
     shopping_cart: { url: '/models/props/shopping-cart.glb', scale: 2.6 }, // ~1.01m height (human waist), 1.25m length
     cash_register: { url: '/models/props/cash-register.glb', scale: 1.5 }, // ~0.89m height (standard table/counter height)
+    cardboard_box: { url: '/models/props/carton.glb', scale: 0.9 }, // ~0.54m height (jumpable box)
+
+    // 📦 Warehouse props
+    wooden_crate: { url: '/models/warehouse/box.glb', scale: 2.4 }, // ~0.60m height
+    crate_large: { url: '/models/warehouse/box-large.glb', scale: 2.4 }, // ~0.60m height, 1.2m length
+    pallet: { url: '/models/warehouse/pallet.glb', scale: 1.2 }, // ~0.18m height, 1.2m width
     oil_drum: { url: '/models/props/barrel.glb', scale: 1.1 }, // ~0.75m height
     barrel: { url: '/models/props/barrel.glb', scale: 1.1 }, // ~0.75m height
+    barrel_open: { url: '/models/warehouse/barrel-open.glb', scale: 2.4 }, // ~0.82m height
+    dumpster: { url: '/models/warehouse/dumpster.glb', scale: 2.0 }, // ~1.08m height
+    traffic_cone: { url: '/models/warehouse/barrier.glb', scale: 1.6 }, // ~0.64m height concrete barrier
+    metal_shelf: { url: '/models/market/shelf-end.glb', scale: 3.8 }, // ~3.04m height
+
+    // 🏢 Office props
+    office_chair: { url: '/models/office/chair.glb', scale: 1.6 }, // ~0.88m height
+    pc_monitor: { url: '/models/office/computer-screen.glb', scale: 0.65 }, // ~0.43m height
+    computer: { url: '/models/office/computer.glb', scale: 0.65 }, // ~0.43m height
+    water_cooler: { url: '/models/market/bottle-return.glb', scale: 1.4 }, // ~1.10m height
+    coffee_mug: { url: '/models/props/can-small.glb', scale: 0.5 }, // ~13cm height
+    storage_box: { url: '/models/office/storage-box.glb', scale: 0.7 }, // ~0.42m height
+    trash_can: { url: '/models/office/storage-box.glb', scale: 0.7 }, // ~0.42m height
+    plant: { url: '/models/market/display-fruit.glb', scale: 1.2 }, // ~0.60m height
+
+    // 🧪 Lab props
+    cryo_tank: { url: '/models/lab/cryo-tank.glb', scale: 3.8 }, // ~1.90m height
+    server_rack: { url: '/models/lab/server-rack.glb', scale: 3.5 }, // ~2.10m height
+    control_console: { url: '/models/lab/control-console.glb', scale: 2.0 }, // ~1.00m height
+    chemical_canister: { url: '/models/lab/chemical-canister.glb', scale: 1.1 }, // ~0.66m height
+    microscope: { url: '/models/office/computer.glb', scale: 0.6 }, // ~0.40m height diagnostic device
+    hazard_barrel: { url: '/models/props/barrel.glb', scale: 1.1 }, // ~0.75m height
+
+    // Misc props
     burger: { url: '/models/props/burger.glb', scale: 0.8 },
     bread: { url: '/models/props/bread.glb', scale: 0.9 },
     bottle_ketchup: { url: '/models/props/bottle-ketchup.glb', scale: 0.4 },
     bottle_oil: { url: '/models/props/bottle-oil.glb', scale: 0.6 },
-    cardboard_box: { url: '/models/props/carton.glb', scale: 0.9 }, // ~0.54m height (jumpable box)
-    metal_shelf: { url: '/models/market/shelf-end.glb', scale: 3.8 }, // ~3.04m height
   };
 
   // Map furniture models
@@ -49,12 +78,49 @@ class PropHuntModelLoader {
     fence: '/models/market/fence.glb',
   };
 
+  public readonly WAREHOUSE_MODELS = {
+    box: '/models/warehouse/box.glb',
+    boxLarge: '/models/warehouse/box-large.glb',
+    pallet: '/models/warehouse/pallet.glb',
+    palletSmall: '/models/warehouse/pallet-small.glb',
+    dumpster: '/models/warehouse/dumpster.glb',
+    barrelOpen: '/models/warehouse/barrel-open.glb',
+    workbench: '/models/warehouse/workbench.glb',
+    barrier: '/models/warehouse/barrier.glb',
+    shelfBoxes: '/models/market/shelf-boxes.glb',
+    shelfEnd: '/models/market/shelf-end.glb',
+  };
+
+  public readonly OFFICE_MODELS = {
+    desk: '/models/office/desk.glb',
+    deskSmall: '/models/office/desk-small.glb',
+    chair: '/models/office/chair.glb',
+    chairSimple: '/models/office/chair-simple.glb',
+    computer: '/models/office/computer.glb',
+    computerScreen: '/models/office/computer-screen.glb',
+    storageBox: '/models/office/storage-box.glb',
+    waterDispenser: '/models/market/bottle-return.glb',
+  };
+
+  public readonly LAB_MODELS = {
+    cryoTank: '/models/lab/cryo-tank.glb',
+    serverRack: '/models/lab/server-rack.glb',
+    controlConsole: '/models/lab/control-console.glb',
+    chemicalCanister: '/models/lab/chemical-canister.glb',
+    analysisTable: '/models/lab/analysis-table.glb',
+    containmentBarrier: '/models/lab/containment-barrier.glb',
+    pipeRing: '/models/lab/pipe-ring.glb',
+  };
+
   public async preloadAll(): Promise<void> {
     if (this.preloaded) return;
 
     const urlsToLoad = [
       ...Object.values(this.PROP_MODELS).map((p) => p.url),
-      ...Object.values(this.MARKET_MODELS)
+      ...Object.values(this.MARKET_MODELS),
+      ...Object.values(this.WAREHOUSE_MODELS),
+      ...Object.values(this.OFFICE_MODELS),
+      ...Object.values(this.LAB_MODELS),
     ];
 
     const uniqueUrls = Array.from(new Set(urlsToLoad));

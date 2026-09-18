@@ -367,158 +367,292 @@ export class PropHunt3DScene {
     });
   }
 
-  // 📦 MAP: WAREHOUSE (Entrepôt)
+  // 📦 MAP: WAREHOUSE (Entrepôt Logistique)
   private buildWarehouse() {
     this.scene.background = new THREE.Color(0x0a0f1d);
-    this.scene.fog = new THREE.FogExp2(0x0a0f1d, 0.016);
+    this.scene.fog = new THREE.FogExp2(0x0a0f1d, 0.012);
 
+    // Floor (55 x 55)
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(55, 55),
-      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6 })
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.65, metalness: 0.1 })
     );
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     this.mapEnvironmentGroup.add(floor);
 
-    this.createRoomWallsWithColliders(55, 55, 10, 0x111827, 0xf59e0b);
+    // Outer Room Walls & Colliders (7.5m high industrial ceiling)
+    this.createRoomWallsWithColliders(55, 55, 7.5, 0x0f172a, 0xf59e0b);
 
-    // High metal storage racks with colliders
-    [-14, 0, 14].forEach((rackX) => {
-      this.createWarehouseRack(rackX, -5, 22);
-      this.addBoxCollider([rackX, 3.5, -5], [2.4, 7.0, 22.5]);
+    // Suspended high-bay industrial lamps
+    for (let x = -16; x <= 16; x += 16) {
+      for (let z = -16; z <= 16; z += 16) {
+        const lamp = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.8, 1.2, 0.4, 16),
+          new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 })
+        );
+        lamp.position.set(x, 7.3, z);
+        this.mapEnvironmentGroup.add(lamp);
+
+        const pLight = new THREE.PointLight(0xfef08a, 0.6, 22);
+        pLight.position.set(x, 6.7, z);
+        this.mapEnvironmentGroup.add(pLight);
+      }
+    }
+
+    // ─── 1. HIGH-BAY INDUSTRIAL PALLET RACKING AISLES (3.04m high) ───
+    [-13, 0, 13].forEach((aisleX) => {
+      // Front cap
+      this.addFurniturePiece(modelLoader.WAREHOUSE_MODELS.shelfEnd, aisleX, -7, 0, 3.8);
+      // Main shelf modules
+      this.addFurniturePiece(modelLoader.WAREHOUSE_MODELS.shelfBoxes, aisleX, -3.5, Math.PI / 2, 3.8);
+      this.addFurniturePiece(modelLoader.WAREHOUSE_MODELS.shelfBoxes, aisleX, 0, Math.PI / 2, 3.8);
+      this.addFurniturePiece(modelLoader.WAREHOUSE_MODELS.shelfBoxes, aisleX, 3.5, Math.PI / 2, 3.8);
+      // Back cap
+      this.addFurniturePiece(modelLoader.WAREHOUSE_MODELS.shelfEnd, aisleX, 7, Math.PI, 3.8);
     });
 
+    // ─── 2. LOADING DOCK & HEAVY LOGISTICS EQUIPMENT ────────────────
     // Shipping Containers with colliders
-    this.createShippingContainer(-18, 18, 0x3b82f6);
+    this.createShippingContainer(-18, 18, 0x2563eb);
     this.addBoxCollider([-18, 2.25, 18], [5.2, 4.6, 10.2]);
 
-    this.createShippingContainer(16, 18, 0xef4444);
-    this.addBoxCollider([16, 2.25, 18], [5.2, 4.6, 10.2]);
+    this.createShippingContainer(18, 18, 0xd97706);
+    this.addBoxCollider([18, 2.25, 18], [5.2, 4.6, 10.2]);
 
-    // Decoy props (Cluttered)
-    for (let i = 0; i < 15; i++) {
-      // Around left shipping container
-      this.spawnDecoyProp('wooden_crate', -18 + this.random() * 8 - 4, 0.6 + Math.floor(i%3)*1.2, 18 + this.random() * 8 - 4);
-      // Around right shipping container
-      this.spawnDecoyProp('oil_drum', 16 + this.random() * 6 - 3, 0.8, 18 + this.random() * 6 - 3);
-      if (i % 2 === 0) this.spawnDecoyProp('oil_drum', 16 + this.random() * 6 - 3, 2.4, 18 + this.random() * 6 - 3); // stacked drums
-    }
+    // Commercial Metal Dumpsters (1.08m high)
+    this.addFurniturePiece(modelLoader.WAREHOUSE_MODELS.dumpster, -21, -14, 0, 2.0);
+    this.addFurniturePiece(modelLoader.WAREHOUSE_MODELS.dumpster, 21, -14, 0, 2.0);
 
-    // Pallets and traffic cones around racks
-    [-14, 0, 14].forEach((rackX) => {
-        for(let z = -15; z <= 5; z+=5) {
-            this.spawnDecoyProp('pallet', rackX + (this.random() > 0.5 ? 2.5 : -2.5), 0.2, z);
-            if (this.random() > 0.5) this.spawnDecoyProp('cardboard_box', rackX + (this.random() > 0.5 ? 2.5 : -2.5), 0.5, z + 1);
-            if (this.random() > 0.7) this.spawnDecoyProp('traffic_cone', rackX + (this.random() > 0.5 ? 3 : -3), 0.4, z - 1);
+    // Maintenance Workbenches (0.86m high)
+    this.addFurniturePiece(modelLoader.WAREHOUSE_MODELS.workbench, -22, 0, Math.PI / 2, 3.6);
+    this.addFurniturePiece(modelLoader.WAREHOUSE_MODELS.workbench, 22, 0, -Math.PI / 2, 3.6);
+
+    // Concrete Security Jersey Barriers (0.88m high)
+    this.addFurniturePiece(modelLoader.WAREHOUSE_MODELS.barrier, -10, 14, 0, 2.2);
+    this.addFurniturePiece(modelLoader.WAREHOUSE_MODELS.barrier, 10, 14, 0, 2.2);
+
+    // ─── 3. PALLETS & STACKED CRATES (FLUSH, 0% FLOATING) ───────────
+    // Pallet 1 with large crate on top
+    const p1 = this.addFurniturePiece(modelLoader.WAREHOUSE_MODELS.pallet, -19, 6, 0, 1.2);
+    this.spawnDecoyProp('crate_large', -19, p1.max.y, 6, 0);
+
+    // Pallet 2 with wooden crate on top
+    const p2 = this.addFurniturePiece(modelLoader.WAREHOUSE_MODELS.pallet, 19, 6, 0, 1.2);
+    this.spawnDecoyProp('wooden_crate', 19, p2.max.y, 6, 0);
+
+    // Pallet 3 near entrance
+    const p3 = this.addFurniturePiece(modelLoader.WAREHOUSE_MODELS.pallet, -7, -15, Math.PI / 4, 1.2);
+    this.spawnDecoyProp('wooden_crate', -7, p3.max.y, -15, Math.PI / 4);
+
+    // ─── 4. REALISTIC DECOY PROPS SPREAD OUT ─────────────────────────
+    // Drums & Barrels (all grounded at y = 0)
+    this.spawnDecoyProp('oil_drum', -14, 0, 18);
+    this.spawnDecoyProp('oil_drum', -15.5, 0, 17.5);
+    this.spawnDecoyProp('barrel_open', 14, 0, 18);
+    this.spawnDecoyProp('barrel_open', 15.5, 0, 17.5);
+
+    // Crates & boxes on the floor
+    this.spawnDecoyProp('wooden_crate', -20, 0, -5);
+    this.spawnDecoyProp('wooden_crate', 20, 0, -5);
+    this.spawnDecoyProp('crate_large', -6.5, 0, 12);
+    this.spawnDecoyProp('crate_large', 6.5, 0, 12);
+    this.spawnDecoyProp('cardboard_box', -13, 0, -10);
+    this.spawnDecoyProp('cardboard_box', 13, 0, -10);
+    this.spawnDecoyProp('cardboard_box', 0, 0, -10);
+
+    // Side decoys
+    [-21, 21].forEach((sideX) => {
+      for (let z = -8; z <= 12; z += 5) {
+        if (this.random() > 0.4) {
+          const choice = this.random() > 0.5 ? 'wooden_crate' : 'cardboard_box';
+          this.spawnDecoyProp(choice, sideX + (this.random() * 1.5 - 0.75), 0, z);
         }
+      }
     });
-
-    // Random wooden crates scattered
-    for(let i=0; i<10; i++) {
-        this.spawnDecoyProp('wooden_crate', -20 + this.random() * 40, 0.6, -20 + this.random() * 10);
-    }
   }
 
-  // 🏢 MAP: OFFICE (Open Space)
+  // 🏢 MAP: OFFICE (Bureaux Open Space)
   private buildOffice() {
-    this.scene.background = new THREE.Color(0x18181b);
-    this.scene.fog = new THREE.FogExp2(0x18181b, 0.018);
+    this.scene.background = new THREE.Color(0x0f172a);
+    this.scene.fog = new THREE.FogExp2(0x0f172a, 0.014);
 
+    // Floor (50 x 50 Carpet)
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(50, 50),
-      new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.8 })
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.85 })
     );
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     this.mapEnvironmentGroup.add(floor);
 
-    this.createRoomWallsWithColliders(50, 50, 7, 0x3f3f46, 0x10b981);
+    // Outer Room Walls & Colliders (4.5m realistic office ceiling)
+    this.createRoomWallsWithColliders(50, 50, 4.5, 0x334155, 0x0ea5e9);
 
-    // Desks with colliders
-    [-12, 0, 12].forEach((x) => {
-      [-8, 4, 16].forEach((z) => {
-        this.createOfficeDesk(x, z);
-        this.addBoxCollider([x, 0.6, z], [3.2, 1.3, 1.8]);
-      });
-    });
+    // Recessed fluorescent acoustic ceiling lights
+    for (let x = -15; x <= 15; x += 15) {
+      for (let z = -15; z <= 15; z += 10) {
+        const lightTile = new THREE.Mesh(
+          new THREE.BoxGeometry(2.0, 0.08, 1.0),
+          new THREE.MeshBasicMaterial({ color: 0xf8fafc })
+        );
+        lightTile.position.set(x, 4.45, z);
+        this.mapEnvironmentGroup.add(lightTile);
 
-    this.spawnDecoyProp('water_cooler', -20, 1.1, -18);
-    this.addBoxCollider([-20, 1.1, -18], [1.0, 2.2, 1.0]);
-
-    // More office chairs, monitors, and mugs at desks
-    [-12, 0, 12].forEach((x) => {
-      [-8, 4, 16].forEach((z) => {
-        this.spawnDecoyProp('office_chair', x, 0.6, z - 1.5); // Chair behind desk
-        this.spawnDecoyProp('pc_monitor', x - 0.5, 1.3, z + 0.2); // Monitor on desk
-        this.spawnDecoyProp('pc_monitor', x + 0.5, 1.3, z + 0.2); // Dual monitor
-        if (this.random() > 0.3) this.spawnDecoyProp('coffee_mug', x + 1, 1.35, z - 0.2);
-        if (this.random() > 0.5) this.spawnDecoyProp('trash_can', x + 1.2, 0.4, z - 1.2);
-      });
-    });
-
-    // Extra scattered chairs
-    for(let i=0; i<5; i++) {
-        this.spawnDecoyProp('office_chair', -15 + this.random()*30, 0.6, -15 + this.random()*30);
+        const pLight = new THREE.PointLight(0xf0f9ff, 0.5, 18);
+        pLight.position.set(x, 4.0, z);
+        this.mapEnvironmentGroup.add(pLight);
+      }
     }
 
-    // Plants in corners and along walls
-    [[-22, -22], [-22, 22], [22, -22], [22, 22], [-10, -22], [10, -22]].forEach(pos => {
-        this.spawnDecoyProp('plant', pos[0], 0.8, pos[1]);
-        if (this.random() > 0.5) this.spawnDecoyProp('water_cooler', pos[0] + 2, 1.1, pos[1]);
+    // ─── 1. WORKSTATION DESK PODS (4 Pods of Desks) ───────────────────
+    const deskPods = [
+      { x: -10, z: -6 },
+      { x: 10, z: -6 },
+      { x: -10, z: 8 },
+      { x: 10, z: 8 },
+    ];
+
+    deskPods.forEach((pod) => {
+      // Main double desk (0.80m high, 2.80m wide, 1.80m deep)
+      const desk = this.addFurniturePiece(modelLoader.OFFICE_MODELS.desk, pod.x, pod.z, 0, 2.0);
+      const deskTop = desk.max.y;
+
+      // 2 Ergonomic office chairs tucked in facing desk (grounded at y = 0)
+      this.spawnDecoyProp('office_chair', pod.x - 0.7, 0, pod.z - 1.2, 0);
+      this.spawnDecoyProp('office_chair', pod.x + 0.7, 0, pod.z - 1.2, 0);
+
+      // Dual PC monitors sitting directly ON desk surface (y = deskTop!)
+      this.spawnDecoyProp('pc_monitor', pod.x - 0.6, deskTop, pod.z, 0);
+      this.spawnDecoyProp('pc_monitor', pod.x + 0.6, deskTop, pod.z, 0);
+
+      // Workstation PC tower on desk
+      this.spawnDecoyProp('computer', pod.x + 1.1, deskTop, pod.z - 0.2, 0);
+
+      // Coffee mug on desk surface
+      this.spawnDecoyProp('coffee_mug', pod.x - 1.1, deskTop, pod.z - 0.2, 0);
+
+      // Archive storage box on floor beside desk (y = 0)
+      this.spawnDecoyProp('storage_box', pod.x + 1.6, 0, pod.z, 0);
+    });
+
+    // ─── 2. CONFERENCE / MEETING ROOM (Z = 18) ───────────────────────
+    const confTable = this.addFurniturePiece(modelLoader.OFFICE_MODELS.desk, 0, 18, Math.PI / 2, 2.0);
+    const confTop = confTable.max.y;
+    this.spawnDecoyProp('office_chair', -1.2, 0, 18, Math.PI / 2);
+    this.spawnDecoyProp('office_chair', 1.2, 0, 18, -Math.PI / 2);
+    this.spawnDecoyProp('office_chair', 0, 0, 16.5, 0);
+    this.spawnDecoyProp('office_chair', 0, 0, 19.5, Math.PI);
+    this.spawnDecoyProp('computer', 0, confTop, 18, 0);
+
+    // ─── 3. BREAK ROOM / REFRESHMENT CORNER (X = -19, Z = -16) ────────
+    // Water Cooler dispenser (1.10m high)
+    this.addFurniturePiece(modelLoader.OFFICE_MODELS.waterDispenser, -19.5, -16, Math.PI / 2, 1.4);
+    // Coffee counter desk
+    this.addFurniturePiece(modelLoader.OFFICE_MODELS.deskSmall, -19.5, -12, Math.PI / 2, 1.8);
+    this.spawnDecoyProp('coffee_mug', -19.5, 0.72, -12, 0);
+
+    // ─── 4. EXTRA OFFICE CLUTTER (GROUNDED AT Y = 0) ──────────────────
+    this.spawnDecoyProp('plant', -21, 0, -21);
+    this.spawnDecoyProp('plant', 21, 0, -21);
+    this.spawnDecoyProp('plant', -21, 0, 21);
+    this.spawnDecoyProp('plant', 21, 0, 21);
+
+    // Storage boxes and extra chairs along the side walls
+    [-19, 19].forEach((sideX) => {
+      for (let z = -4; z <= 12; z += 6) {
+        if (this.random() > 0.4) {
+          const propChoice = this.random() > 0.5 ? 'storage_box' : 'office_chair';
+          this.spawnDecoyProp(propChoice, sideX + (this.random() * 1.5 - 0.75), 0, z);
+        }
+      }
     });
   }
 
-  // 🧪 MAP: LAB (Laboratoire Sci-Fi)
+  // 🧪 MAP: LAB (Laboratoire Secret Sci-Fi)
   private buildLab() {
     this.scene.background = new THREE.Color(0x030712);
-    this.scene.fog = new THREE.FogExp2(0x030712, 0.02);
+    this.scene.fog = new THREE.FogExp2(0x030712, 0.015);
 
+    // Floor (50 x 50 Cleanroom reflective floor)
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(50, 50),
-      new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1, metalness: 0.6 })
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.2, metalness: 0.5 })
     );
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     this.mapEnvironmentGroup.add(floor);
 
-    this.createRoomWallsWithColliders(50, 50, 8, 0x1e1b4b, 0x8b5cf6);
+    // Outer Room Walls & Colliders (6.0m sci-fi cleanroom ceiling)
+    this.createRoomWallsWithColliders(50, 50, 6.0, 0x1e1b4b, 0x8b5cf6);
 
-    // Cryo pods with colliders
-    [-10, 0, 10].forEach((x) => {
-      this.createCryoPod(x, 0);
-      this.addBoxCollider([x, 2.0, 0], [2.6, 4.0, 2.6]);
+    // Futuristic cyan and violet lighting panels
+    for (let x = -15; x <= 15; x += 15) {
+      for (let z = -15; z <= 15; z += 10) {
+        const lightBox = new THREE.Mesh(
+          new THREE.BoxGeometry(3.0, 0.1, 1.2),
+          new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+        );
+        lightBox.position.set(x, 5.95, z);
+        this.mapEnvironmentGroup.add(lightBox);
+
+        const pLight = new THREE.PointLight(0x38bdf8, 0.55, 18);
+        pLight.position.set(x, 5.3, z);
+        this.mapEnvironmentGroup.add(pLight);
+      }
+    }
+
+    // ─── 1. CENTRAL SPECIMEN CRYO PRESERVATION TANKS (1.90m high) ───
+    [-6, 6].forEach((cx) => {
+      [-6, 6].forEach((cz) => {
+        this.addFurniturePiece(modelLoader.LAB_MODELS.cryoTank, cx, cz, 0, 3.8);
+      });
     });
 
-    // Server Racks with colliders
-    for (let x = -18; x <= 18; x += 6) {
-      this.createServerRack(x, -22);
-      this.addBoxCollider([x, 2.25, -22], [2.2, 4.6, 1.8]);
+    // Laser Containment barriers around cryo zone
+    this.addFurniturePiece(modelLoader.LAB_MODELS.containmentBarrier, 0, -10, 0, 4.0);
+    this.addFurniturePiece(modelLoader.LAB_MODELS.containmentBarrier, 0, 10, Math.PI, 4.0);
+
+    // ─── 2. DATA CENTER MAINFRAME SERVER RACKS (2.10m high) ─────────
+    // Continuous row of high-tech server racks along the back wall (z = 21.5)
+    for (let x = -15; x <= 15; x += 7.5) {
+      this.addFurniturePiece(modelLoader.LAB_MODELS.serverRack, x, 21.5, Math.PI, 3.5);
     }
 
-    // Lab Clutter
-    // Clusters of hazard barrels
-    for (let i = 0; i < 8; i++) {
-        this.spawnDecoyProp('hazard_barrel', 14 + this.random()*4, 0.8, -10 + this.random()*4);
-        this.spawnDecoyProp('hazard_barrel', -14 + this.random()*4, 0.8, 10 + this.random()*4);
-    }
+    // ─── 3. COMMAND & CONTROL SCIENTIFIC CONSOLES (1.00m high) ──────
+    this.addFurniturePiece(modelLoader.LAB_MODELS.controlConsole, -14, -6, Math.PI / 2, 2.0);
+    this.addFurniturePiece(modelLoader.LAB_MODELS.controlConsole, 14, -6, -Math.PI / 2, 2.0);
 
-    // Chemical canisters around cryo pods
-    [-10, 0, 10].forEach((x) => {
-        for(let i=0; i<3; i++) {
-           this.spawnDecoyProp('chemical_canister', x - 2 + this.random()*4, 0.5, -2 + this.random()*4);
+    // Diagnostic Examination Analysis Tables (0.90m high)
+    const tableLeft = this.addFurniturePiece(modelLoader.LAB_MODELS.analysisTable, -14, 6, Math.PI / 2, 2.2);
+    const tableRight = this.addFurniturePiece(modelLoader.LAB_MODELS.analysisTable, 14, 6, -Math.PI / 2, 2.2);
+
+    // Diagnostic Scanners directly ON analysis table surfaces (y = table.max.y!)
+    this.spawnDecoyProp('microscope', -14, tableLeft.max.y, 6, 0);
+    this.spawnDecoyProp('microscope', 14, tableRight.max.y, 6, 0);
+
+    // ─── 4. HAZARDOUS CHEMICAL BAY & DECOYS (0% FLOATING, ALL Y = 0) ───
+    // Hazard barrels clustered in corners
+    this.spawnDecoyProp('hazard_barrel', -19, 0, -16);
+    this.spawnDecoyProp('hazard_barrel', -17.5, 0, -16.5);
+    this.spawnDecoyProp('hazard_barrel', 19, 0, -16);
+    this.spawnDecoyProp('hazard_barrel', 17.5, 0, -16.5);
+
+    // Chemical canisters around the facility
+    this.spawnDecoyProp('chemical_canister', -9, 0, -6);
+    this.spawnDecoyProp('chemical_canister', 9, 0, -6);
+    this.spawnDecoyProp('chemical_canister', -9, 0, 6);
+    this.spawnDecoyProp('chemical_canister', 9, 0, 6);
+
+    // Random scattered canisters along side perimeters
+    [-19, 19].forEach((sideX) => {
+      for (let z = -8; z <= 10; z += 6) {
+        if (this.random() > 0.4) {
+          const propChoice = this.random() > 0.5 ? 'chemical_canister' : 'hazard_barrel';
+          this.spawnDecoyProp(propChoice, sideX + (this.random() * 1.5 - 0.75), 0, z);
         }
+      }
     });
-
-    // Microscopes and canisters on random tables/floor
-    for (let i=0; i<10; i++) {
-        this.spawnDecoyProp('microscope', -20 + this.random()*40, 0.6, -10 + this.random()*20);
-        this.spawnDecoyProp('chemical_canister', -20 + this.random()*40, 0.5, -10 + this.random()*20);
-    }
-
-    // More server racks randomly placed
-    for(let i=0; i<5; i++) {
-        this.spawnDecoyProp('server_rack', -20 + this.random()*40, 2.25, -10 + this.random()*15);
-    }
   }
 
   // ─── ENVIRONMENT HELPERS ───────────────────────────────────────────────────
@@ -559,31 +693,6 @@ export class PropHunt3DScene {
     });
   }
 
-  private createWarehouseRack(x: number, z: number, length: number) {
-    const rack = new THREE.Group();
-    rack.position.set(x, 0, z);
-    const orangeMat = new THREE.MeshStandardMaterial({ color: 0xea580c });
-    const blueMat = new THREE.MeshStandardMaterial({ color: 0x2563eb });
-
-    for (let sz = -length / 2; sz <= length / 2; sz += 4) {
-      [-1, 1].forEach((px) => {
-        const post = new THREE.Mesh(new THREE.BoxGeometry(0.15, 7, 0.15), blueMat);
-        post.position.set(px, 3.5, sz);
-        rack.add(post);
-      });
-    }
-
-    [1.5, 3.5, 5.5].forEach((y) => {
-      const beam1 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.2, length), orangeMat);
-      beam1.position.set(-1, y, 0);
-      const beam2 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.2, length), orangeMat);
-      beam2.position.set(1, y, 0);
-      rack.add(beam1, beam2);
-    });
-
-    this.mapEnvironmentGroup.add(rack);
-  }
-
   private createShippingContainer(x: number, z: number, color: number) {
     const box = new THREE.Mesh(
       new THREE.BoxGeometry(5, 4.5, 10),
@@ -592,60 +701,6 @@ export class PropHunt3DScene {
     box.position.set(x, 2.25, z);
     box.castShadow = true;
     this.mapEnvironmentGroup.add(box);
-  }
-
-  private createOfficeDesk(x: number, z: number) {
-    const desk = new THREE.Group();
-    desk.position.set(x, 0, z);
-
-    const top = new THREE.Mesh(
-      new THREE.BoxGeometry(3, 0.1, 1.6),
-      new THREE.MeshStandardMaterial({ color: 0xd4d4d8 })
-    );
-    top.position.y = 1.2;
-    top.castShadow = true;
-    desk.add(top);
-
-    [-1.4, 1.4].forEach((lx) => {
-      const leg = new THREE.Mesh(
-        new THREE.BoxGeometry(0.08, 1.2, 1.4),
-        new THREE.MeshStandardMaterial({ color: 0x27272a, metalness: 0.7 })
-      );
-      leg.position.set(lx, 0.6, 0);
-      desk.add(leg);
-    });
-
-    this.mapEnvironmentGroup.add(desk);
-  }
-
-  private createCryoPod(x: number, z: number) {
-    const pod = new THREE.Group();
-    pod.position.set(x, 0, z);
-
-    const base = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.2, 1.4, 0.6, 16),
-      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 })
-    );
-    base.position.y = 0.3;
-    pod.add(base);
-
-    const tube = new THREE.Mesh(
-      new THREE.CylinderGeometry(1, 1, 3.5, 16),
-      new THREE.MeshPhysicalMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.4 })
-    );
-    tube.position.y = 2.2;
-    pod.add(tube);
-
-    this.mapEnvironmentGroup.add(pod);
-  }
-
-  private createServerRack(x: number, z: number) {
-    const rack = new THREE.Mesh(
-      new THREE.BoxGeometry(2, 4.5, 1.5),
-      new THREE.MeshStandardMaterial({ color: 0x09090b, metalness: 0.8 })
-    );
-    rack.position.set(x, 2.25, z);
-    this.mapEnvironmentGroup.add(rack);
   }
 
   // ─── PROP MESH FACTORY ─────────────────────────────────────────────────────
