@@ -268,78 +268,73 @@ export class PropHunt3DScene {
     floor.receiveShadow = true;
     this.mapEnvironmentGroup.add(floor);
 
-    // Outer Room Walls & Colliders
-    this.createRoomWallsWithColliders(50, 50, 8, 0x1e293b, 0x0284c7);
+    // Outer Room Walls & Colliders (Ceiling at 6.5m for realistic supermarket height)
+    this.createRoomWallsWithColliders(50, 50, 6.5, 0x1e293b, 0x0284c7);
 
-    // Ceiling Lights
+    // Ceiling Lights (suspended from 6.5m ceiling)
     for (let x = -15; x <= 15; x += 15) {
       for (let z = -15; z <= 15; z += 10) {
         const lightBox = new THREE.Mesh(
-          new THREE.BoxGeometry(1.2, 0.15, 4.5),
+          new THREE.BoxGeometry(1.4, 0.15, 4.5),
           new THREE.MeshBasicMaterial({ color: 0xffffff })
         );
-        lightBox.position.set(x, 7.9, z);
+        lightBox.position.set(x, 6.4, z);
         this.mapEnvironmentGroup.add(lightBox);
 
-        const pLight = new THREE.PointLight(0xfff7ed, 0.45, 18);
-        pLight.position.set(x, 7.4, z);
+        const pLight = new THREE.PointLight(0xfff7ed, 0.55, 20);
+        pLight.position.set(x, 5.8, z);
         this.mapEnvironmentGroup.add(pLight);
       }
     }
 
-    // ─── 1. REAL 3D SHELVES & GONDOLA AISLES ───────────────────────────
-    // 3 Double-Sided Gondola Aisles at x = -10, 0, +10 running along z from -9 to +9
-    [-10, 0, 10].forEach((aisleX) => {
-      // Front cap (tête de gondole) facing front
-      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfEnd, aisleX, -9, 0, 2.8);
+    // ─── 1. REAL 3D SHELVES & GONDOLA AISLES (3.04m high, 2.66m wide) ──
+    // 3 Double-Sided Gondola Aisles at x = -11, 0, +11
+    [-11, 0, 11].forEach((aisleX) => {
+      // Front cap (tête de gondole)
+      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfEnd, aisleX, -6.5, 0, 3.8);
 
-      // Central aisle modules
-      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfBoxes, aisleX - 0.7, -4.5, Math.PI / 2, 2.8);
-      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfBags, aisleX + 0.7, -4.5, -Math.PI / 2, 2.8);
-
-      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfBags, aisleX - 0.7, 0, Math.PI / 2, 2.8);
-      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfBoxes, aisleX + 0.7, 0, -Math.PI / 2, 2.8);
-
-      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfBoxes, aisleX - 0.7, 4.5, Math.PI / 2, 2.8);
-      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfBags, aisleX + 0.7, 4.5, -Math.PI / 2, 2.8);
+      // Continuous shelf modules along Z
+      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfBoxes, aisleX, -3.2, Math.PI / 2, 3.8);
+      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfBags, aisleX, 0, Math.PI / 2, 3.8);
+      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfBoxes, aisleX, 3.2, Math.PI / 2, 3.8);
 
       // Back cap facing back
-      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfEnd, aisleX, 9, Math.PI, 2.8);
+      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfEnd, aisleX, 6.5, Math.PI, 3.8);
     });
 
-    // ─── 2. CHECKOUT COUNTERS (CAISSES) ──────────────────────────────
+    // ─── 2. CHECKOUT COUNTERS (CAISSES - 1.42m high, 2.04m wide) ─────
     const checkout1 = this.addFurniturePiece(modelLoader.MARKET_MODELS.cashRegister, -8, -16, 0, 2.4);
     const checkout2 = this.addFurniturePiece(modelLoader.MARKET_MODELS.cashRegister, 4, -16, 0, 2.4);
 
-    // Guide Fences around checkouts
-    this.addFurniturePiece(modelLoader.MARKET_MODELS.fence, -11, -16, 0, 2.4);
-    this.addFurniturePiece(modelLoader.MARKET_MODELS.fence, 1, -16, 0, 2.4);
-    this.addFurniturePiece(modelLoader.MARKET_MODELS.fence, 7, -16, 0, 2.4);
+    // Guide Fences around checkouts (1.0m high)
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.fence, -11.5, -16, 0, 2.6);
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.fence, 0.5, -16, 0, 2.6);
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.fence, 7.5, -16, 0, 2.6);
 
-    // ─── 3. REFRIGERATED & FROZEN AISLE (WALL Z = 21) ─────────────────
-    for (let x = -16; x <= 16; x += 6.5) {
-      this.addFurniturePiece(modelLoader.MARKET_MODELS.freezersStanding, x, 22, Math.PI, 2.8);
+    // ─── 3. REFRIGERATED & FROZEN AISLE (3.15m high wall fridges) ────
+    for (let x = -14; x <= 14; x += 7) {
+      this.addFurniturePiece(modelLoader.MARKET_MODELS.freezersStanding, x, 22.5, Math.PI, 3.5);
     }
-    // Island freezers in front of fridges
-    this.addFurniturePiece(modelLoader.MARKET_MODELS.freezer, -8, 17, 0, 2.6);
-    this.addFurniturePiece(modelLoader.MARKET_MODELS.freezer, 8, 17, 0, 2.6);
+    // Island freezers in front of fridges (0.94m high)
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.freezer, -7, 16.5, 0, 2.7);
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.freezer, 7, 16.5, 0, 2.7);
 
-    // ─── 4. FRESH PRODUCE & BAKERY CORNER (X = -18) ───────────────────
-    this.addFurniturePiece(modelLoader.MARKET_MODELS.displayFruit, -18, -4, Math.PI / 2, 2.8);
-    this.addFurniturePiece(modelLoader.MARKET_MODELS.displayFruit, -18, 2, Math.PI / 2, 2.8);
-    this.addFurniturePiece(modelLoader.MARKET_MODELS.displayBread, -18, 8, Math.PI / 2, 2.8);
+    // ─── 4. FRESH PRODUCE & BAKERY CORNER (1.40m high) ───────────────
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.displayFruit, -18.5, -4, Math.PI / 2, 2.8);
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.displayFruit, -18.5, 2, Math.PI / 2, 2.8);
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.displayBread, -18.5, 8, Math.PI / 2, 2.8);
 
     // ─── 5. SHOPPING CARTS & BOTTLE RETURN ─────────────────────────────
-    this.addFurniturePiece(modelLoader.MARKET_MODELS.bottleReturn, -18, -16, Math.PI / 2, 2.6);
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.bottleReturn, -18.5, -16, Math.PI / 2, 2.2);
 
-    // Row of shopping carts near entrance
+    // Row of human-sized shopping carts (1.01m high) near entrance
     for (let i = 0; i < 5; i++) {
-      const cart = this.spawnDecoyProp('shopping_cart', 16, 0, -18 + i * 1.4, Math.PI);
+      const cart = this.spawnDecoyProp('shopping_cart', 16, 0, -18 + i * 1.5, Math.PI);
       this.colliders.push(new THREE.Box3().setFromObject(cart));
     }
 
-    // ─── 6. REALISTIC DECOY PROPS (NO FLOATING, ALL FLUSH WITH SURFACE) ───
-    // Cans directly on checkout counter surfaces
+    // ─── 6. REALISTIC DECOY PROPS (NO FLOATING, PROPORTIONAL) ─────────
+    // Cans on checkout counter surfaces
     const check1Top = checkout1.max.y;
     const check2Top = checkout2.max.y;
     this.spawnDecoyProp('soda_can', -7.5, check1Top, -16.2);
@@ -352,15 +347,15 @@ export class PropHunt3DScene {
     this.spawnDecoyProp('apple_basket', 13.5, 0, -17);
 
     // Prop clutter on the floor in corners and aisles (y = 0 touches floor!)
-    this.spawnDecoyProp('milk_carton', -10, 0, -10.5);
-    this.spawnDecoyProp('milk_carton', 0, 0, -10.5);
-    this.spawnDecoyProp('milk_carton', 10, 0, -10.5);
-    this.spawnDecoyProp('cereal_box', -10, 0, 10.5);
-    this.spawnDecoyProp('cereal_box', 0, 0, 10.5);
-    this.spawnDecoyProp('cereal_box', 10, 0, 10.5);
+    this.spawnDecoyProp('milk_carton', -11, 0, -8.5);
+    this.spawnDecoyProp('milk_carton', 0, 0, -8.5);
+    this.spawnDecoyProp('milk_carton', 11, 0, -8.5);
+    this.spawnDecoyProp('cereal_box', -11, 0, 8.5);
+    this.spawnDecoyProp('cereal_box', 0, 0, 8.5);
+    this.spawnDecoyProp('cereal_box', 11, 0, 8.5);
 
     // Random extra decoys on the floor (all with y = 0 so they NEVER float!)
-    [-18, 18].forEach((sideX) => {
+    [-18.5, 18.5].forEach((sideX) => {
       for (let z = -10; z <= 10; z += 5) {
         if (this.random() > 0.4) {
           const propChoice = this.random() > 0.5 ? 'soda_can' : 'cereal_box';

@@ -14,22 +14,22 @@ class PropHuntModelLoader {
   private normalizedTemplates = new Map<string, THREE.Group>();
   private preloaded = false;
 
-  // Prop ID to GLB path mapping
+  // Prop ID to GLB path mapping with realistic physical proportions
   public readonly PROP_MODELS: Record<string, { url: string; scale: number }> = {
-    soda_can: { url: '/models/props/can.glb', scale: 1.8 },
-    cereal_box: { url: '/models/props/carton.glb', scale: 1.3 },
-    milk_carton: { url: '/models/props/carton-small.glb', scale: 1.5 },
-    apple: { url: '/models/props/apple.glb', scale: 1.8 },
-    apple_basket: { url: '/models/props/shopping-basket.glb', scale: 1.0 },
-    shopping_cart: { url: '/models/props/shopping-cart.glb', scale: 1.0 },
-    cash_register: { url: '/models/props/cash-register.glb', scale: 1.0 },
-    oil_drum: { url: '/models/props/barrel.glb', scale: 1.3 },
-    barrel: { url: '/models/props/barrel.glb', scale: 1.2 },
-    burger: { url: '/models/props/burger.glb', scale: 1.8 },
-    bread: { url: '/models/props/bread.glb', scale: 1.6 },
-    bottle_ketchup: { url: '/models/props/bottle-ketchup.glb', scale: 1.4 },
-    bottle_oil: { url: '/models/props/bottle-oil.glb', scale: 1.4 },
-    metal_shelf: { url: '/models/market/shelf-end.glb', scale: 1.6 },
+    soda_can: { url: '/models/props/can.glb', scale: 0.8 }, // ~26cm height
+    cereal_box: { url: '/models/props/carton.glb', scale: 0.65 }, // ~38cm height
+    milk_carton: { url: '/models/props/carton-small.glb', scale: 0.7 }, // ~27cm height
+    apple: { url: '/models/props/apple.glb', scale: 0.5 }, // ~10cm
+    apple_basket: { url: '/models/props/shopping-basket.glb', scale: 1.4 }, // ~35cm height, 49cm width
+    shopping_cart: { url: '/models/props/shopping-cart.glb', scale: 2.6 }, // ~1.01m height (human waist), 1.25m length
+    cash_register: { url: '/models/props/cash-register.glb', scale: 2.2 }, // ~1.30m height
+    oil_drum: { url: '/models/props/barrel.glb', scale: 1.4 }, // ~0.95m height
+    barrel: { url: '/models/props/barrel.glb', scale: 1.4 }, // ~0.95m height
+    burger: { url: '/models/props/burger.glb', scale: 0.8 },
+    bread: { url: '/models/props/bread.glb', scale: 0.9 },
+    bottle_ketchup: { url: '/models/props/bottle-ketchup.glb', scale: 0.4 },
+    bottle_oil: { url: '/models/props/bottle-oil.glb', scale: 0.6 },
+    metal_shelf: { url: '/models/market/shelf-end.glb', scale: 3.8 }, // ~3.04m height
   };
 
   // Map furniture models
