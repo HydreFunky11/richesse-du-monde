@@ -10,6 +10,7 @@ import {
   type PropHuntPlayer
 } from './propHuntTypes';
 import { propAudio } from './propHuntAudio';
+import { modelLoader } from './propHuntModelLoader';
 
 const SERVER_URL =
   import.meta.env.VITE_WS_SERVER_URL ||
@@ -50,6 +51,10 @@ export default function PropHuntApp() {
     };
     document.addEventListener('pointerlockchange', onLock);
     return () => document.removeEventListener('pointerlockchange', onLock);
+  }, []);
+
+  useEffect(() => {
+    modelLoader.preloadAll().catch(console.error);
   }, []);
 
   // Socket setup

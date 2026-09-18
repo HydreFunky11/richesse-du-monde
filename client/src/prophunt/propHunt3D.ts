@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { PropHuntGameState, PropHuntMapId, PropHuntPlayer, PropHuntRole } from './propHuntTypes';
 import { propAudio } from './propHuntAudio';
+import { modelLoader } from './propHuntModelLoader';
 
 export interface PropHuntEngineCallbacks {
   onShoot?: (hitPlayerId: string | null) => void;
@@ -242,15 +243,26 @@ export class PropHunt3DScene {
     }
   }
 
-  // 🛒 MAP: SUPERETTE (Supérette / Épicerie)
+  private addFurniturePiece(modelUrl: string, x: number, z: number, rotY: number = 0, scale: number = 2.8): THREE.Box3 {
+    const mesh = modelLoader.getMarketFurniture(modelUrl, scale);
+    mesh.position.set(x, 0, z);
+    mesh.rotation.y = rotY;
+    this.mapEnvironmentGroup.add(mesh);
+
+    const box = new THREE.Box3().setFromObject(mesh);
+    this.colliders.push(box);
+    return box;
+  }
+
+  // 🛒 MAP: SUPERETTE (Supérette / Épicerie 3D Low-Poly)
   private buildSuperette() {
     this.scene.background = new THREE.Color(0x0f172a);
-    this.scene.fog = new THREE.FogExp2(0x0f172a, 0.015);
+    this.scene.fog = new THREE.FogExp2(0x0f172a, 0.012);
 
     // Floor (50 x 50)
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(50, 50),
-      new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.3 })
+      new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.35, metalness: 0.1 })
     );
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
@@ -269,86 +281,93 @@ export class PropHunt3DScene {
         lightBox.position.set(x, 7.9, z);
         this.mapEnvironmentGroup.add(lightBox);
 
-        const pLight = new THREE.PointLight(0xfff7ed, 0.45, 16);
+        const pLight = new THREE.PointLight(0xfff7ed, 0.45, 18);
         pLight.position.set(x, 7.4, z);
         this.mapEnvironmentGroup.add(pLight);
       }
     }
 
-    // 3 Double-Sided Gondola Aisles with solid colliders
+    // ─── 1. REAL 3D SHELVES & GONDOLA AISLES ───────────────────────────
+    // 3 Double-Sided Gondola Aisles at x = -10, 0, +10 running along z from -9 to +9
     [-10, 0, 10].forEach((aisleX) => {
-      this.createSupermarketAisle(aisleX, 0, 18);
-      // Add solid box collider for each aisle: x ± 1.2, y 0 to 3.2, z -9 to +9
-      this.addBoxCollider([aisleX, 1.6, 0], [2.5, 3.2, 18.5]);
+      // Front cap (tête de gondole) facing front
+      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfEnd, aisleX, -9, 0, 2.8);
+
+      // Central aisle modules
+      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfBoxes, aisleX - 0.7, -4.5, Math.PI / 2, 2.8);
+      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfBags, aisleX + 0.7, -4.5, -Math.PI / 2, 2.8);
+
+      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfBags, aisleX - 0.7, 0, Math.PI / 2, 2.8);
+      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfBoxes, aisleX + 0.7, 0, -Math.PI / 2, 2.8);
+
+      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfBoxes, aisleX - 0.7, 4.5, Math.PI / 2, 2.8);
+      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfBags, aisleX + 0.7, 4.5, -Math.PI / 2, 2.8);
+
+      // Back cap facing back
+      this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfEnd, aisleX, 9, Math.PI, 2.8);
     });
 
-    // 2 Checkout Counters with solid colliders
-    this.createCheckoutCounter(-8, -16);
-    this.addBoxCollider([-8, 0.6, -16], [4.2, 1.2, 1.6]);
+    // ─── 2. CHECKOUT COUNTERS (CAISSES) ──────────────────────────────
+    const checkout1 = this.addFurniturePiece(modelLoader.MARKET_MODELS.cashRegister, -8, -16, 0, 2.4);
+    const checkout2 = this.addFurniturePiece(modelLoader.MARKET_MODELS.cashRegister, 4, -16, 0, 2.4);
 
-    this.createCheckoutCounter(4, -16);
-    this.addBoxCollider([4, 0.6, -16], [4.2, 1.2, 1.6]);
+    // Guide Fences around checkouts
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.fence, -11, -16, 0, 2.4);
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.fence, 1, -16, 0, 2.4);
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.fence, 7, -16, 0, 2.4);
 
-    // Beverage Fridges along back wall (z = 23.5) with colliders
-    for (let x = -16; x <= 16; x += 8) {
-      this.createBeverageFridge(x, 23.5);
-      this.addBoxCollider([x, 2.0, 23.5], [4.2, 4.2, 1.8]);
+    // ─── 3. REFRIGERATED & FROZEN AISLE (WALL Z = 21) ─────────────────
+    for (let x = -16; x <= 16; x += 6.5) {
+      this.addFurniturePiece(modelLoader.MARKET_MODELS.freezersStanding, x, 22, Math.PI, 2.8);
     }
+    // Island freezers in front of fridges
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.freezer, -8, 17, 0, 2.6);
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.freezer, 8, 17, 0, 2.6);
 
-    // Fruit and Vegetable Market Islands with colliders
-    this.createFruitStand(-16, -4);
-    this.addBoxCollider([-16, 0.6, -4], [3.2, 1.3, 4.2]);
+    // ─── 4. FRESH PRODUCE & BAKERY CORNER (X = -18) ───────────────────
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.displayFruit, -18, -4, Math.PI / 2, 2.8);
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.displayFruit, -18, 2, Math.PI / 2, 2.8);
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.displayBread, -18, 8, Math.PI / 2, 2.8);
 
-    this.createFruitStand(-16, 6);
-    this.addBoxCollider([-16, 0.6, 6], [3.2, 1.3, 4.2]);
+    // ─── 5. SHOPPING CARTS & BOTTLE RETURN ─────────────────────────────
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.bottleReturn, -18, -16, Math.PI / 2, 2.6);
 
-    // Shopping Carts cluster
-    this.createShoppingCartCluster(16, -18);
-    this.addBoxCollider([16, 0.6, -16], [3.0, 1.2, 6.0]);
-
-    // Decoy props in superette
-    this.spawnDecoyProp('soda_can', -8, 1.25, -16.2);
-    this.spawnDecoyProp('soda_can', 4, 1.25, -16.2);
-    this.spawnDecoyProp('cash_register', -6.5, 1.25, -16);
-    this.spawnDecoyProp('cash_register', 5.5, 1.25, -16);
-
-    // Soda cans scattered on checkouts
+    // Row of shopping carts near entrance
     for (let i = 0; i < 5; i++) {
-        this.spawnDecoyProp('soda_can', -9 + this.random() * 2, 1.25, -16.2 + this.random() * 0.5);
-        this.spawnDecoyProp('soda_can', 3 + this.random() * 2, 1.25, -16.2 + this.random() * 0.5);
+      const cart = this.spawnDecoyProp('shopping_cart', 16, 0, -18 + i * 1.4, Math.PI);
+      this.colliders.push(new THREE.Box3().setFromObject(cart));
     }
 
-    // Cereal boxes and milk cartons on shelves (aisles are at x: -10, 0, 10, z: -9 to 9)
-    [-10, 0, 10].forEach(x => {
-       for(let z = -8; z <= 8; z+=2) {
-           if (this.random() > 0.3) this.spawnDecoyProp('cereal_box', x - 0.8, 1.45, z);
-           if (this.random() > 0.3) this.spawnDecoyProp('cereal_box', x + 0.8, 1.45, z);
-           if (this.random() > 0.3) this.spawnDecoyProp('cereal_box', x - 0.8, 2.45, z);
-           if (this.random() > 0.3) this.spawnDecoyProp('cereal_box', x + 0.8, 2.45, z);
+    // ─── 6. REALISTIC DECOY PROPS (NO FLOATING, ALL FLUSH WITH SURFACE) ───
+    // Cans directly on checkout counter surfaces
+    const check1Top = checkout1.max.y;
+    const check2Top = checkout2.max.y;
+    this.spawnDecoyProp('soda_can', -7.5, check1Top, -16.2);
+    this.spawnDecoyProp('soda_can', -8.5, check1Top, -15.8);
+    this.spawnDecoyProp('soda_can', 4.5, check2Top, -16.2);
+    this.spawnDecoyProp('soda_can', 3.5, check2Top, -15.8);
 
-           if (this.random() > 0.5) this.spawnDecoyProp('milk_carton', x - 0.8, 0.45, z + 0.5);
-           if (this.random() > 0.5) this.spawnDecoyProp('milk_carton', x + 0.8, 0.45, z + 0.5);
-       }
+    // Baskets on the floor near entrance
+    this.spawnDecoyProp('apple_basket', 12, 0, -17);
+    this.spawnDecoyProp('apple_basket', 13.5, 0, -17);
+
+    // Prop clutter on the floor in corners and aisles (y = 0 touches floor!)
+    this.spawnDecoyProp('milk_carton', -10, 0, -10.5);
+    this.spawnDecoyProp('milk_carton', 0, 0, -10.5);
+    this.spawnDecoyProp('milk_carton', 10, 0, -10.5);
+    this.spawnDecoyProp('cereal_box', -10, 0, 10.5);
+    this.spawnDecoyProp('cereal_box', 0, 0, 10.5);
+    this.spawnDecoyProp('cereal_box', 10, 0, 10.5);
+
+    // Random extra decoys on the floor (all with y = 0 so they NEVER float!)
+    [-18, 18].forEach((sideX) => {
+      for (let z = -10; z <= 10; z += 5) {
+        if (this.random() > 0.4) {
+          const propChoice = this.random() > 0.5 ? 'soda_can' : 'cereal_box';
+          this.spawnDecoyProp(propChoice, sideX + (this.random() * 1.5 - 0.75), 0, z);
+        }
+      }
     });
-
-    // Milk cartons near fridges (z=23)
-    for (let x = -16; x <= 16; x += 4) {
-       this.spawnDecoyProp('milk_carton', x + this.random(), 0.2, 21 + this.random());
-    }
-
-    // Apple baskets near fruit stands
-    this.spawnDecoyProp('apple_basket', -16, 1.1, -4);
-    this.spawnDecoyProp('apple_basket', -16, 1.1, 6);
-    for(let i=0; i<3; i++) {
-        this.spawnDecoyProp('apple_basket', -16 + this.random(), 1.1, -4 + this.random() * 2);
-        this.spawnDecoyProp('apple_basket', -16 + this.random(), 1.1, 6 + this.random() * 2);
-    }
-
-    // Stacks of cardboard boxes in corners
-    for(let i=0; i<8; i++) {
-        this.spawnDecoyProp('cardboard_box', -22 + this.random()*4, 0.5 + (i%3)*1.0, 22 - this.random()*4);
-        this.spawnDecoyProp('cardboard_box', 22 - this.random()*4, 0.5 + (i%3)*1.0, -22 + this.random()*4);
-    }
   }
 
   // 📦 MAP: WAREHOUSE (Entrepôt)
@@ -543,115 +562,6 @@ export class PropHunt3DScene {
     });
   }
 
-  private createSupermarketAisle(x: number, z: number, length: number) {
-    const shelfGroup = new THREE.Group();
-    shelfGroup.position.set(x, 0, z);
-
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.4 });
-    const shelfMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.3 });
-
-    [0.4, 1.4, 2.4].forEach((y) => {
-      const shelf = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.08, length), shelfMat);
-      shelf.position.y = y;
-      shelf.castShadow = true;
-      shelfGroup.add(shelf);
-
-      for (let sz = -length / 2 + 1; sz <= length / 2 - 1; sz += 1.4) {
-        const cereal = new THREE.Mesh(
-          new THREE.BoxGeometry(0.35, 0.6, 0.2),
-          new THREE.MeshStandardMaterial({
-            color: [0xef4444, 0x3b82f6, 0x10b981, 0xf59e0b][Math.floor(this.random() * 4)]
-          })
-        );
-        cereal.position.set(-0.6, y + 0.3, sz);
-        shelfGroup.add(cereal);
-
-        const can = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.12, 0.12, 0.35, 12),
-          new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.6 })
-        );
-        can.position.set(0.6, y + 0.18, sz);
-        shelfGroup.add(can);
-      }
-    });
-
-    const back = new THREE.Mesh(new THREE.BoxGeometry(0.1, 3.2, length), frameMat);
-    back.position.y = 1.6;
-    shelfGroup.add(back);
-
-    this.mapEnvironmentGroup.add(shelfGroup);
-  }
-
-  private createCheckoutCounter(x: number, z: number) {
-    const group = new THREE.Group();
-    group.position.set(x, 0, z);
-
-    const table = new THREE.Mesh(
-      new THREE.BoxGeometry(4, 1.1, 1.4),
-      new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.3 })
-    );
-    table.position.y = 0.55;
-    table.castShadow = true;
-    group.add(table);
-
-    const belt = new THREE.Mesh(
-      new THREE.BoxGeometry(2.8, 0.05, 0.9),
-      new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.9 })
-    );
-    belt.position.set(-0.4, 1.12, 0);
-    group.add(belt);
-
-    this.mapEnvironmentGroup.add(group);
-  }
-
-  private createBeverageFridge(x: number, z: number) {
-    const fridge = new THREE.Group();
-    fridge.position.set(x, 0, z);
-
-    const frame = new THREE.Mesh(
-      new THREE.BoxGeometry(4, 4, 1.5),
-      new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.5 })
-    );
-    frame.position.y = 2;
-    fridge.add(frame);
-
-    const glass = new THREE.Mesh(
-      new THREE.BoxGeometry(3.6, 3.6, 0.05),
-      new THREE.MeshPhysicalMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.35, roughness: 0.1 })
-    );
-    glass.position.set(0, 2, 0.76);
-    fridge.add(glass);
-
-    const coldLight = new THREE.PointLight(0x38bdf8, 0.8, 6);
-    coldLight.position.set(0, 2, 0.3);
-    fridge.add(coldLight);
-
-    this.mapEnvironmentGroup.add(fridge);
-  }
-
-  private createFruitStand(x: number, z: number) {
-    const stand = new THREE.Group();
-    stand.position.set(x, 0, z);
-
-    const woodMat = new THREE.MeshStandardMaterial({ color: 0x854d0e, roughness: 0.8 });
-    const base = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 4), woodMat);
-    base.position.y = 0.5;
-    base.castShadow = true;
-    stand.add(base);
-
-    this.mapEnvironmentGroup.add(stand);
-  }
-
-  private createShoppingCartCluster(x: number, z: number) {
-    for (let i = 0; i < 4; i++) {
-      const cart = this.buildPropMesh('shopping_cart');
-      cart.position.set(x, 0.5, z + i * 0.9);
-      cart.rotation.y = Math.PI / 2;
-      this.mapEnvironmentGroup.add(cart);
-      this.staticDecoyMeshes.push(cart);
-    }
-  }
-
   private createWarehouseRack(x: number, z: number, length: number) {
     const rack = new THREE.Group();
     rack.position.set(x, 0, z);
@@ -744,148 +654,19 @@ export class PropHunt3DScene {
   // ─── PROP MESH FACTORY ─────────────────────────────────────────────────────
 
   public buildPropMesh(propId: string): THREE.Group {
-    const group = new THREE.Group();
-
-    switch (propId) {
-      case 'soda_can': {
-        const can = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.2, 0.2, 0.6, 16),
-          new THREE.MeshStandardMaterial({ color: 0xdc2626, metalness: 0.8, roughness: 0.2 })
-        );
-        can.position.y = 0.3;
-        can.castShadow = true;
-        group.add(can);
-        break;
-      }
-      case 'cereal_box': {
-        const box = new THREE.Mesh(
-          new THREE.BoxGeometry(0.6, 0.9, 0.3),
-          new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.4 })
-        );
-        box.position.y = 0.45;
-        box.castShadow = true;
-        group.add(box);
-        break;
-      }
-      case 'shopping_cart': {
-        const cartMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8 });
-        const basket = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 1.2), cartMat);
-        basket.position.y = 0.5;
-        group.add(basket);
-        break;
-      }
-      case 'cash_register': {
-        const base = new THREE.Mesh(
-          new THREE.BoxGeometry(0.8, 0.4, 0.7),
-          new THREE.MeshStandardMaterial({ color: 0x334155 })
-        );
-        base.position.y = 0.2;
-        const screen = new THREE.Mesh(
-          new THREE.BoxGeometry(0.4, 0.3, 0.1),
-          new THREE.MeshBasicMaterial({ color: 0x22c55e })
-        );
-        screen.position.set(0, 0.45, -0.2);
-        group.add(base, screen);
-        break;
-      }
-      case 'milk_carton': {
-        const carton = new THREE.Mesh(
-          new THREE.BoxGeometry(0.35, 0.8, 0.35),
-          new THREE.MeshStandardMaterial({ color: 0x38bdf8 })
-        );
-        carton.position.y = 0.4;
-        group.add(carton);
-        break;
-      }
-      case 'apple_basket': {
-        const basket = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.5, 0.35, 0.4, 12),
-          new THREE.MeshStandardMaterial({ color: 0x78350f })
-        );
-        basket.position.y = 0.2;
-        const apple = new THREE.Mesh(
-          new THREE.SphereGeometry(0.2),
-          new THREE.MeshStandardMaterial({ color: 0xef4444 })
-        );
-        apple.position.y = 0.45;
-        group.add(basket, apple);
-        break;
-      }
-      case 'cardboard_box': {
-        const box = new THREE.Mesh(
-          new THREE.BoxGeometry(0.9, 0.9, 0.9),
-          new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.8 })
-        );
-        box.position.y = 0.45;
-        box.castShadow = true;
-        group.add(box);
-        break;
-      }
-      case 'wooden_crate': {
-        const crate = new THREE.Mesh(
-          new THREE.BoxGeometry(1.2, 1.2, 1.2),
-          new THREE.MeshStandardMaterial({ color: 0x713f12, roughness: 0.7 })
-        );
-        crate.position.y = 0.6;
-        crate.castShadow = true;
-        group.add(crate);
-        break;
-      }
-      case 'oil_drum': {
-        const drum = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.5, 0.5, 1.4, 16),
-          new THREE.MeshStandardMaterial({ color: 0x1d4ed8, metalness: 0.6 })
-        );
-        drum.position.y = 0.7;
-        drum.castShadow = true;
-        group.add(drum);
-        break;
-      }
-      case 'pallet': {
-        const p = new THREE.Mesh(
-          new THREE.BoxGeometry(1.6, 0.25, 1.6),
-          new THREE.MeshStandardMaterial({ color: 0xa16207 })
-        );
-        p.position.y = 0.125;
-        group.add(p);
-        break;
-      }
-      case 'office_chair': {
-        const seat = new THREE.Mesh(
-          new THREE.BoxGeometry(0.8, 0.15, 0.8),
-          new THREE.MeshStandardMaterial({ color: 0x18181b })
-        );
-        seat.position.y = 0.45;
-        const back = new THREE.Mesh(
-          new THREE.BoxGeometry(0.8, 0.8, 0.15),
-          new THREE.MeshStandardMaterial({ color: 0x18181b })
-        );
-        back.position.set(0, 0.9, -0.35);
-        group.add(seat, back);
-        break;
-      }
-      default: {
-        const box = new THREE.Mesh(
-          new THREE.BoxGeometry(0.8, 0.8, 0.8),
-          new THREE.MeshStandardMaterial({ color: 0x64748b })
-        );
-        box.position.y = 0.4;
-        group.add(box);
-        break;
-      }
-    }
-
+    const group = modelLoader.getPropMesh(propId);
     group.userData = { isProp: true, propId };
     return group;
   }
 
-  private spawnDecoyProp(propId: string, x: number, y: number, z: number) {
+  private spawnDecoyProp(propId: string, x: number, y: number, z: number, rotY?: number): THREE.Group {
     const mesh = this.buildPropMesh(propId);
     mesh.position.set(x, y, z);
-    mesh.rotation.y = this.random() * Math.PI * 2;
+    mesh.rotation.y = rotY !== undefined ? rotY : this.random() * Math.PI * 2;
     mesh.userData = { isDecoy: true, propId };
     this.mapEnvironmentGroup.add(mesh);
     this.staticDecoyMeshes.push(mesh);
+    return mesh;
   }
 
   // ─── 1-BULLET HUNTER WEAPON (VISIBLE ONLY FOR HUNTER) ──────────────────────
