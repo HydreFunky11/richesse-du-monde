@@ -11,7 +11,12 @@ import {
 } from './propHuntTypes';
 import { propAudio } from './propHuntAudio';
 
-const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+const SERVER_URL =
+  import.meta.env.VITE_WS_SERVER_URL ||
+  import.meta.env.VITE_SERVER_URL ||
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+    ? 'https://richesse-du-monde-server.onrender.com'
+    : 'http://localhost:3001');
 
 export default function PropHuntApp() {
   const navigate = useNavigate();
@@ -23,6 +28,7 @@ export default function PropHuntApp() {
   const [username, setUsername] = useState(() => localStorage.getItem('prophunt_username') || '');
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [joined, setJoined] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
   const [gameState, setGameState] = useState<PropHuntGameState | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [copiedCode, setCopiedCode] = useState(false);
@@ -48,19 +54,41 @@ export default function PropHuntApp() {
 
   // Socket setup
   useEffect(() => {
-    const s = io(SERVER_URL);
+    const s = io(SERVER_URL, {
+      transports: ['websocket', 'polling'],
+      timeout: 60000, // 60s to accommodate Render cold start
+      reconnection: true,
+      reconnectionAttempts: 30,
+      reconnectionDelay: 1500,
+      reconnectionDelayMax: 5000,
+    });
     socketRef.current = s;
 
     s.on('connect', () => {
       console.log('Connecté au serveur Prop Hunt !', s.id);
+      setIsConnected(true);
+      setErrorMsg('');
       if (engineRef.current && s.id) {
         engineRef.current.setMyPlayerId(s.id);
       }
     });
 
+    s.on('disconnect', (reason) => {
+      console.log('[PropHunt] Déconnecté:', reason);
+      setIsConnected(false);
+      if (reason === 'io server disconnect') {
+        s.connect();
+      }
+    });
+
     s.on('connect_error', (err) => {
       console.error('[PropHunt] Erreur de connexion:', err);
-      setErrorMsg(`Connexion au serveur impossible : ${err.message}`);
+      setIsConnected(false);
+      if (err.message.includes('timeout')) {
+        setErrorMsg('Réveil du serveur Render en cours (~30-60s au premier chargement)... Reconnexion automatique...');
+      } else {
+        setErrorMsg(`Connexion au serveur : ${err.message}. Nouvelle tentative...`);
+      }
     });
 
     s.on('prophuntStateUpdate', (st: PropHuntGameState) => {
@@ -187,6 +215,10 @@ export default function PropHuntApp() {
       setErrorMsg('Veuillez entrer un code de salon');
       return;
     }
+    if (!socketRef.current?.connected) {
+      setErrorMsg('Connexion au serveur en cours (réveil Render ~30s)... Veuillez patienter.');
+      return;
+    }
 
     localStorage.setItem('prophunt_username', cleanUser);
     socketRef.current?.emit('joinGame', {
@@ -302,9 +334,17 @@ export default function PropHuntApp() {
             <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-300 to-yellow-400 mb-1">
               PROP HUNT 3D
             </h1>
-            <p className="text-xs text-amber-300/80 font-bold uppercase tracking-widest mb-6">
+            <p className="text-xs text-amber-300/80 font-bold uppercase tracking-widest mb-4">
               Cache-Cache en 3D dans la Supérette & Entrepôt
             </p>
+
+            {/* Server connection indicator */}
+            <div className="flex items-center justify-center gap-2 mb-6 text-xs font-bold">
+              <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-amber-400 animate-ping'}`} />
+              <span className={isConnected ? 'text-emerald-400' : 'text-amber-300'}>
+                {isConnected ? 'Serveur en ligne' : 'Connexion au serveur... (hébergement Render)'}
+              </span>
+            </div>
 
             <form onSubmit={handleJoin} className="space-y-4 text-left">
               <div>
@@ -339,9 +379,14 @@ export default function PropHuntApp() {
 
               <button
                 type="submit"
-                className="w-full py-4 mt-2 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black rounded-xl text-base uppercase tracking-wider transition shadow-xl shadow-amber-500/20 cursor-pointer transform hover:scale-[1.02] active:scale-[0.98]"
+                disabled={!isConnected}
+                className={`w-full py-4 mt-2 font-black rounded-xl text-base uppercase tracking-wider transition shadow-xl cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] ${
+                  isConnected
+                    ? 'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 shadow-amber-500/20'
+                    : 'bg-slate-800 text-slate-400 border border-slate-700 cursor-not-allowed opacity-80'
+                }`}
               >
-                Rejoindre ou Créer le Salon 🚀
+                {isConnected ? 'Rejoindre ou Créer le Salon 🚀' : 'Connexion au serveur en cours... ⏳'}
               </button>
             </form>
           </div>
