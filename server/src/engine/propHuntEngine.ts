@@ -43,6 +43,61 @@ const MAP_PROPS: Record<PropHuntMapId, string[]> = {
 
 const TAUNT_SOUNDS = ['pouet', 'whistle', 'quack', 'bell', 'giggle', 'boing'];
 
+const MAP_SPAWN_POINTS: Record<PropHuntMapId, { hunter: [number, number, number]; hiders: [number, number, number][] }> = {
+  superette: {
+    hunter: [0, 1.6, -21],
+    hiders: [
+      [-5, 0.5, -4],
+      [5, 0.5, -4],
+      [-5, 0.5, 4],
+      [5, 0.5, 4],
+      [0, 0.5, 14],
+      [-6, 0.5, 14],
+      [6, 0.5, 14],
+      [18, 0.5, 0]
+    ]
+  },
+  warehouse: {
+    hunter: [0, 1.6, -22],
+    hiders: [
+      [-7, 0.5, -5],
+      [7, 0.5, -5],
+      [-7, 0.5, 10],
+      [7, 0.5, 10],
+      [0, 0.5, 16],
+      [-7, 0.5, -18],
+      [7, 0.5, -18],
+      [-20, 0.5, 0]
+    ]
+  },
+  office: {
+    hunter: [0, 1.6, -21],
+    hiders: [
+      [-6, 0.5, -8],
+      [6, 0.5, -8],
+      [-6, 0.5, 4],
+      [6, 0.5, 4],
+      [-6, 0.5, 16],
+      [6, 0.5, 16],
+      [0, 0.5, -2],
+      [0, 0.5, 10]
+    ]
+  },
+  lab: {
+    hunter: [0, 1.6, -16],
+    hiders: [
+      [-5, 0.5, -8],
+      [5, 0.5, -8],
+      [-5, 0.5, 8],
+      [5, 0.5, 8],
+      [-16, 0.5, 0],
+      [16, 0.5, 0],
+      [0, 0.5, 12],
+      [0, 0.5, -8]
+    ]
+  }
+};
+
 const PLAYER_COLORS = [
   '#EF4444', '#3B82F6', '#10B981', '#F59E0B',
   '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'
@@ -87,7 +142,7 @@ export class PropHuntEngine {
       role: 'HIDER',
       health: 100,
       maxHealth: 100,
-      position: [0, 1, 0],
+      position: [0, 0.5, 14],
       rotation: [0, 0, 0],
       currentProp: 'cardboard_box',
       isFrozen: false,
@@ -185,7 +240,9 @@ export class PropHuntEngine {
     const mapProps = MAP_PROPS[this.selectedMap];
 
     // Reset players
-    this.players.forEach((p, idx) => {
+    const spawnConfig = MAP_SPAWN_POINTS[this.selectedMap];
+    let hiderIndex = 0;
+    this.players.forEach((p) => {
       p.health = 100;
       p.maxHealth = 100;
       p.isFrozen = false;
@@ -197,17 +254,15 @@ export class PropHuntEngine {
       if (p.id === hunter.id) {
         p.role = 'SEEKER';
         p.currentProp = 'hunter';
-        // Spawn hunter in the designated hunter spawn room / cage
-        p.position = [0, 1.5, -20];
+        p.position = [...spawnConfig.hunter];
         p.rotation = [0, 0, 0];
       } else {
         p.role = 'HIDER';
-        // Give random base prop from map
-        p.currentProp = mapProps[idx % mapProps.length];
-        // Spread hiders in map center
-        const angle = (idx / (this.players.length - 1)) * Math.PI * 2;
-        p.position = [Math.cos(angle) * 4, 0.8, Math.sin(angle) * 4];
-        p.rotation = [0, angle, 0];
+        p.currentProp = mapProps[hiderIndex % mapProps.length];
+        const spawnPos = spawnConfig.hiders[hiderIndex % spawnConfig.hiders.length];
+        p.position = [...spawnPos];
+        p.rotation = [0, 0, 0];
+        hiderIndex++;
       }
     });
 

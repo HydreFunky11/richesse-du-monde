@@ -34,10 +34,12 @@ export class PropHunt3DScene {
   private cameraDistance: number = 3.5;
 
   // Physics & Movement
-  private position: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
+  private position: THREE.Vector3 = new THREE.Vector3(0, 0.5, 14);
   private verticalVelocity: number = 0;
   private isGrounded: boolean = true;
   private keys: Record<string, boolean> = {};
+  private hasInitializedSpawn: boolean = false;
+  private lastSyncedPhase: string = 'LOBBY';
 
   // Colliders for all obstacles in map
   private colliders: THREE.Box3[] = [];
@@ -153,53 +155,46 @@ export class PropHunt3DScene {
       }
     }
 
-    // Check static props (decoy meshes)
-    for (const mesh of this.staticDecoyMeshes) {
-      if (!mesh.userData.collider) {
-         mesh.userData.collider = new THREE.Box3().setFromObject(mesh);
-      }
-      const box = mesh.userData.collider;
-      if (
-        maxX > box.min.x &&
-        minX < box.max.x &&
-        maxY > box.min.y &&
-        minY < box.max.y &&
-        maxZ > box.min.z &&
-        minZ < box.max.z
-      ) {
-        return true;
-      }
-    }
-
-    // Check other players (acting as props)
-    for (const [playerId, mesh] of this.playerMeshes.entries()) {
-      if (playerId === this.myPlayerId) continue; // Don't collide with self
-      if (!mesh.visible) continue; // Don't collide with invisible hunters
-
-      // Simple custom AABB for players to avoid setFromObject performance hit
-      const pr = mesh.userData.role === 'SEEKER' ? 0.4 : 0.3; // radius
-      const ph = mesh.userData.role === 'SEEKER' ? 1.8 : 0.6; // height
-
-      const px = mesh.position.x;
-      const py = mesh.position.y;
-      const pz = mesh.position.z;
-
-      if (
-        maxX > px - pr &&
-        minX < px + pr &&
-        maxY > py &&
-        minY < py + ph &&
-        maxZ > pz - pr &&
-        minZ < pz + pr
-      ) {
-        return true;
-      }
-    }
-
     return false;
   }
 
-    // Seeded PRNG for consistent map generation across clients
+  private resolveCollisionsAndUnstuck(radius: number, height: number) {
+    const pMinY = this.position.y;
+    const pMaxY = this.position.y + height;
+
+    for (const col of this.colliders) {
+      const pMinX = this.position.x - radius;
+      const pMaxX = this.position.x + radius;
+      const pMinZ = this.position.z - radius;
+      const pMaxZ = this.position.z + radius;
+
+      if (
+        pMaxX > col.min.x &&
+        pMinX < col.max.x &&
+        pMaxY > col.min.y &&
+        pMinY < col.max.y &&
+        pMaxZ > col.min.z &&
+        pMinZ < col.max.z
+      ) {
+        // Player is inside or intersecting a collider! Push out along the shallowest axis
+        const pushX = (this.position.x < (col.min.x + col.max.x) / 2)
+          ? col.min.x - radius - this.position.x
+          : col.max.x + radius - this.position.x;
+
+        const pushZ = (this.position.z < (col.min.z + col.max.z) / 2)
+          ? col.min.z - radius - this.position.z
+          : col.max.z + radius - this.position.z;
+
+        if (Math.abs(pushX) < Math.abs(pushZ)) {
+          this.position.x += pushX;
+        } else {
+          this.position.z += pushZ;
+        }
+      }
+    }
+  }
+
+  // Seeded PRNG for consistent map generation across clients
   private seed: number = 1;
   private random(): number {
     const x = Math.sin(this.seed++) * 10000;
@@ -960,6 +955,7 @@ export class PropHunt3DScene {
       }, 120);
     }
 
+    this.camera.updateMatrixWorld();
     this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
 
     const playerTargets: THREE.Object3D[] = [];
@@ -1052,11 +1048,30 @@ export class PropHunt3DScene {
       this.myRole = me.role;
       this.isFrozen = me.isFrozen;
 
+      // Teleport local player if phase changed (e.g. game start to HIDING, or back to LOBBY) or on initial sync
+      if (
+        !this.hasInitializedSpawn ||
+        (this.lastSyncedPhase !== gameState.phase && (gameState.phase === 'HIDING' || gameState.phase === 'LOBBY'))
+      ) {
+        this.hasInitializedSpawn = true;
+        this.position.set(me.position[0], me.position[1], me.position[2]);
+        this.verticalVelocity = 0;
+        this.isGrounded = true;
+        if (me.rotation) {
+          this.yaw = me.rotation[1] || 0;
+          this.pitch = 0;
+        }
+        const r = me.role === 'SEEKER' ? 0.45 : 0.35;
+        const h = me.role === 'SEEKER' ? 1.8 : 0.6;
+        this.resolveCollisionsAndUnstuck(r, h);
+      }
+
       // Update weapon visibility: ONLY visible for SEEKER during active hunting!
       if (this.weaponMesh) {
         this.weaponMesh.visible = (this.myRole === 'SEEKER' && (gameState.phase === 'HUNTING' || gameState.phase === 'HIDING'));
       }
     }
+    this.lastSyncedPhase = gameState.phase;
 
     // Player meshes sync
     const currentIds = new Set(gameState.players.map((p) => p.id));
@@ -1211,12 +1226,12 @@ export class PropHunt3DScene {
       this.yaw -= e.movementX * sensitivity;
       this.pitch -= e.movementY * sensitivity;
 
-      if (this.myRole === 'SEEKER') {
+      if (this.myRole === 'SEEKER' || this.myRole === 'SPECTATOR') {
         // 1st person FPS pitch
-        this.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.pitch));
+        this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch));
       } else {
-        // 3rd person orbit camera pitch
-        this.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.pitch));
+        // 3rd person orbit camera pitch: clamp to prevent underground clipping & gimbal lock
+        this.pitch = Math.max(-0.35, Math.min(1.15, this.pitch));
       }
     });
   }
@@ -1290,6 +1305,11 @@ export class PropHunt3DScene {
         this.position.x += deltaMoveX;
         this.position.z += deltaMoveZ;
       }
+    }
+
+    if (!isSpectator) {
+      // Unstuck resolution run unconditionally EVERY frame so player is NEVER stuck in a collider
+      this.resolveCollisionsAndUnstuck(playerRadius, playerHeight);
     }
 
     // ─── 2. VERTICAL PHYSICS / GRAVITY / JUMPING ────────────────────────────
@@ -1372,18 +1392,12 @@ export class PropHunt3DScene {
     }
 
     // ─── 4. CAMERA POSITIONING & VIEW MODE ──────────────────────────────────
-    if (isHunter) {
-      // 🎯 1ST PERSON FPS VIEW FOR HUNTER
+    if (isHunter || isSpectator) {
+      // 🎯 1ST PERSON FPS VIEW FOR HUNTER & SPECTATOR (Uses Quaternions to prevent roll)
       this.camera.position.set(this.position.x, this.position.y + 1.6, this.position.z);
-      this.camera.rotation.set(0, 0, 0);
-      this.camera.rotation.y = this.yaw;
-      this.camera.rotation.x = this.pitch;
-    } else if (isSpectator) {
-      // 👻 FREE SPECTATOR CAMERA
-      this.camera.position.set(this.position.x, this.position.y + 1.6, this.position.z);
-      this.camera.rotation.set(0, 0, 0);
-      this.camera.rotation.y = this.yaw;
-      this.camera.rotation.x = this.pitch;
+      const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
+      const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), this.pitch);
+      this.camera.quaternion.copy(qYaw).multiply(qPitch);
     } else {
       // 🎭 3RD PERSON ORBITAL FOLLOW CAMERA FOR PROP
       const targetLookAt = new THREE.Vector3(
@@ -1401,7 +1415,7 @@ export class PropHunt3DScene {
       let actualCamY = idealCamY;
       let actualCamZ = idealCamZ;
 
-      // Simple Raycast to avoid camera clipping through colliders
+      // Raycast to avoid camera clipping through colliders
       const origin = targetLookAt.clone();
       const dest = new THREE.Vector3(idealCamX, idealCamY, idealCamZ);
       const dir = dest.clone().sub(origin);
@@ -1412,19 +1426,19 @@ export class PropHunt3DScene {
 
       let hitDistance = dist;
       for (const col of this.colliders) {
-          const hit = camRay.ray.intersectBox(col, new THREE.Vector3());
-          if (hit) {
-              const d = origin.distanceTo(hit);
-              if (d < hitDistance) {
-                  hitDistance = Math.max(0, d - 0.2); // keep a little distance from wall, clamped to 0
-              }
+        const hit = camRay.ray.intersectBox(col, new THREE.Vector3());
+        if (hit) {
+          const d = origin.distanceTo(hit);
+          if (d < hitDistance) {
+            hitDistance = Math.max(0.8, d - 0.2); // keep min 0.8m distance from target
           }
+        }
       }
 
       if (hitDistance < dist) {
-          actualCamX = origin.x + dir.x * hitDistance;
-          actualCamY = origin.y + dir.y * hitDistance;
-          actualCamZ = origin.z + dir.z * hitDistance;
+        actualCamX = origin.x + dir.x * hitDistance;
+        actualCamY = origin.y + dir.y * hitDistance;
+        actualCamZ = origin.z + dir.z * hitDistance;
       }
 
       // Keep camera inside room and above floor
@@ -1433,6 +1447,7 @@ export class PropHunt3DScene {
         Math.max(0.3, Math.min(7.5, actualCamY)),
         Math.max(-24.2, Math.min(24.2, actualCamZ))
       );
+      this.camera.up.set(0, 1, 0);
       this.camera.lookAt(targetLookAt);
     }
 

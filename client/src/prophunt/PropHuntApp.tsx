@@ -29,6 +29,8 @@ export default function PropHuntApp() {
 
   // Local cooldown tracking
   const [dashCooldown, setDashCooldown] = useState(0);
+  const dashCooldownRef = useRef(0);
+  dashCooldownRef.current = dashCooldown;
   const [changePropCooldown, setChangePropCooldown] = useState(0);
   const [ammoStatus, setAmmoStatus] = useState({ hasAmmo: true, isReloading: false, reloadProgress: 1 });
   const [hitmarker, setHitmarker] = useState(false);
@@ -78,6 +80,9 @@ export default function PropHuntApp() {
 
     s.on('prophunt:dashCooldown', (sec: number) => {
       setDashCooldown(sec);
+      if (sec > 0 && engineRef.current) {
+        engineRef.current.triggerDash();
+      }
     });
 
     s.on('prophunt:changePropCooldown', (sec: number) => {
@@ -88,6 +93,9 @@ export default function PropHuntApp() {
       if (res.hit) {
         setHitmarker(true);
         setTimeout(() => setHitmarker(false), 200);
+      }
+      if (res.hunterDamageTaken > 0) {
+        // Hunter took damage
       }
     });
 
@@ -101,11 +109,11 @@ export default function PropHuntApp() {
     };
   }, []);
 
-  // Cooldown countdown timers
+  // Periodic cooldown ticker
   useEffect(() => {
     const interval = setInterval(() => {
-      setDashCooldown((prev) => Math.max(0, prev - 1));
-      setChangePropCooldown((prev) => Math.max(0, prev - 1));
+      setDashCooldown(prev => Math.max(0, prev - 1));
+      setChangePropCooldown(prev => Math.max(0, prev - 1));
       if (engineRef.current) {
         setAmmoStatus(engineRef.current.getAmmoStatus());
       }
@@ -122,6 +130,9 @@ export default function PropHuntApp() {
         socketRef.current?.emit('prophunt:shoot', { hitPlayerId });
       },
       onDash: () => {
+        if (dashCooldownRef.current === 0) {
+          engine.triggerDash();
+        }
         socketRef.current?.emit('prophunt:dash');
       },
       onChangeProp: () => {
@@ -143,6 +154,9 @@ export default function PropHuntApp() {
     }
     if (gameState?.selectedMap) {
       engine.buildMap(gameState.selectedMap);
+    }
+    if (gameState) {
+      engine.updateGameState(gameState);
     }
 
     engineRef.current = engine;
@@ -592,7 +606,15 @@ export default function PropHuntApp() {
               </div>
 
               {/* Ability 2: Dash (Shift, 5s cooldown) */}
-              <div className="flex flex-col items-center">
+              <div
+                className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform"
+                onClick={() => {
+                  if (dashCooldown === 0) {
+                    engineRef.current?.triggerDash();
+                    socketRef.current?.emit('prophunt:dash');
+                  }
+                }}
+              >
                 <div
                   className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center border font-bold text-xs ${
                     dashCooldown > 0

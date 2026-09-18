@@ -1306,6 +1306,7 @@ io.on('connection', (socket) => {
         if (!roomCode || !prophuntGames[roomCode])
             return;
         prophuntGames[roomCode].updatePlayerMovement(socket.id, position, rotation);
+        socket.to(roomCode).emit('prophunt:playerMoved', { id: socket.id, position, rotation });
     });
     socket.on('prophunt:dash', () => {
         const roomCode = socket.roomCode;
