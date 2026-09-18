@@ -87,6 +87,18 @@ class PropHuntModelLoader {
               const mesh = child as THREE.Mesh;
               mesh.castShadow = true;
               mesh.receiveShadow = true;
+              if (mesh.material) {
+                const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+                mats.forEach((m) => {
+                  const stdMat = m as THREE.MeshStandardMaterial;
+                  if (stdMat.map) {
+                    stdMat.map.colorSpace = THREE.SRGBColorSpace;
+                    stdMat.map.needsUpdate = true;
+                  }
+                  stdMat.roughness = 0.6;
+                  stdMat.metalness = 0.1;
+                });
+              }
             }
           });
           this.cache.set(url, model);
