@@ -29,6 +29,7 @@ class PropHuntModelLoader {
     bread: { url: '/models/props/bread.glb', scale: 0.9 },
     bottle_ketchup: { url: '/models/props/bottle-ketchup.glb', scale: 0.4 },
     bottle_oil: { url: '/models/props/bottle-oil.glb', scale: 0.6 },
+    cardboard_box: { url: '/models/props/carton.glb', scale: 1.1 }, // ~65cm height box
     metal_shelf: { url: '/models/market/shelf-end.glb', scale: 3.8 }, // ~3.04m height
   };
 
@@ -115,24 +116,25 @@ class PropHuntModelLoader {
   }
 
   /**
-   * Strictly normalizes the pivot point of any model so its lowest vertex sits at y = 0.
+   * Strictly normalizes the pivot point of any model so its lowest vertex sits at y = 0,
+   * centered horizontally at (0, 0), and correctly scaled.
    */
   private createNormalizedClone(source: THREE.Group, scale: number = 1): THREE.Group {
     const clone = source.clone(true);
-    clone.scale.set(scale, scale, scale);
     clone.updateMatrixWorld(true);
 
     const box = new THREE.Box3().setFromObject(clone);
     const minY = box.min.y;
+    const centerX = (box.min.x + box.max.x) / 2;
+    const centerZ = (box.min.z + box.max.z) / 2;
+
+    // Shift unscaled clone so its base is at y = 0 and centered horizontally
+    clone.position.set(-centerX, -minY, -centerZ);
 
     const root = new THREE.Group();
-    const inner = new THREE.Group();
-    inner.position.y = -minY; // shift up so bottom is strictly at y=0
-
-    while (clone.children.length > 0) {
-      inner.add(clone.children[0]);
-    }
-    root.add(inner);
+    root.add(clone);
+    root.scale.set(scale, scale, scale);
+    root.updateMatrixWorld(true);
     return root;
   }
 

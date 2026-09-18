@@ -247,6 +247,7 @@ export class PropHunt3DScene {
     const mesh = modelLoader.getMarketFurniture(modelUrl, scale);
     mesh.position.set(x, 0, z);
     mesh.rotation.y = rotY;
+    mesh.updateMatrixWorld(true);
     this.mapEnvironmentGroup.add(mesh);
 
     const box = new THREE.Box3().setFromObject(mesh);
@@ -1029,8 +1030,17 @@ export class PropHunt3DScene {
 
     const isHunter = this.myRole === 'SEEKER';
     const isSpectator = this.myRole === 'SPECTATOR';
-    const playerRadius = isHunter ? 0.45 : 0.35;
-    const playerHeight = isHunter ? 1.8 : 0.6;
+    let playerRadius = isHunter ? 0.45 : 0.35;
+    let playerHeight = isHunter ? 1.8 : 0.6;
+    if (!isHunter && !isSpectator && this.myPlayerId && this.playerMeshes.has(this.myPlayerId)) {
+      const myMesh = this.playerMeshes.get(this.myPlayerId)!;
+      const b = new THREE.Box3().setFromObject(myMesh);
+      const size = b.getSize(new THREE.Vector3());
+      if (size.y > 0.05) {
+        playerHeight = Math.min(2.5, Math.max(0.2, size.y));
+        playerRadius = Math.min(0.8, Math.max(0.12, Math.max(size.x, size.z) / 2));
+      }
+    }
     let moveSpeed = isHunter ? 10 : 8;
     if (Date.now() < this.dashUntil) {
       moveSpeed = 20; // Dash speed boost
@@ -1178,13 +1188,14 @@ export class PropHunt3DScene {
       // 🎭 3RD PERSON ORBITAL FOLLOW CAMERA FOR PROP
       const targetLookAt = new THREE.Vector3(
         this.position.x,
-        this.position.y + 0.45,
+        this.position.y + playerHeight * 0.5,
         this.position.z
       );
 
-      const hDist = this.cameraDistance * Math.cos(this.pitch);
+      const dynamicCamDist = Math.max(1.8, Math.min(4.0, playerHeight * 1.5 + 1.0));
+      const hDist = dynamicCamDist * Math.cos(this.pitch);
       const idealCamX = this.position.x - Math.sin(this.yaw) * hDist;
-      const idealCamY = this.position.y + 0.45 + this.cameraDistance * Math.sin(this.pitch);
+      const idealCamY = this.position.y + playerHeight * 0.5 + dynamicCamDist * Math.sin(this.pitch);
       const idealCamZ = this.position.z - Math.cos(this.yaw) * hDist;
 
       let actualCamX = idealCamX;
