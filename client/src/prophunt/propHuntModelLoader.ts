@@ -22,14 +22,14 @@ class PropHuntModelLoader {
     apple: { url: '/models/props/apple.glb', scale: 0.5 }, // ~10cm
     apple_basket: { url: '/models/props/shopping-basket.glb', scale: 1.4 }, // ~35cm height, 49cm width
     shopping_cart: { url: '/models/props/shopping-cart.glb', scale: 2.6 }, // ~1.01m height (human waist), 1.25m length
-    cash_register: { url: '/models/props/cash-register.glb', scale: 2.2 }, // ~1.30m height
-    oil_drum: { url: '/models/props/barrel.glb', scale: 1.4 }, // ~0.95m height
-    barrel: { url: '/models/props/barrel.glb', scale: 1.4 }, // ~0.95m height
+    cash_register: { url: '/models/props/cash-register.glb', scale: 1.5 }, // ~0.89m height (standard table/counter height)
+    oil_drum: { url: '/models/props/barrel.glb', scale: 1.1 }, // ~0.75m height
+    barrel: { url: '/models/props/barrel.glb', scale: 1.1 }, // ~0.75m height
     burger: { url: '/models/props/burger.glb', scale: 0.8 },
     bread: { url: '/models/props/bread.glb', scale: 0.9 },
     bottle_ketchup: { url: '/models/props/bottle-ketchup.glb', scale: 0.4 },
     bottle_oil: { url: '/models/props/bottle-oil.glb', scale: 0.6 },
-    cardboard_box: { url: '/models/props/carton.glb', scale: 1.1 }, // ~65cm height box
+    cardboard_box: { url: '/models/props/carton.glb', scale: 0.9 }, // ~0.54m height (jumpable box)
     metal_shelf: { url: '/models/market/shelf-end.glb', scale: 3.8 }, // ~3.04m height
   };
 

@@ -360,18 +360,19 @@ export class PropHuntEngine {
     playerId: string,
     position: [number, number, number],
     rotation: [number, number, number]
-  ) {
+  ): boolean {
     const player = this.players.find(p => p.id === playerId);
-    if (!player) return;
+    if (!player) return false;
     if (player.role === 'SPECTATOR') {
       player.position = position;
       player.rotation = rotation;
-      return;
+      return true;
     }
-    if (player.isFrozen) return;
+    if (player.isFrozen) return false;
 
     player.position = position;
     player.rotation = rotation;
+    return true;
   }
 
   public dash(playerId: string): { success: boolean; cooldownRemaining?: number } {

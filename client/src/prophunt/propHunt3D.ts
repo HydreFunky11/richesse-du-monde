@@ -27,6 +27,7 @@ export class PropHunt3DScene {
   private currentPhase: string = 'LOBBY';
   private isPointerLocked: boolean = false;
   private isFrozen: boolean = false;
+  private propFacingYaw: number = 0;
   private dashUntil: number = 0;
 
   // Camera & Orbit settings
@@ -139,7 +140,7 @@ export class PropHunt3DScene {
     const maxX = x + radius;
     const minZ = z - radius;
     const maxZ = z + radius;
-    const minY = y;
+    const minY = y + 0.35; // Step-up tolerance for curbs, pallets, and jumping onto low obstacles
     const maxY = y + height;
 
     // Check static colliders (walls, environment)
@@ -303,14 +304,14 @@ export class PropHunt3DScene {
       this.addFurniturePiece(modelLoader.MARKET_MODELS.shelfEnd, aisleX, 6.5, Math.PI, 3.8);
     });
 
-    // ─── 2. CHECKOUT COUNTERS (CAISSES - 1.42m high, 2.04m wide) ─────
-    const checkout1 = this.addFurniturePiece(modelLoader.MARKET_MODELS.cashRegister, -8, -16, 0, 2.4);
-    const checkout2 = this.addFurniturePiece(modelLoader.MARKET_MODELS.cashRegister, 4, -16, 0, 2.4);
+    // ─── 2. CHECKOUT COUNTERS (CAISSES - 0.89m high, 1.28m wide) ─────
+    const checkout1 = this.addFurniturePiece(modelLoader.MARKET_MODELS.cashRegister, -8, -16, 0, 1.5);
+    const checkout2 = this.addFurniturePiece(modelLoader.MARKET_MODELS.cashRegister, 4, -16, 0, 1.5);
 
-    // Guide Fences around checkouts (1.0m high)
-    this.addFurniturePiece(modelLoader.MARKET_MODELS.fence, -11.5, -16, 0, 2.6);
-    this.addFurniturePiece(modelLoader.MARKET_MODELS.fence, 0.5, -16, 0, 2.6);
-    this.addFurniturePiece(modelLoader.MARKET_MODELS.fence, 7.5, -16, 0, 2.6);
+    // Guide Fences around checkouts (0.84m high)
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.fence, -11, -16, 0, 2.2);
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.fence, 1, -16, 0, 2.2);
+    this.addFurniturePiece(modelLoader.MARKET_MODELS.fence, 7, -16, 0, 2.2);
 
     // ─── 3. REFRIGERATED & FROZEN AISLE (3.15m high wall fridges) ────
     for (let x = -14; x <= 14; x += 7) {
@@ -805,6 +806,7 @@ export class PropHunt3DScene {
   public updateRemotePlayerMovement(playerId: string, position: [number, number, number], rotation: [number, number, number]) {
     const mesh = this.playerMeshes.get(playerId);
     if (mesh && mesh.userData) {
+      if (mesh.userData.isFrozen) return; // Ignore movement packets when prop is locked
       mesh.userData.targetPosition = new THREE.Vector3(position[0], position[1], position[2]);
 
       const pitch = mesh.userData.role === 'HIDER' ? 0 : rotation[0];
@@ -878,17 +880,14 @@ export class PropHunt3DScene {
       }
 
       if (!isMe) {
-        // mesh.position.set(player.position[0], player.position[1], player.position[2]);
-        // mesh.rotation.set(player.rotation[0], player.rotation[1], player.rotation[2]);
-
-        // Target values for lerp are stored in userData
+        mesh.userData.isFrozen = player.isFrozen;
         mesh.userData.targetPosition = new THREE.Vector3(player.position[0], player.position[1], player.position[2]);
 
         // Fix pitch tilt issue for HIDER
         const pitch = player.role === 'HIDER' ? 0 : player.rotation[0];
         mesh.userData.targetRotation = new THREE.Euler(pitch, player.rotation[1], player.rotation[2]);
 
-        if (!mesh.userData.hasInitializedPosition) {
+        if (!mesh.userData.hasInitializedPosition || player.isFrozen) {
            mesh.position.copy(mesh.userData.targetPosition);
            mesh.rotation.copy(mesh.userData.targetRotation);
            mesh.userData.hasInitializedPosition = true;
@@ -1114,7 +1113,7 @@ export class PropHunt3DScene {
           this.position.z - playerRadius < col.max.z
         ) {
           // If standing on or landing on top surface of collider
-          if (this.position.y >= col.max.y - 0.25 && col.max.y > groundY) {
+          if (this.position.y >= col.max.y - 0.45 && col.max.y > groundY) {
             groundY = col.max.y;
           }
         }
@@ -1130,9 +1129,9 @@ export class PropHunt3DScene {
 
       this.position.y = nextPosY;
 
-      // Jump (Space key)
+      // Jump (Space key) - snappy CS/GMod style jump
       if (this.keys['Space'] && this.isGrounded && canMove) {
-        this.verticalVelocity = 8.5;
+        this.verticalVelocity = 9.5;
         this.isGrounded = false;
       }
     } else {
@@ -1148,6 +1147,13 @@ export class PropHunt3DScene {
     // ─── LERP REMOTE PLAYER MESHES ──────────────────────────────────────────
     this.playerMeshes.forEach((mesh, id) => {
         if (id !== this.myPlayerId && mesh.userData.targetPosition) {
+             if (mesh.userData.isFrozen) {
+               // When locked/frozen, absolutely pin transform without any interpolation drift or spinning
+               mesh.position.copy(mesh.userData.targetPosition);
+               mesh.rotation.copy(mesh.userData.targetRotation);
+               return;
+             }
+
              mesh.position.lerp(mesh.userData.targetPosition, delta * 15);
 
              // Simple rotation slerp
@@ -1168,9 +1174,9 @@ export class PropHunt3DScene {
         myMesh.visible = !isSpectator;
         // If not frozen and moving, rotate prop to face direction of movement
         if (!this.isFrozen && inputVector.lengthSq() > 0) {
-          const targetAngle = Math.atan2(inputVector.x, inputVector.z);
-          myMesh.rotation.y = targetAngle;
+          this.propFacingYaw = Math.atan2(inputVector.x, inputVector.z);
         }
+        myMesh.rotation.y = this.propFacingYaw;
       } else {
         // Hunter 1st person mesh is hidden
         myMesh.visible = false;
@@ -1242,10 +1248,18 @@ export class PropHunt3DScene {
     const now = Date.now();
     if (now - this.lastMovementEmitTime > 50) {
       this.lastMovementEmitTime = now;
-      this.callbacks.onMovement?.(
-        [this.position.x, this.position.y, this.position.z],
-        [this.pitch, this.yaw, 0]
-      );
+
+      // When frozen as a prop, NEVER emit movement so prop remains 100% still and locked!
+      if (!this.isFrozen || isHunter || isSpectator) {
+        const emitRotation: [number, number, number] = isHunter || isSpectator
+          ? [this.pitch, this.yaw, 0]
+          : [0, this.propFacingYaw, 0];
+
+        this.callbacks.onMovement?.(
+          [this.position.x, this.position.y, this.position.z],
+          emitRotation
+        );
+      }
     }
   }
 

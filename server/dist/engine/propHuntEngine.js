@@ -321,16 +321,17 @@ class PropHuntEngine {
     updatePlayerMovement(playerId, position, rotation) {
         const player = this.players.find(p => p.id === playerId);
         if (!player)
-            return;
+            return false;
         if (player.role === 'SPECTATOR') {
             player.position = position;
             player.rotation = rotation;
-            return;
+            return true;
         }
         if (player.isFrozen)
-            return;
+            return false;
         player.position = position;
         player.rotation = rotation;
+        return true;
     }
     dash(playerId) {
         const player = this.players.find(p => p.id === playerId);
