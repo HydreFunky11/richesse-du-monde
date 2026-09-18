@@ -70,6 +70,12 @@ export default function PropHuntApp() {
       }
     });
 
+    s.on('prophunt:playerMoved', (data: { id: string; position: [number, number, number]; rotation: [number, number, number] }) => {
+      if (engineRef.current) {
+        engineRef.current.updateRemotePlayerMovement(data.id, data.position, data.rotation);
+      }
+    });
+
     s.on('prophunt:dashCooldown', (sec: number) => {
       setDashCooldown(sec);
     });
