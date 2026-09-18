@@ -199,10 +199,18 @@ export class PropHunt3DScene {
     return false;
   }
 
+    // Seeded PRNG for consistent map generation across clients
+  private seed: number = 1;
+  private random(): number {
+    const x = Math.sin(this.seed++) * 10000;
+    return x - Math.floor(x);
+  }
+
   // ─── MAP BUILDERS ────────────────────────────────────────────────────────────
 
   public buildMap(mapId: PropHuntMapId) {
     this.currentMapId = mapId;
+    this.seed = mapId.charCodeAt(0);
 
     // Reset previous environment and colliders
     while (this.mapEnvironmentGroup.children.length > 0) {
@@ -306,15 +314,46 @@ export class PropHunt3DScene {
     // Decoy props in superette
     this.spawnDecoyProp('soda_can', -8, 1.25, -16.2);
     this.spawnDecoyProp('soda_can', 4, 1.25, -16.2);
-    this.spawnDecoyProp('cereal_box', -10, 1.5, 4);
-    this.spawnDecoyProp('cereal_box', 0, 2.2, -2);
-    this.spawnDecoyProp('cereal_box', 10, 1.5, -4);
-    this.spawnDecoyProp('milk_carton', -16, 1.5, 23);
-    this.spawnDecoyProp('apple_basket', -16, 1.1, -4);
-    this.spawnDecoyProp('apple_basket', -16, 1.1, 6);
     this.spawnDecoyProp('cash_register', -6.5, 1.25, -16);
     this.spawnDecoyProp('cash_register', 5.5, 1.25, -16);
-    this.spawnDecoyProp('cardboard_box', -18, 0.5, 18);
+
+    // Soda cans scattered on checkouts
+    for (let i = 0; i < 5; i++) {
+        this.spawnDecoyProp('soda_can', -9 + this.random() * 2, 1.25, -16.2 + this.random() * 0.5);
+        this.spawnDecoyProp('soda_can', 3 + this.random() * 2, 1.25, -16.2 + this.random() * 0.5);
+    }
+
+    // Cereal boxes and milk cartons on shelves (aisles are at x: -10, 0, 10, z: -9 to 9)
+    [-10, 0, 10].forEach(x => {
+       for(let z = -8; z <= 8; z+=2) {
+           if (this.random() > 0.3) this.spawnDecoyProp('cereal_box', x - 0.8, 1.45, z);
+           if (this.random() > 0.3) this.spawnDecoyProp('cereal_box', x + 0.8, 1.45, z);
+           if (this.random() > 0.3) this.spawnDecoyProp('cereal_box', x - 0.8, 2.45, z);
+           if (this.random() > 0.3) this.spawnDecoyProp('cereal_box', x + 0.8, 2.45, z);
+
+           if (this.random() > 0.5) this.spawnDecoyProp('milk_carton', x - 0.8, 0.45, z + 0.5);
+           if (this.random() > 0.5) this.spawnDecoyProp('milk_carton', x + 0.8, 0.45, z + 0.5);
+       }
+    });
+
+    // Milk cartons near fridges (z=23)
+    for (let x = -16; x <= 16; x += 4) {
+       this.spawnDecoyProp('milk_carton', x + this.random(), 0.2, 21 + this.random());
+    }
+
+    // Apple baskets near fruit stands
+    this.spawnDecoyProp('apple_basket', -16, 1.1, -4);
+    this.spawnDecoyProp('apple_basket', -16, 1.1, 6);
+    for(let i=0; i<3; i++) {
+        this.spawnDecoyProp('apple_basket', -16 + this.random(), 1.1, -4 + this.random() * 2);
+        this.spawnDecoyProp('apple_basket', -16 + this.random(), 1.1, 6 + this.random() * 2);
+    }
+
+    // Stacks of cardboard boxes in corners
+    for(let i=0; i<8; i++) {
+        this.spawnDecoyProp('cardboard_box', -22 + this.random()*4, 0.5 + (i%3)*1.0, 22 - this.random()*4);
+        this.spawnDecoyProp('cardboard_box', 22 - this.random()*4, 0.5 + (i%3)*1.0, -22 + this.random()*4);
+    }
   }
 
   // 📦 MAP: WAREHOUSE (Entrepôt)
@@ -345,11 +384,28 @@ export class PropHunt3DScene {
     this.createShippingContainer(16, 18, 0xef4444);
     this.addBoxCollider([16, 2.25, 18], [5.2, 4.6, 10.2]);
 
-    // Decoy props
-    this.spawnDecoyProp('wooden_crate', -8, 0.6, 2);
-    this.spawnDecoyProp('wooden_crate', 6, 0.6, -8);
-    this.spawnDecoyProp('oil_drum', 18, 0.8, -10);
-    this.spawnDecoyProp('pallet', 0, 0.2, 12);
+    // Decoy props (Cluttered)
+    for (let i = 0; i < 15; i++) {
+      // Around left shipping container
+      this.spawnDecoyProp('wooden_crate', -18 + this.random() * 8 - 4, 0.6 + Math.floor(i%3)*1.2, 18 + this.random() * 8 - 4);
+      // Around right shipping container
+      this.spawnDecoyProp('oil_drum', 16 + this.random() * 6 - 3, 0.8, 18 + this.random() * 6 - 3);
+      if (i % 2 === 0) this.spawnDecoyProp('oil_drum', 16 + this.random() * 6 - 3, 2.4, 18 + this.random() * 6 - 3); // stacked drums
+    }
+
+    // Pallets and traffic cones around racks
+    [-14, 0, 14].forEach((rackX) => {
+        for(let z = -15; z <= 5; z+=5) {
+            this.spawnDecoyProp('pallet', rackX + (this.random() > 0.5 ? 2.5 : -2.5), 0.2, z);
+            if (this.random() > 0.5) this.spawnDecoyProp('cardboard_box', rackX + (this.random() > 0.5 ? 2.5 : -2.5), 0.5, z + 1);
+            if (this.random() > 0.7) this.spawnDecoyProp('traffic_cone', rackX + (this.random() > 0.5 ? 3 : -3), 0.4, z - 1);
+        }
+    });
+
+    // Random wooden crates scattered
+    for(let i=0; i<10; i++) {
+        this.spawnDecoyProp('wooden_crate', -20 + this.random() * 40, 0.6, -20 + this.random() * 10);
+    }
   }
 
   // 🏢 MAP: OFFICE (Open Space)
@@ -378,9 +434,27 @@ export class PropHunt3DScene {
     this.spawnDecoyProp('water_cooler', -20, 1.1, -18);
     this.addBoxCollider([-20, 1.1, -18], [1.0, 2.2, 1.0]);
 
-    this.spawnDecoyProp('office_chair', -12, 0.6, -6.5);
-    this.spawnDecoyProp('pc_monitor', 12, 1.3, 16);
-    this.spawnDecoyProp('plant', 20, 0.8, -20);
+    // More office chairs, monitors, and mugs at desks
+    [-12, 0, 12].forEach((x) => {
+      [-8, 4, 16].forEach((z) => {
+        this.spawnDecoyProp('office_chair', x, 0.6, z - 1.5); // Chair behind desk
+        this.spawnDecoyProp('pc_monitor', x - 0.5, 1.3, z + 0.2); // Monitor on desk
+        this.spawnDecoyProp('pc_monitor', x + 0.5, 1.3, z + 0.2); // Dual monitor
+        if (this.random() > 0.3) this.spawnDecoyProp('coffee_mug', x + 1, 1.35, z - 0.2);
+        if (this.random() > 0.5) this.spawnDecoyProp('trash_can', x + 1.2, 0.4, z - 1.2);
+      });
+    });
+
+    // Extra scattered chairs
+    for(let i=0; i<5; i++) {
+        this.spawnDecoyProp('office_chair', -15 + this.random()*30, 0.6, -15 + this.random()*30);
+    }
+
+    // Plants in corners and along walls
+    [[-22, -22], [-22, 22], [22, -22], [22, 22], [-10, -22], [10, -22]].forEach(pos => {
+        this.spawnDecoyProp('plant', pos[0], 0.8, pos[1]);
+        if (this.random() > 0.5) this.spawnDecoyProp('water_cooler', pos[0] + 2, 1.1, pos[1]);
+    });
   }
 
   // 🧪 MAP: LAB (Laboratoire Sci-Fi)
@@ -410,8 +484,30 @@ export class PropHunt3DScene {
       this.addBoxCollider([x, 2.25, -22], [2.2, 4.6, 1.8]);
     }
 
-    this.spawnDecoyProp('hazard_barrel', 14, 0.8, -10);
-    this.spawnDecoyProp('chemical_canister', -8, 0.5, 12);
+    // Lab Clutter
+    // Clusters of hazard barrels
+    for (let i = 0; i < 8; i++) {
+        this.spawnDecoyProp('hazard_barrel', 14 + this.random()*4, 0.8, -10 + this.random()*4);
+        this.spawnDecoyProp('hazard_barrel', -14 + this.random()*4, 0.8, 10 + this.random()*4);
+    }
+
+    // Chemical canisters around cryo pods
+    [-10, 0, 10].forEach((x) => {
+        for(let i=0; i<3; i++) {
+           this.spawnDecoyProp('chemical_canister', x - 2 + this.random()*4, 0.5, -2 + this.random()*4);
+        }
+    });
+
+    // Microscopes and canisters on random tables/floor
+    for (let i=0; i<10; i++) {
+        this.spawnDecoyProp('microscope', -20 + this.random()*40, 0.6, -10 + this.random()*20);
+        this.spawnDecoyProp('chemical_canister', -20 + this.random()*40, 0.5, -10 + this.random()*20);
+    }
+
+    // More server racks randomly placed
+    for(let i=0; i<5; i++) {
+        this.spawnDecoyProp('server_rack', -20 + this.random()*40, 2.25, -10 + this.random()*15);
+    }
   }
 
   // ─── ENVIRONMENT HELPERS ───────────────────────────────────────────────────
@@ -469,7 +565,7 @@ export class PropHunt3DScene {
         const cereal = new THREE.Mesh(
           new THREE.BoxGeometry(0.35, 0.6, 0.2),
           new THREE.MeshStandardMaterial({
-            color: [0xef4444, 0x3b82f6, 0x10b981, 0xf59e0b][Math.floor(Math.random() * 4)]
+            color: [0xef4444, 0x3b82f6, 0x10b981, 0xf59e0b][Math.floor(this.random() * 4)]
           })
         );
         cereal.position.set(-0.6, y + 0.3, sz);
@@ -791,7 +887,7 @@ export class PropHunt3DScene {
   private spawnDecoyProp(propId: string, x: number, y: number, z: number) {
     const mesh = this.buildPropMesh(propId);
     mesh.position.set(x, y, z);
-    mesh.rotation.y = Math.random() * Math.PI * 2;
+    mesh.rotation.y = this.random() * Math.PI * 2;
     mesh.userData = { isDecoy: true, propId };
     this.mapEnvironmentGroup.add(mesh);
     this.staticDecoyMeshes.push(mesh);
