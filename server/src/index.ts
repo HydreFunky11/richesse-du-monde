@@ -17,6 +17,7 @@ import { MobaEngine } from './engine/mobaEngine';
 import { NoteEngine } from './engine/noteEngine';
 import { PropHuntEngine } from './engine/propHuntEngine';
 import { HellGambleEngine } from './engine/hellGambleEngine';
+import { RacingEngine } from './engine/racingEngine';
 import { ChampionId, SpellKey } from './types/moba';
 import fs from 'fs';
 import path from 'path';
@@ -83,6 +84,7 @@ const mobaGames: { [roomCode: string]: MobaEngine } = {};
 const noteGames: { [roomCode: string]: NoteEngine } = {};
 const prophuntGames: { [roomCode: string]: PropHuntEngine } = {};
 const hellgambleGames: { [roomCode: string]: HellGambleEngine } = {};
+const racingGames: { [roomCode: string]: RacingEngine } = {};
 const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
 
 function broadcastNoteState(roomCode: string, game: NoteEngine) {
@@ -107,11 +109,12 @@ io.on('connection', (socket) => {
 
   socket.on('joinGame', ({ username, roomCode, gameType }: { username: string, roomCode: string, gameType?: string }) => {
     const formattedRoomCode = roomCode.toUpperCase().trim();
-    const validTypes = ['uno', 'chaos', 'loveletter', 'discretos', 'skyjo', 'kingoftokyo', 'mayhem', 'clash', 'sumo', 'rts', 'moba', 'note', 'prophunt', 'hellgamble'];
+    const validTypes = ['uno', 'chaos', 'loveletter', 'discretos', 'skyjo', 'kingoftokyo', 'mayhem', 'clash', 'sumo', 'rts', 'moba', 'note', 'prophunt', 'hellgamble', 'racing'];
     let type = 'richesse';
     if (gameType === 'dungeonmayhem') type = 'mayhem';
     else if (gameType === 'hideseek') type = 'prophunt';
     else if (gameType === 'caseclash' || gameType === 'gamble') type = 'hellgamble';
+    else if (gameType === 'course' || gameType === 'race') type = 'racing';
     else if (gameType && validTypes.includes(gameType)) type = gameType;
     (socket as any).gameType = type;
 
@@ -355,6 +358,25 @@ io.on('connection', (socket) => {
       socket.emit('hellgambleStateUpdate', game.getState());
       io.to(formattedRoomCode).emit('hellgambleStateUpdate', game.getState());
       console.log(`[HELLGAMBLE LOBBY] ${username} a rejoint le casino ${formattedRoomCode}`);
+    } else if (type === 'racing') {
+      if (!racingGames[formattedRoomCode] || racingGames[formattedRoomCode].getState().status === 'FINISHED' || racingGames[formattedRoomCode].getPlayers().length === 0) {
+        racingGames[formattedRoomCode] = new RacingEngine(formattedRoomCode, (state) => {
+          io.to(formattedRoomCode).emit('racingStateUpdate', state);
+        });
+      }
+      const game = racingGames[formattedRoomCode];
+      const color = PLAYER_COLORS[game.getPlayers().length] || '#6B7280';
+      const success = game.addPlayer(socket.id, username, color);
+      if (success) {
+        socket.join(formattedRoomCode);
+        (socket as any).roomCode = formattedRoomCode;
+        (socket as any).username = username;
+        socket.emit('racingStateUpdate', game.getState());
+        io.to(formattedRoomCode).emit('racingStateUpdate', game.getState());
+        console.log(`[RACING LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+      } else {
+        socket.emit('error', 'Impossible de rejoindre le salon Course (partie commencée ou salon plein).');
+      }
     } else {
       if (!games[formattedRoomCode] || games[formattedRoomCode].getStatus() === 'FINISHED' || games[formattedRoomCode].getPlayers().length === 0 || games[formattedRoomCode].getPlayers().every(p => p.isBankrupt)) {
         games[formattedRoomCode] = new GameEngine(formattedRoomCode);
@@ -1445,6 +1467,58 @@ io.on('connection', (socket) => {
     socket.emit('hellgamble:tradeUpResult', result);
   });
 
+  // ===================== RACING EVENTS =====================
+  socket.on('racing:startDrawing', () => {
+    const roomCode = (socket as any).roomCode;
+    const game = racingGames[roomCode];
+    if (!game) return;
+    if (game.getState().hostId !== socket.id) return;
+    game.startDrawing();
+    io.to(roomCode).emit('racingStateUpdate', game.getState());
+  });
+
+  socket.on('racing:setTrack', ({ points, laps }: { points: { x: number; z: number }[], laps: number }) => {
+    const roomCode = (socket as any).roomCode;
+    const game = racingGames[roomCode];
+    if (!game) return;
+    if (game.getState().hostId !== socket.id) return; // only host can set track
+    game.setTrack(points, laps);
+    io.to(roomCode).emit('racingStateUpdate', game.getState());
+  });
+
+  socket.on('racing:selectVehicle', ({ vehicle }: { vehicle: string }) => {
+    const roomCode = (socket as any).roomCode;
+    const game = racingGames[roomCode];
+    if (!game) return;
+    game.selectVehicle(socket.id, vehicle as any);
+    io.to(roomCode).emit('racingStateUpdate', game.getState());
+  });
+
+  socket.on('racing:startRace', () => {
+    const roomCode = (socket as any).roomCode;
+    const game = racingGames[roomCode];
+    if (!game) return;
+    if (game.getState().hostId !== socket.id) return;
+    game.startRace();
+    io.to(roomCode).emit('racingStateUpdate', game.getState());
+  });
+
+  socket.on('racing:input', ({ throttle, steer }: { throttle: number; steer: number }) => {
+    const roomCode = (socket as any).roomCode;
+    const game = racingGames[roomCode];
+    if (!game) return;
+    game.setInput(socket.id, throttle, steer);
+  });
+
+  socket.on('racing:reset', () => {
+    const roomCode = (socket as any).roomCode;
+    const game = racingGames[roomCode];
+    if (!game) return;
+    if (game.getState().hostId !== socket.id) return;
+    game.resetToLobby();
+    io.to(roomCode).emit('racingStateUpdate', game.getState());
+  });
+
   // ─── Disconnect ────────────────────────────────────────────────────────────
 
   socket.on('disconnect', () => {
@@ -1559,6 +1633,16 @@ io.on('connection', (socket) => {
       console.log(`[HELLGAMBLE] Déconnexion de ${username} du casino ${roomCode}`);
       if (game.getPlayers().length === 0) {
         delete hellgambleGames[roomCode];
+      }
+    } else if (gameType === 'racing' && roomCode && racingGames[roomCode]) {
+      const game = racingGames[roomCode];
+      game.removePlayer(socket.id);
+      console.log(`[RACING] Déconnexion de ${username} du salon ${roomCode}`);
+      if (game.getPlayers().length === 0) {
+        game.destroy();
+        delete racingGames[roomCode];
+      } else {
+        io.to(roomCode).emit('racingStateUpdate', game.getState());
       }
     } else if (gameType === 'chaos' && roomCode && chaosGames[roomCode]) {
       const game = chaosGames[roomCode];

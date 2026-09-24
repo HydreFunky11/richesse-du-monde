@@ -20,6 +20,20 @@ interface GameTheme {
 
 const GAMES: GameTheme[] = [
   {
+    emoji: '🏁',
+    title: 'Course Libre',
+    subtitle: 'Dessine ton Circuit • F1, NASCAR, Moto, Twingo',
+    description: 'Le host dessine son propre circuit à la main ! Chaque joueur choisit son véhicule (F1 ultra-rapide, NASCAR, Moto, ou Twingo), puis c\'est parti pour une course multijoueur en 3D avec caméra derrière le bolide !',
+    route: '/racing',
+    fontClass: 'font-display font-black tracking-wide',
+    cardTheme: 'bg-gradient-to-b from-red-950/90 via-slate-950 to-orange-950/50',
+    borderTheme: 'border-red-500/60 hover:border-yellow-300 hover:shadow-red-900/70',
+    titleGradient: 'from-red-400 via-orange-400 to-yellow-400',
+    badge: 'COURSE 3D MULTIJOUEUR 🏎️',
+    badgeStyle: 'bg-red-950 text-red-300 border-red-500/50',
+    players: '2 à 8 Joueurs (Multijoueur En Ligne)',
+  },
+  {
     emoji: '🎰',
     title: 'Hell Gamble : Case Clash',
     subtitle: 'Simulateur Hellcase & Case Battles • Faux Cash',

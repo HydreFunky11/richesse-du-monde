@@ -18,6 +18,7 @@ import PixelGunApp from './pixelgun/PixelGunApp';
 import NoteApp from './note/NoteApp';
 import PropHuntApp from './prophunt/PropHuntApp';
 import { HellGambleApp } from './hellgamble/HellGambleApp';
+import RacingApp from './racing/RacingApp';
 
 export default function Router() {
   return (
@@ -50,6 +51,9 @@ export default function Router() {
       <Route path="/nexus" element={<RtsApp />} />
       <Route path="/moba" element={<MobaApp />} />
       <Route path="/nexusclash" element={<MobaApp />} />
+      <Route path="/racing" element={<RacingApp />} />
+      <Route path="/course" element={<RacingApp />} />
+      <Route path="/race" element={<RacingApp />} />
     </Routes>
   );
 }
