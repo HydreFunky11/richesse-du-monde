@@ -16,8 +16,7 @@ import { TradeUpView } from './TradeUpView';
 import { InventoryView } from './InventoryView';
 import { LeaderboardView } from './LeaderboardView';
 import { soundFx } from '../utils/audio';
-
-const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+import { SERVER_URL } from '../config/serverUrl';
 
 type ActiveTab = 'CASES' | 'BATTLES' | 'UPGRADER' | 'TRADEUP' | 'INVENTORY' | 'LEADERBOARD';
 

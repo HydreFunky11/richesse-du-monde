@@ -13,7 +13,7 @@ import { CHAMPIONS, MOBA_ITEMS } from './moba/mobaConstants';
 import { renderMoba } from './moba/mobaRenderer';
 import type { Camera, ClickFx } from './moba/mobaRenderer';
 
-const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+import { SERVER_URL } from './config/serverUrl';
 
 type ControlScheme = 'LOL_AZERTY' | 'LOL_QWERTY' | 'WASD_1234' | 'ZQSD_1234';
 

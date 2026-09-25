@@ -72,7 +72,7 @@ const RATING_DESCRIPTIONS = [
   { val: 10, label: 'Perfection divine 👑', color: 'text-amber-300', bg: 'bg-amber-900/80 border-amber-300 shadow-[0_0_15px_rgba(252,211,77,0.4)]' }
 ];
 
-const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+import { SERVER_URL } from '../config/serverUrl';
 
 export default function NoteApp() {
   const navigate = useNavigate();

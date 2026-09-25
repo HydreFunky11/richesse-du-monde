@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import { soundFx } from './utils/audio';
 
-const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+import { SERVER_URL } from './config/serverUrl';
 
 export type SumoPlayerSide = 'left' | 'right';
 export type SumoEventState = 'NORMAL' | 'FEINT' | 'TURBO' | 'SWITCH_WARNING';

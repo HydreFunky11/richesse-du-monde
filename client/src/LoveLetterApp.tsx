@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
 
-const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || 'http://localhost:3001';
+import { SERVER_URL } from './config/serverUrl';
 
 type LoveLetterCardType = 'GARDE' | 'PRETRE' | 'BARON' | 'SERVANTE' | 'PRINCE' | 'ROI' | 'COMTESSE' | 'PRINCESSE';
 

@@ -17,7 +17,7 @@ import type {
 import { RtsRenderer } from './rts/rtsRenderer';
 import type { Camera } from './rts/rtsRenderer';
 
-const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+import { SERVER_URL } from './config/serverUrl';
 
 export default function RtsApp() {
   const navigate = useNavigate();

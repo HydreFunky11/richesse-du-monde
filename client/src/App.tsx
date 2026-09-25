@@ -6,7 +6,7 @@ import { RESOURCE_DEFINITIONS, COUNTRY_CONTINENT_MAP } from './data/board';
 import { soundFx } from './utils/audio';
 import './App.css';
 
-const SERVER_URL = import.meta.env.VITE_WS_SERVER_URL || 'http://localhost:3001';
+import { SERVER_URL } from './config/serverUrl';
 
 
 export default function App() {

@@ -2,8 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import * as THREE from 'three';
-
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+import { SERVER_URL } from '../config/serverUrl';
 
 type VehicleType = 'f1' | 'nascar' | 'moto' | 'twingo';
 type GameStatus = 'LOBBY' | 'DRAWING' | 'VEHICLE_SELECT' | 'COUNTDOWN' | 'RACING' | 'FINISHED';
@@ -738,32 +737,90 @@ export default function RacingApp() {
   const navigate = useNavigate();
   const socketRef = useRef<Socket | null>(null);
   const [phase, setPhase] = useState<'join' | 'game'>('join');
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(() => localStorage.getItem('racing_username') || '');
   const [roomCode, setRoomCode] = useState('');
   const [myId, setMyId] = useState('');
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState('');
 
-  const joinGame = () => {
-    if (!username.trim() || !roomCode.trim()) return;
-    const socket = io(SERVER_URL);
-    socketRef.current = socket;
+  useEffect(() => {
+    const s = io(SERVER_URL, {
+      transports: ['websocket', 'polling'],
+      timeout: 60000,
+      reconnection: true,
+      reconnectionAttempts: 30,
+      reconnectionDelay: 1500,
+      reconnectionDelayMax: 5000,
+    });
+    socketRef.current = s;
 
-    socket.on('connect', () => {
-      setMyId(socket.id || '');
-      socket.emit('joinGame', {
-        username: username.trim(),
-        roomCode: roomCode.trim().toUpperCase(),
-        gameType: 'racing',
-      });
+    s.on('connect', () => {
+      console.log('[Racing] Connecté au serveur !', s.id);
+      setIsConnected(true);
+      setMyId(s.id || '');
+      setError('');
     });
 
-    socket.on('racingStateUpdate', (state: GameState) => {
+    s.on('disconnect', (reason) => {
+      console.log('[Racing] Déconnecté:', reason);
+      setIsConnected(false);
+      if (reason === 'io server disconnect') {
+        s.connect();
+      }
+    });
+
+    s.on('connect_error', (err) => {
+      console.error('[Racing] Erreur connexion:', err);
+      setIsConnected(false);
+      if (err.message.includes('timeout')) {
+        setError('Réveil du serveur Render en cours (~30-60s au premier chargement)... Reconnexion automatique...');
+      } else {
+        setError(`Connexion au serveur : ${err.message}. Nouvelle tentative...`);
+      }
+    });
+
+    s.on('racingStateUpdate', (state: GameState) => {
       setGameState(state);
-      setPhase('game');
+      if (s.id && state.players.some(p => p.id === s.id)) {
+        setPhase('game');
+        setError('');
+      }
     });
 
-    socket.on('error', (msg: string) => setError(msg));
+    s.on('error', (msg: string) => {
+      setError(msg);
+    });
+
+    return () => {
+      s.disconnect();
+    };
+  }, []);
+
+  const joinGame = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanUser = username.trim();
+    const cleanRoom = roomCode.trim().toUpperCase();
+    if (!cleanUser) {
+      setError('Veuillez entrer votre pseudo');
+      return;
+    }
+    if (!cleanRoom) {
+      setError('Veuillez entrer un code de salon');
+      return;
+    }
+    if (!socketRef.current?.connected) {
+      setError('Connexion au serveur en cours (réveil Render ~30s)... Veuillez patienter.');
+      return;
+    }
+
+    localStorage.setItem('racing_username', cleanUser);
+    setError('');
+    socketRef.current.emit('joinGame', {
+      username: cleanUser,
+      roomCode: cleanRoom,
+      gameType: 'racing',
+    });
   };
 
   const handleSetTrack = useCallback((points: TrackPoint[], laps: number) => {
@@ -789,44 +846,75 @@ export default function RacingApp() {
   // ─── Join screen ─────────────────────────────────────────────────────────
   if (phase === 'join') {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="w-full max-w-md p-8 bg-slate-900 rounded-2xl border border-slate-700">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="w-full max-w-md p-8 bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl">
           <button
             onClick={() => navigate('/')}
-            className="text-slate-400 hover:text-white text-sm mb-6 flex items-center gap-1"
+            className="text-slate-400 hover:text-white text-sm mb-6 flex items-center gap-1 transition-colors"
           >
             ← Accueil
           </button>
           <div className="text-5xl mb-3 text-center">🏁</div>
           <h1 className="text-3xl font-black text-white text-center mb-1">Course Libre</h1>
-          <p className="text-slate-400 text-center text-sm mb-8">
+          <p className="text-slate-400 text-center text-sm mb-4">
             Dessine ton circuit, choisis ton véhicule, fonce !
           </p>
+
+          {/* Server connection indicator */}
+          <div className="flex items-center justify-center gap-2 mb-6 text-xs font-bold">
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${
+                isConnected ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-amber-400 animate-ping'
+              }`}
+            />
+            <span className={isConnected ? 'text-emerald-400' : 'text-amber-300'}>
+              {isConnected ? 'Serveur en ligne' : 'Connexion au serveur... (hébergement Render)'}
+            </span>
+          </div>
+
           {error && (
             <div className="bg-red-900/50 border border-red-500 text-red-300 p-3 rounded-lg mb-4 text-sm">
               {error}
             </div>
           )}
-          <input
-            className="w-full bg-slate-800 border border-slate-600 text-white p-3 rounded-xl mb-3"
-            placeholder="Ton pseudo"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && joinGame()}
-          />
-          <input
-            className="w-full bg-slate-800 border border-slate-600 text-white p-3 rounded-xl mb-6 uppercase"
-            placeholder="Code du salon"
-            value={roomCode}
-            onChange={e => setRoomCode(e.target.value.toUpperCase())}
-            onKeyDown={e => e.key === 'Enter' && joinGame()}
-          />
-          <button
-            onClick={joinGame}
-            className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold text-lg rounded-xl transition-colors"
-          >
-            Rejoindre / Créer une Course
-          </button>
+
+          <form onSubmit={joinGame} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                Votre Pseudo
+              </label>
+              <input
+                className="w-full bg-slate-800 border border-slate-600 text-white p-3 rounded-xl focus:border-red-500 focus:outline-none transition"
+                placeholder="Ex: MaxVerstappen"
+                maxLength={16}
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                Code du Salon
+              </label>
+              <input
+                className="w-full bg-slate-800 border border-slate-600 text-white p-3 rounded-xl uppercase font-mono focus:border-red-500 focus:outline-none transition"
+                placeholder="Ex: CIRCUIT1"
+                maxLength={10}
+                value={roomCode}
+                onChange={e => setRoomCode(e.target.value.toUpperCase())}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={!isConnected}
+              className={`w-full py-4 font-bold text-lg rounded-xl transition-all shadow-xl cursor-pointer ${
+                isConnected
+                  ? 'bg-red-600 hover:bg-red-500 text-white shadow-red-600/30'
+                  : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-80'
+              }`}
+            >
+              {isConnected ? 'Rejoindre / Créer une Course 🏁' : 'Connexion au serveur en cours... ⏳'}
+            </button>
+          </form>
         </div>
       </div>
     );

@@ -3,13 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import type { ChaosGameState, ChaosCell, ChaosDuelState } from './chaos/chaosTypes';
 
-// Use production websocket url or origin, never localhost on deployed domains
-const SERVER_URL =
-  import.meta.env.VITE_WS_SERVER_URL ||
-  import.meta.env.VITE_SERVER_URL ||
-  (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-    ? 'https://richesse-du-monde-server.onrender.com'
-    : 'http://localhost:3001');
+import { SERVER_URL } from './config/serverUrl';
 
 const RULE_SUGGESTIONS = [
   "Invoquer un Dragon Ancestral (3 ATK) sur le plateau !",

@@ -11,13 +11,7 @@ import {
 } from './propHuntTypes';
 import { propAudio } from './propHuntAudio';
 import { modelLoader } from './propHuntModelLoader';
-
-const SERVER_URL =
-  import.meta.env.VITE_WS_SERVER_URL ||
-  import.meta.env.VITE_SERVER_URL ||
-  (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-    ? 'https://richesse-du-monde-server.onrender.com'
-    : 'http://localhost:3001');
+import { SERVER_URL } from '../config/serverUrl';
 
 export default function PropHuntApp() {
   const navigate = useNavigate();
