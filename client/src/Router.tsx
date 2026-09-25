@@ -1,4 +1,5 @@
-import { Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import HomePage from './HomePage';
 import App from './App';
 import UnoApp from './UnoApp';
@@ -20,9 +21,33 @@ import PropHuntApp from './prophunt/PropHuntApp';
 import { HellGambleApp } from './hellgamble/HellGambleApp';
 import RacingApp from './racing/RacingApp';
 
+function ReloadRedirectHandler() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    try {
+      const navEntries = performance.getEntriesByType('navigation');
+      const isReload =
+        navEntries.length > 0
+          ? (navEntries[0] as PerformanceNavigationTiming).type === 'reload'
+          : (window.performance as any)?.navigation?.type === 1;
+
+      if (isReload && window.location.pathname !== '/') {
+        navigate('/', { replace: true });
+      }
+    } catch {
+      // ignore
+    }
+  }, [navigate]);
+
+  return null;
+}
+
 export default function Router() {
   return (
-    <Routes>
+    <>
+      <ReloadRedirectHandler />
+      <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/hellgamble" element={<HellGambleApp />} />
       <Route path="/caseclash" element={<HellGambleApp />} />
@@ -54,6 +79,8 @@ export default function Router() {
       <Route path="/racing" element={<RacingApp />} />
       <Route path="/course" element={<RacingApp />} />
       <Route path="/race" element={<RacingApp />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 }
