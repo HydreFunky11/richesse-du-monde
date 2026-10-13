@@ -20,6 +20,20 @@ interface GameTheme {
 
 const GAMES: GameTheme[] = [
   {
+    emoji: '💣',
+    title: 'Time Bomb',
+    subtitle: 'Démineurs vs Terroristes • Cartes 52 & Bluff',
+    description: 'Le jeu culte d\'ambiance et de déduction ! Démineurs (Rois Rouges) contre Terroristes (Rois Noirs) : coupez les fils avec la pince coupante, bluffez autour de la table pour guider ou piéger vos amis, trouvez les désamorçages (As & Dames) et évitez à tout prix le Valet de Pique ♠️ !',
+    route: '/timebomb',
+    fontClass: 'font-display font-black tracking-wide',
+    cardTheme: 'bg-gradient-to-b from-rose-950/90 via-slate-950 to-amber-950/50',
+    borderTheme: 'border-rose-500/60 hover:border-amber-300 hover:shadow-rose-900/70',
+    titleGradient: 'from-rose-400 via-red-400 to-amber-400',
+    badge: 'BLUFF & DÉDUCTION 💣',
+    badgeStyle: 'bg-rose-950 text-rose-300 border-rose-500/50',
+    players: '3 à 8 Joueurs (Solo Bots ou En Ligne)',
+  },
+  {
     emoji: '🎰',
     title: 'Hell Gamble : Case Clash',
     subtitle: 'Simulateur Hellcase & Case Battles • Faux Cash',

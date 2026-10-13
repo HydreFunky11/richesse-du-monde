@@ -20,6 +20,7 @@ import NoteApp from './note/NoteApp';
 import PropHuntApp from './prophunt/PropHuntApp';
 import { HellGambleApp } from './hellgamble/HellGambleApp';
 import RacingApp from './racing/RacingApp';
+import TimeBombApp from './timebomb/TimeBombApp';
 
 function ReloadRedirectHandler() {
   const navigate = useNavigate();
@@ -79,6 +80,9 @@ export default function Router() {
       <Route path="/racing" element={<RacingApp />} />
       <Route path="/course" element={<RacingApp />} />
       <Route path="/race" element={<RacingApp />} />
+      <Route path="/timebomb" element={<TimeBombApp />} />
+      <Route path="/bomb" element={<TimeBombApp />} />
+      <Route path="/time-bomb" element={<TimeBombApp />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     </>

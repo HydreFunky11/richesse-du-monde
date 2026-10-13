@@ -18,6 +18,7 @@ import { NoteEngine } from './engine/noteEngine';
 import { PropHuntEngine } from './engine/propHuntEngine';
 import { HellGambleEngine } from './engine/hellGambleEngine';
 import { RacingEngine } from './engine/racingEngine';
+import { TimeBombEngine } from './engine/timebombEngine';
 import { ChampionId, SpellKey } from './types/moba';
 import fs from 'fs';
 import path from 'path';
@@ -85,7 +86,19 @@ const noteGames: { [roomCode: string]: NoteEngine } = {};
 const prophuntGames: { [roomCode: string]: PropHuntEngine } = {};
 const hellgambleGames: { [roomCode: string]: HellGambleEngine } = {};
 const racingGames: { [roomCode: string]: RacingEngine } = {};
+const timebombGames: { [roomCode: string]: TimeBombEngine } = {};
 const PLAYER_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
+
+function broadcastTimebombState(roomCode: string, game: TimeBombEngine) {
+  const roomSockets = io.sockets.adapter.rooms.get(roomCode);
+  if (roomSockets) {
+    for (const sid of roomSockets) {
+      io.to(sid).emit('timebombStateUpdate', game.getState(sid));
+    }
+  } else {
+    io.to(roomCode).emit('timebombStateUpdate', game.getState());
+  }
+}
 
 function broadcastNoteState(roomCode: string, game: NoteEngine) {
   const roomSockets = io.sockets.adapter.rooms.get(roomCode);
@@ -109,12 +122,13 @@ io.on('connection', (socket) => {
 
   socket.on('joinGame', ({ username, roomCode, gameType }: { username: string, roomCode: string, gameType?: string }) => {
     const formattedRoomCode = roomCode.toUpperCase().trim();
-    const validTypes = ['uno', 'chaos', 'loveletter', 'discretos', 'skyjo', 'kingoftokyo', 'mayhem', 'clash', 'sumo', 'rts', 'moba', 'note', 'prophunt', 'hellgamble', 'racing'];
+    const validTypes = ['uno', 'chaos', 'loveletter', 'discretos', 'skyjo', 'kingoftokyo', 'mayhem', 'clash', 'sumo', 'rts', 'moba', 'note', 'prophunt', 'hellgamble', 'racing', 'timebomb'];
     let type = 'richesse';
     if (gameType === 'dungeonmayhem') type = 'mayhem';
     else if (gameType === 'hideseek') type = 'prophunt';
     else if (gameType === 'caseclash' || gameType === 'gamble') type = 'hellgamble';
     else if (gameType === 'course' || gameType === 'race') type = 'racing';
+    else if (gameType === 'time_bomb' || gameType === 'bomb') type = 'timebomb';
     else if (gameType && validTypes.includes(gameType)) type = gameType;
     (socket as any).gameType = type;
 
@@ -376,6 +390,24 @@ io.on('connection', (socket) => {
         console.log(`[RACING LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
       } else {
         socket.emit('error', 'Impossible de rejoindre le salon Course (partie commencée ou salon plein).');
+      }
+    } else if (type === 'timebomb') {
+      if (!timebombGames[formattedRoomCode] || timebombGames[formattedRoomCode].getState().status === 'FINISHED' || timebombGames[formattedRoomCode].getPlayers().length === 0) {
+        timebombGames[formattedRoomCode] = new TimeBombEngine(formattedRoomCode, () => {
+          broadcastTimebombState(formattedRoomCode, timebombGames[formattedRoomCode]);
+        });
+      }
+      const game = timebombGames[formattedRoomCode];
+      const color = PLAYER_COLORS[game.getPlayers().length % PLAYER_COLORS.length] || '#6B7280';
+      const success = game.addPlayer(socket.id, username, color);
+      if (success) {
+        socket.join(formattedRoomCode);
+        (socket as any).roomCode = formattedRoomCode;
+        (socket as any).username = username;
+        broadcastTimebombState(formattedRoomCode, game);
+        console.log(`[TIMEBOMB LOBBY] ${username} a rejoint le salon ${formattedRoomCode}`);
+      } else {
+        socket.emit('error', 'Impossible de rejoindre le salon Time Bomb (partie en cours ou salon plein).');
       }
     } else {
       if (!games[formattedRoomCode] || games[formattedRoomCode].getStatus() === 'FINISHED' || games[formattedRoomCode].getPlayers().length === 0 || games[formattedRoomCode].getPlayers().every(p => p.isBankrupt)) {
@@ -1519,6 +1551,67 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('racingStateUpdate', game.getState());
   });
 
+  // ─── Time Bomb Events ──────────────────────────────────────────────────────
+
+  socket.on('timebomb:startGame', () => {
+    const roomCode = (socket as any).roomCode;
+    const game = timebombGames[roomCode];
+    if (!game) return;
+    const success = game.startGame();
+    if (!success) {
+      socket.emit('error', 'Il faut entre 3 et 8 joueurs pour lancer Time Bomb (ajoutez des Bots si besoin).');
+    }
+  });
+
+  socket.on('timebomb:cutWire', ({ targetId, cardIndex }: { targetId: string; cardIndex: number }) => {
+    const roomCode = (socket as any).roomCode;
+    const game = timebombGames[roomCode];
+    if (!game) return;
+    game.cutWire(socket.id, targetId, cardIndex);
+  });
+
+  socket.on('timebomb:setVariant', ({ variant }: { variant: any }) => {
+    const roomCode = (socket as any).roomCode;
+    const game = timebombGames[roomCode];
+    if (!game) return;
+    game.setVariant(variant);
+  });
+
+  socket.on('timebomb:addBot', () => {
+    const roomCode = (socket as any).roomCode;
+    const game = timebombGames[roomCode];
+    if (!game) return;
+    game.addBot();
+  });
+
+  socket.on('timebomb:removeBot', ({ botId }: { botId: string }) => {
+    const roomCode = (socket as any).roomCode;
+    const game = timebombGames[roomCode];
+    if (!game) return;
+    game.removeBot(botId);
+  });
+
+  socket.on('timebomb:announce', (announcement: { claimedDefuses?: number; claimsBomb?: boolean; text?: string }) => {
+    const roomCode = (socket as any).roomCode;
+    const game = timebombGames[roomCode];
+    if (!game) return;
+    game.setAnnouncement(socket.id, announcement);
+  });
+
+  socket.on('timebomb:chat', ({ text }: { text: string }) => {
+    const roomCode = (socket as any).roomCode;
+    const game = timebombGames[roomCode];
+    if (!game) return;
+    game.addMessage(socket.id, text);
+  });
+
+  socket.on('timebomb:restart', () => {
+    const roomCode = (socket as any).roomCode;
+    const game = timebombGames[roomCode];
+    if (!game) return;
+    game.restartGame();
+  });
+
   // ─── Disconnect ────────────────────────────────────────────────────────────
 
   socket.on('disconnect', () => {
@@ -1643,6 +1736,16 @@ io.on('connection', (socket) => {
         delete racingGames[roomCode];
       } else {
         io.to(roomCode).emit('racingStateUpdate', game.getState());
+      }
+    } else if (gameType === 'timebomb' && roomCode && timebombGames[roomCode]) {
+      const game = timebombGames[roomCode];
+      game.removePlayer(socket.id);
+      console.log(`[TIMEBOMB] Déconnexion de ${username} du salon ${roomCode}`);
+      if (game.getPlayers().length === 0) {
+        game.destroy();
+        delete timebombGames[roomCode];
+      } else {
+        broadcastTimebombState(roomCode, game);
       }
     } else if (gameType === 'chaos' && roomCode && chaosGames[roomCode]) {
       const game = chaosGames[roomCode];
