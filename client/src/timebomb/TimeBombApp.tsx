@@ -73,23 +73,19 @@ export default function TimeBombApp() {
   const handleJoin = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const cleanUser = username.trim();
-    const cleanRoom = roomCodeInput.trim().toUpperCase();
+    let cleanRoom = roomCodeInput.trim().toUpperCase();
     if (!cleanUser) {
       setErrorMsg('Veuillez entrer un pseudo.');
       return;
     }
     if (!cleanRoom) {
-      setErrorMsg('Veuillez entrer un code de salon.');
-      return;
-    }
-    if (!socketRef.current?.connected) {
-      setErrorMsg('Connexion au serveur en cours... Veuillez patienter.');
-      return;
+      cleanRoom = `BOMB${Math.floor(100 + Math.random() * 900)}`;
+      setRoomCodeInput(cleanRoom);
     }
 
     localStorage.setItem('timebomb_username', cleanUser);
     setErrorMsg('');
-    socketRef.current.emit('joinGame', {
+    socketRef.current?.emit('joinGame', {
       username: cleanUser,
       roomCode: cleanRoom,
       gameType: 'timebomb',
@@ -210,30 +206,33 @@ export default function TimeBombApp() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                  Code du Salon
-                </label>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    Code du Salon
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setRoomCodeInput(`BOMB${Math.floor(100 + Math.random() * 900)}`)}
+                    className="text-[11px] text-rose-400 hover:text-rose-300 font-bold cursor-pointer"
+                  >
+                    🎲 Générer un code
+                  </button>
+                </div>
                 <input
                   type="text"
                   maxLength={10}
-                  required
                   value={roomCodeInput}
                   onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
-                  placeholder="Ex: BOMB42"
+                  placeholder="Laisser vide pour créer (ou ex: BOMB42)"
                   className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono uppercase focus:border-rose-500 focus:outline-none transition text-sm"
                 />
               </div>
 
               <button
                 type="submit"
-                disabled={!isConnected}
-                className={`w-full py-4 mt-2 font-black rounded-xl text-base uppercase tracking-wider transition shadow-xl cursor-pointer ${
-                  isConnected
-                    ? 'bg-gradient-to-r from-rose-500 via-red-600 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-white shadow-rose-600/30'
-                    : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
-                }`}
+                className="w-full py-4 mt-2 font-black rounded-xl text-base uppercase tracking-wider transition shadow-xl cursor-pointer bg-gradient-to-r from-rose-500 via-red-600 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-white shadow-rose-600/30 active:scale-[0.98]"
               >
-                {isConnected ? 'Rejoindre ou Créer le Salon 💣' : 'Connexion en cours... ⏳'}
+                Rejoindre ou Créer le Salon 💣
               </button>
             </form>
 
