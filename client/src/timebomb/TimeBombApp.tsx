@@ -541,8 +541,8 @@ export default function TimeBombApp() {
                     ⚪ {mySecret.roundKnowledge.neutrals} Neutres
                   </span>
                 </div>
-                <div className="text-slate-500 italic text-[11px] sm:text-xs">
-                  * Vos cartes sont disposées face cachée dans un ordre aléatoire que vous ignorez.
+                <div className="text-slate-400 italic text-[11px] sm:text-xs">
+                  * Vos cartes en main sont visibles sur votre profil ci-dessous. Les autres joueurs les voient face cachée.
                 </div>
               </div>
             )}
@@ -613,6 +613,8 @@ export default function TimeBombApp() {
                 className={`bg-slate-900/80 border rounded-2xl p-4 sm:p-5 transition-all shadow-lg flex flex-col justify-between ${
                   hasCutter
                     ? 'border-amber-400 ring-2 ring-amber-400/20 shadow-amber-900/20'
+                    : isMe
+                    ? 'border-indigo-500/70 ring-2 ring-indigo-500/20 shadow-indigo-950/40'
                     : canCutHere
                     ? 'border-emerald-500/70 hover:border-emerald-400'
                     : 'border-slate-800'
@@ -631,7 +633,11 @@ export default function TimeBombApp() {
                       <div>
                         <div className="font-bold text-base flex items-center gap-1.5">
                           <span>{player.username}</span>
-                          {isMe && <span className="text-[10px] text-rose-400 font-bold">(VOUS)</span>}
+                          {isMe && (
+                            <span className="px-2 py-0.5 bg-indigo-950 border border-indigo-500/50 text-indigo-300 font-black text-[10px] rounded-full uppercase tracking-wider">
+                              (VOUS)
+                            </span>
+                          )}
                         </div>
                         <div className="text-xs text-slate-400">
                           {player.cardCount} carte(s) restante(s)
@@ -662,12 +668,48 @@ export default function TimeBombApp() {
                       const isCut = card.isCut;
                       const cardType = card.type;
 
-                      if (isCut || isFinished) {
-                        // REVEALED CARD
-                        let bgStyle = 'bg-slate-800 border-slate-700 text-slate-300';
+                      // 1. CARTE COUPÉE (Révélée pour tout le monde)
+                      if (isCut) {
+                        let bgStyle = 'bg-slate-800/80 border-slate-700 text-slate-400 opacity-75';
                         let icon = '⚪';
                         if (cardType === 'BOMB') {
                           bgStyle = 'bg-rose-950 border-rose-500 text-rose-200 shadow-[0_0_16px_#f43f5e] animate-bounce';
+                          icon = '💣';
+                        } else if (cardType === 'DEFUSE') {
+                          bgStyle = 'bg-emerald-950 border-emerald-400 text-emerald-200 shadow-[0_0_14px_#10b981]';
+                          icon = '✂️';
+                        }
+
+                        return (
+                          <div
+                            key={card.id}
+                            className={`w-16 h-24 sm:w-20 sm:h-28 rounded-xl border-2 flex flex-col items-center justify-between p-1.5 sm:p-2 text-xs font-bold transition transform shadow-md relative ${bgStyle}`}
+                          >
+                            <div className="w-full flex items-center justify-between text-[10px] leading-none">
+                              <span className="font-mono text-slate-400 font-bold">#{cIdx + 1}</span>
+                              <span className="text-[9px] bg-red-950 border border-red-500/60 text-red-300 px-1 rounded font-black">
+                                COUPÉ ✂️
+                              </span>
+                            </div>
+                            <span className="text-xl sm:text-2xl my-auto">{icon}</span>
+                            <div className="w-full text-center">
+                              <div className="text-xs sm:text-sm leading-tight font-mono font-black">
+                                {card.value}{card.suit}
+                              </div>
+                              <div className="text-[8px] sm:text-[9px] uppercase tracking-wider opacity-85 font-black">
+                                {cardType === 'BOMB' ? 'BOMBE' : cardType === 'DEFUSE' ? 'DÉSAM.' : 'NEUTRE'}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // 2. PARTIE TERMINÉE : TOUT LE MONDE EST RÉVÉLÉ
+                      if (isFinished) {
+                        let bgStyle = 'bg-slate-800 border-slate-700 text-slate-300';
+                        let icon = '⚪';
+                        if (cardType === 'BOMB') {
+                          bgStyle = 'bg-rose-950 border-rose-500 text-rose-200 shadow-[0_0_16px_#f43f5e]';
                           icon = '💣';
                         } else if (cardType === 'DEFUSE') {
                           bgStyle = 'bg-emerald-950 border-emerald-400 text-emerald-200 shadow-[0_0_14px_#10b981]';
@@ -683,14 +725,55 @@ export default function TimeBombApp() {
                             <span className="text-xs sm:text-sm text-center leading-tight font-mono font-black">
                               {card.value}{card.suit}
                             </span>
-                            <span className="text-[9px] sm:text-[10px] uppercase tracking-wider opacity-85 font-black">
+                            <span className="text-[8px] sm:text-[9px] uppercase tracking-wider opacity-85 font-black">
                               {cardType === 'BOMB' ? 'BOMBE' : cardType === 'DEFUSE' ? 'DÉSAM.' : 'NEUTRE'}
                             </span>
                           </div>
                         );
                       }
 
-                      // FACE DOWN CARD
+                      // 3. VOS PROPRES CARTES EN MAIN (NON COUPÉES) : VISIBLES PAR VOUS UNIQUEMENT
+                      if (isMe) {
+                        let bgStyle = 'bg-slate-900 border-slate-700 text-slate-200';
+                        let icon = '⚪';
+                        let badgeColor = 'bg-slate-800 text-slate-300 border-slate-700';
+                        let typeText = 'NEUTRE';
+
+                        if (cardType === 'BOMB') {
+                          bgStyle = 'bg-gradient-to-b from-rose-950 via-slate-900 to-rose-950/80 border-rose-500 text-rose-200 ring-1 ring-rose-500/50 shadow-md shadow-rose-950/40';
+                          icon = '💣';
+                          badgeColor = 'bg-rose-950 text-rose-300 border-rose-500/60';
+                          typeText = 'BOMBE';
+                        } else if (cardType === 'DEFUSE') {
+                          bgStyle = 'bg-gradient-to-b from-emerald-950 via-slate-900 to-emerald-950/80 border-emerald-500 text-emerald-200 ring-1 ring-emerald-500/50 shadow-md shadow-emerald-950/40';
+                          icon = '✂️';
+                          badgeColor = 'bg-emerald-950 text-emerald-300 border-emerald-500/60';
+                          typeText = 'DÉSAM.';
+                        }
+
+                        return (
+                          <div
+                            key={card.id}
+                            className={`w-16 h-24 sm:w-20 sm:h-28 rounded-xl border-2 flex flex-col items-center justify-between p-1.5 sm:p-2 text-xs font-bold transition transform shadow-md relative ${bgStyle}`}
+                            title={`Votre carte en main #${cIdx + 1} : ${card.label || typeText}`}
+                          >
+                            <div className="w-full flex items-center justify-between text-[10px] leading-none opacity-85">
+                              <span className="font-mono text-slate-400 font-bold">#{cIdx + 1}</span>
+                              <span className="text-base sm:text-lg">{icon}</span>
+                            </div>
+                            <div className="text-sm sm:text-base text-center leading-tight font-mono font-black my-auto">
+                              {card.value}{card.suit}
+                            </div>
+                            <div className="w-full flex items-center justify-center">
+                              <span className={`text-[8px] sm:text-[9px] uppercase tracking-wider font-black px-1.5 py-0.5 rounded border ${badgeColor}`}>
+                                {typeText}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // 4. CARTES DES AUTRES JOUEURS (FACE CACHÉE, CLIQUABLES SI PINCE ACTIVE)
                       return (
                         <button
                           key={card.id}
@@ -715,7 +798,12 @@ export default function TimeBombApp() {
                   </div>
                 </div>
 
-                {/* Helper prompt when player is clickable */}
+                {/* Helper prompt when player is clickable or own hand */}
+                {isMe && (
+                  <div className="mt-2 text-center text-xs text-indigo-300/80 font-medium italic">
+                    👀 Vos cartes en main (visibles uniquement par vous)
+                  </div>
+                )}
                 {canCutHere && (
                   <div className="mt-2 text-center text-xs sm:text-sm font-bold text-emerald-400 animate-pulse">
                     👉 Cliquez sur une carte pour couper ce fil !

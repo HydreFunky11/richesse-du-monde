@@ -542,10 +542,10 @@ class TimeBombEngine {
             cards: p.cards.map(c => ({
                 id: c.id,
                 isCut: c.isCut,
-                type: c.isCut || isFinished ? c.type : undefined,
-                label: c.isCut || isFinished ? c.label : undefined,
-                suit: c.isCut || isFinished ? c.suit : undefined,
-                value: c.isCut || isFinished ? c.value : undefined,
+                type: c.isCut || isFinished || p.id === socketId ? c.type : undefined,
+                label: c.isCut || isFinished || p.id === socketId ? c.label : undefined,
+                suit: c.isCut || isFinished || p.id === socketId ? c.suit : undefined,
+                value: c.isCut || isFinished || p.id === socketId ? c.value : undefined,
             })),
         }));
         return {
