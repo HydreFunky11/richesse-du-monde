@@ -117,11 +117,6 @@ export default function TimeBombApp() {
     socketRef.current?.emit('timebomb:removeBot', { botId });
   };
 
-  const handleSendAnnouncement = (claimedDefuses?: number, claimsBomb?: boolean, text?: string) => {
-    soundFx.click();
-    socketRef.current?.emit('timebomb:announce', { claimedDefuses, claimsBomb, text });
-  };
-
   const handleSendChat = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
@@ -364,10 +359,10 @@ export default function TimeBombApp() {
                 </h3>
                 <div className="space-y-2">
                   {[
-                    { id: 'STANDARD' as TimeBombVariant, label: 'Standard', desc: '1 Bombe, Désamorçages = Joueurs' },
+                    { id: 'STANDARD' as TimeBombVariant, label: 'Standard', desc: '1 Bombe, Désamorçages = Nombre de joueurs' },
+                    { id: 'DEBUTANT' as TimeBombVariant, label: '✂️ Débutant', desc: '-1 Désamorçage requis (plus facile pour les Démineurs)' },
+                    { id: 'EXPERT' as TimeBombVariant, label: '⏱️ Expert', desc: '+1 Désamorçage requis (plus difficile pour les Démineurs)' },
                     { id: 'MORT_SUBITE' as TimeBombVariant, label: '💣 Mort Subite', desc: '2 Bombes (Valet ♠️ + Valet ♣️)' },
-                    { id: 'DEBUTANT' as TimeBombVariant, label: '✂️ Débutant', desc: '+1 Désamorçage de sécurité' },
-                    { id: 'EXPERT' as TimeBombVariant, label: '⏱️ Expert', desc: '-1 Désamorçage (zéro erreur)' },
                   ].map((v) => (
                     <button
                       key={v.id}
@@ -660,21 +655,6 @@ export default function TimeBombApp() {
                     </div>
                   </div>
 
-                  {/* Player Announcement Banner */}
-                  {player.announcement && (
-                    <div className="mb-3 px-3 py-1.5 bg-slate-950/70 border border-slate-800 rounded-xl text-xs sm:text-sm flex items-center justify-between text-slate-300">
-                      <span>
-                        {player.announcement.claimedDefuses !== undefined && (
-                          <span className="text-emerald-400 font-bold mr-2">
-                            ✂️ {player.announcement.claimedDefuses} Désam.
-                          </span>
-                        )}
-                        {player.announcement.claimsBomb && (
-                          <span className="text-rose-400 font-bold">💣 Prétend avoir la Bombe</span>
-                        )}
-                      </span>
-                    </div>
-                  )}
 
                   {/* Cards Row in front of this player */}
                   <div className="flex flex-wrap gap-2.5 sm:gap-3 py-3 items-center">
@@ -746,70 +726,65 @@ export default function TimeBombApp() {
           })}
         </div>
 
-        {/* Bluffing Actions & Chat Panel */}
+        {/* Cuts History & Room Chat */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
-          {/* Quick Bluff Actions (left) */}
-          <div className="lg:col-span-5 xl:col-span-4 bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+          {/* Cuts history feed (left) */}
+          <div className="lg:col-span-5 xl:col-span-4 bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between h-80 sm:h-96">
             <div>
-              <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">
-                🗣️ Bluff & Annonces Rapides
-              </h3>
-              <p className="text-xs text-slate-400 mb-3">
-                Vous avez le droit de mentir librement pour orienter le porteur de la pince !
-              </p>
-
-              <div className="grid grid-cols-2 gap-2.5 text-xs sm:text-sm">
-                <button
-                  onClick={() => handleSendAnnouncement(1, false, "J'ai 1 Désamorçage garanti ✂️ venez couper chez moi !")}
-                  className="p-3 bg-slate-950 hover:bg-slate-800 border border-emerald-500/40 text-emerald-300 rounded-xl font-bold cursor-pointer transition text-left"
-                >
-                  ✂️ J'ai 1 Désam.
-                </button>
-                <button
-                  onClick={() => handleSendAnnouncement(2, false, "J'ai 2 Désamorçages ✂️✂️ foncez !")}
-                  className="p-3 bg-slate-950 hover:bg-slate-800 border border-emerald-500/40 text-emerald-300 rounded-xl font-bold cursor-pointer transition text-left"
-                >
-                  ✂️✂️ J'ai 2 Désam.
-                </button>
-                <button
-                  onClick={() => handleSendAnnouncement(0, true, "⚠️ ATTENTION j'ai la Bombe, ne venez surtout pas !")}
-                  className="p-3 bg-slate-950 hover:bg-slate-800 border border-rose-500/40 text-rose-300 rounded-xl font-bold cursor-pointer transition text-left"
-                >
-                  💣 J'ai la Bombe !
-                </button>
-                <button
-                  onClick={() => handleSendAnnouncement(0, false, "Je n'ai que des fils neutres ⚪ rien d'intéressant.")}
-                  className="p-3 bg-slate-950 hover:bg-slate-800 border border-slate-700 text-slate-300 rounded-xl font-bold cursor-pointer transition text-left"
-                >
-                  ⚪ Tout est neutre
-                </button>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                  <span>📜 Historique des Coupes</span>
+                </h3>
+                <span className="text-[11px] text-slate-500 font-mono">
+                  {gameState.history.length} coupure(s)
+                </span>
               </div>
+              <p className="text-xs text-slate-400 mb-2">
+                🗣️ Les annonces et bluffs se font directement à l'oral autour de la table !
+              </p>
             </div>
 
-            {/* Cuts history feed */}
-            <div className="mt-5 pt-3 border-t border-slate-800">
-              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                Dernières Coupes
-              </div>
-              <div className="max-h-36 overflow-y-auto space-y-1.5 text-xs">
-                {gameState.history.slice(0, 6).map((h, i) => (
-                  <div key={i} className="text-slate-400 flex items-center justify-between text-xs">
-                    <span>
-                      {h.cutterName} ➔ {h.targetName}
-                    </span>
-                    <span className={h.cardType === 'DEFUSE' ? 'text-emerald-400 font-bold' : h.cardType === 'BOMB' ? 'text-rose-400 font-bold' : 'text-slate-500'}>
+            <div className="flex-1 overflow-y-auto space-y-2 p-3 bg-slate-950/70 rounded-xl border border-slate-800 text-xs sm:text-sm my-2">
+              {gameState.history.length === 0 ? (
+                <div className="text-slate-500 italic text-center py-12 text-xs">
+                  Aucun fil coupé pour l'instant.
+                </div>
+              ) : (
+                gameState.history.map((h, i) => (
+                  <div
+                    key={i}
+                    className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800/80 flex items-center justify-between text-xs sm:text-sm"
+                  >
+                    <div className="text-slate-300">
+                      <span className="font-bold text-white">{h.cutterName}</span>
+                      <span className="text-slate-500 mx-1.5">➔</span>
+                      <span className="font-bold text-slate-200">{h.targetName}</span>
+                    </div>
+                    <span
+                      className={`font-black font-mono px-2 py-0.5 rounded text-xs ${
+                        h.cardType === 'DEFUSE'
+                          ? 'bg-emerald-950 border border-emerald-500/40 text-emerald-300'
+                          : h.cardType === 'BOMB'
+                          ? 'bg-rose-950 border border-rose-500/40 text-rose-300 animate-pulse'
+                          : 'bg-slate-800 text-slate-300'
+                      }`}
+                    >
                       {h.cardLabel}
                     </span>
                   </div>
-                ))}
-              </div>
+                ))
+              )}
+            </div>
+
+            <div className="text-[11px] text-slate-500 text-center italic">
+              Tournez la pince coupante après chaque fil coupé.
             </div>
           </div>
 
           {/* Room Live Chat (right) */}
           <div className="lg:col-span-7 xl:col-span-8 bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between h-80 sm:h-96">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-              💬 Débat autour de la table
+              💬 Débat & Notes autour de la table
             </h3>
 
             <div className="flex-1 overflow-y-auto space-y-2 p-3 bg-slate-950/70 rounded-xl border border-slate-800 text-xs sm:text-sm mb-3">
@@ -822,8 +797,8 @@ export default function TimeBombApp() {
                 </div>
               ))}
               {gameState.messages.length === 0 && (
-                <div className="text-slate-500 italic text-center py-10">
-                  Aucun message pour l'instant. Discutez et bluffez !
+                <div className="text-slate-500 italic text-center py-12 text-xs">
+                  Aucun message écrit. Discutez à l'oral ou tapez vos remarques ici !
                 </div>
               )}
             </div>
@@ -833,7 +808,7 @@ export default function TimeBombApp() {
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Bluffez, accusez ou conseillez le coupeur..."
+                placeholder="Discutez, accusez ou notez des indices..."
                 maxLength={140}
                 className="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs sm:text-sm focus:border-rose-500 focus:outline-none"
               />

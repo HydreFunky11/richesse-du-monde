@@ -190,8 +190,8 @@ export class TimeBombEngine {
     this.totalBombsInGame = this.variant === 'MORT_SUBITE' ? 2 : 1;
 
     let defuses = n;
-    if (this.variant === 'DEBUTANT') defuses = n + 1;
-    else if (this.variant === 'EXPERT') defuses = Math.max(1, n - 1);
+    if (this.variant === 'DEBUTANT') defuses = Math.max(1, n - 1);
+    else if (this.variant === 'EXPERT') defuses = n + 1;
 
     this.totalDefusesNeeded = defuses;
     this.defusesFound = 0;
